@@ -101,14 +101,14 @@ impl SqliteHookHistoryStorage {
         };
 
         // Serialize tags as JSON array
-        let tags_json = serde_json::to_string(&execution.tags)
-            .context("Failed to serialize tags")?;
+        let tags_json =
+            serde_json::to_string(&execution.tags).context("Failed to serialize tags")?;
 
         // Serialize result_data and metadata
         let result_json = serde_json::to_string(&execution.result_data)
             .context("Failed to serialize result_data")?;
-        let metadata_json = serde_json::to_string(&execution.metadata)
-            .context("Failed to serialize metadata")?;
+        let metadata_json =
+            serde_json::to_string(&execution.metadata).context("Failed to serialize metadata")?;
 
         // Insert execution
         conn.execute(
@@ -134,7 +134,11 @@ impl SqliteHookHistoryStorage {
                 libsql::Value::Text(tags_json),
                 libsql::Value::Integer(execution.retention_priority as i64),
                 libsql::Value::Integer(execution.context_size as i64),
-                libsql::Value::Integer(if execution.contains_sensitive_data { 1 } else { 0 }),
+                libsql::Value::Integer(if execution.contains_sensitive_data {
+                    1
+                } else {
+                    0
+                }),
                 libsql::Value::Text(metadata_json),
             ],
         )
@@ -381,25 +385,30 @@ impl SqliteHookHistoryStorage {
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to query statistics: {}", e)))?;
 
-        let (total_executions, storage_size_bytes, oldest_execution, newest_execution, avg_duration_ms) =
-            if let Some(row) = rows
-                .next()
-                .await
-                .map_err(|e| SqliteError::Query(format!("Failed to fetch stats: {}", e)))?
-            {
-                let total: i64 = row.get(0).unwrap_or(0);
-                let size: i64 = row.get(1).unwrap_or(0);
-                let oldest: Option<i64> = row.get::<i64>(2).ok();
-                let newest: Option<i64> = row.get::<i64>(3).ok();
-                let avg_dur: f64 = row.get(4).unwrap_or(0.0);
+        let (
+            total_executions,
+            storage_size_bytes,
+            oldest_execution,
+            newest_execution,
+            avg_duration_ms,
+        ) = if let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| SqliteError::Query(format!("Failed to fetch stats: {}", e)))?
+        {
+            let total: i64 = row.get(0).unwrap_or(0);
+            let size: i64 = row.get(1).unwrap_or(0);
+            let oldest: Option<i64> = row.get::<i64>(2).ok();
+            let newest: Option<i64> = row.get::<i64>(3).ok();
+            let avg_dur: f64 = row.get(4).unwrap_or(0.0);
 
-                let oldest_dt = oldest.map(|ts| Utc.timestamp_opt(ts, 0).unwrap());
-                let newest_dt = newest.map(|ts| Utc.timestamp_opt(ts, 0).unwrap());
+            let oldest_dt = oldest.map(|ts| Utc.timestamp_opt(ts, 0).unwrap());
+            let newest_dt = newest.map(|ts| Utc.timestamp_opt(ts, 0).unwrap());
 
-                (total as u64, size as u64, oldest_dt, newest_dt, avg_dur)
-            } else {
-                (0, 0, None, None, 0.0)
-            };
+            (total as u64, size as u64, oldest_dt, newest_dt, avg_dur)
+        } else {
+            (0, 0, None, None, 0.0)
+        };
 
         // Get executions by hook_id
         let mut executions_by_hook = HashMap::new();
@@ -459,20 +468,17 @@ impl SqliteHookHistoryStorage {
     }
 
     /// Convert SQLite row to SerializedHookExecution
-    fn execution_from_row(
-        &self,
-        row: &libsql::Row,
-    ) -> anyhow::Result<SerializedHookExecution> {
+    fn execution_from_row(&self, row: &libsql::Row) -> anyhow::Result<SerializedHookExecution> {
         let execution_id_str: String = row.get(0).context("Missing execution_id")?;
-        let execution_id = Uuid::parse_str(&execution_id_str)
-            .context("Failed to parse execution_id")?;
+        let execution_id =
+            Uuid::parse_str(&execution_id_str).context("Failed to parse execution_id")?;
 
         let hook_id: String = row.get(1).unwrap_or_default();
         let hook_type: String = row.get(2).unwrap_or_default();
 
         let correlation_id_str: String = row.get(3).context("Missing correlation_id")?;
-        let correlation_id = Uuid::parse_str(&correlation_id_str)
-            .context("Failed to parse correlation_id")?;
+        let correlation_id =
+            Uuid::parse_str(&correlation_id_str).context("Failed to parse correlation_id")?;
 
         // Decompress hook_context
         let compressed_context: Vec<u8> = row.get(4).unwrap_or_default();
@@ -484,8 +490,8 @@ impl SqliteHookHistoryStorage {
         };
 
         let result_json: String = row.get(5).unwrap_or_else(|_| "{}".to_string());
-        let result_data: Value = serde_json::from_str(&result_json)
-            .context("Failed to parse result_data")?;
+        let result_data: Value =
+            serde_json::from_str(&result_json).context("Failed to parse result_data")?;
 
         let timestamp_i64: i64 = row.get(6).unwrap_or(0);
         let timestamp = Utc.timestamp_opt(timestamp_i64, 0).unwrap();
@@ -499,8 +505,7 @@ impl SqliteHookHistoryStorage {
         let modified_operation = modified_operation_i64 != 0;
 
         let tags_json: String = row.get(11).unwrap_or_else(|_| "[]".to_string());
-        let tags: Vec<String> = serde_json::from_str(&tags_json)
-            .context("Failed to parse tags")?;
+        let tags: Vec<String> = serde_json::from_str(&tags_json).context("Failed to parse tags")?;
 
         let retention_priority: i64 = row.get(12).unwrap_or(0);
         let context_size: i64 = row.get(13).unwrap_or(0);
@@ -509,8 +514,8 @@ impl SqliteHookHistoryStorage {
         let contains_sensitive_data = contains_sensitive_data_i64 != 0;
 
         let metadata_json: String = row.get(15).unwrap_or_else(|_| "{}".to_string());
-        let metadata: Value = serde_json::from_str(&metadata_json)
-            .context("Failed to parse metadata")?;
+        let metadata: Value =
+            serde_json::from_str(&metadata_json).context("Failed to parse metadata")?;
 
         Ok(SerializedHookExecution {
             execution_id,

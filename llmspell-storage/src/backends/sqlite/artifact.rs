@@ -293,7 +293,7 @@ impl ArtifactStorage for SqliteArtifactStorage {
         // Return ArtifactId with the database artifact_id as content_hash
         // This allows delete_artifact to uniquely identify the artifact row
         Ok(ArtifactId::new(
-            artifact_id.clone(),  // Full database ID: "{session_id}:{sequence}:{content_hash}"
+            artifact_id.clone(), // Full database ID: "{session_id}:{sequence}:{content_hash}"
             artifact.artifact_id.session_id.clone(),
         ))
     }
@@ -313,7 +313,7 @@ impl ArtifactStorage for SqliteArtifactStorage {
                    AND a.artifact_id = ?2",
                 vec![
                     libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(artifact_id.content_hash.clone()),  // This is the database artifact_id
+                    libsql::Value::Text(artifact_id.content_hash.clone()), // This is the database artifact_id
                 ],
             )
             .await
@@ -381,7 +381,7 @@ impl ArtifactStorage for SqliteArtifactStorage {
                  WHERE tenant_id = ?1 AND artifact_id = ?2",
                 vec![
                     libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(artifact_id.content_hash.clone()),  // This is the database artifact_id
+                    libsql::Value::Text(artifact_id.content_hash.clone()), // This is the database artifact_id
                 ],
             )
             .await
@@ -406,7 +406,7 @@ impl ArtifactStorage for SqliteArtifactStorage {
                  WHERE tenant_id = ?1 AND artifact_id = ?2",
                 vec![
                     libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(artifact_id.content_hash.clone()),  // This is the database artifact_id
+                    libsql::Value::Text(artifact_id.content_hash.clone()), // This is the database artifact_id
                 ],
             )
             .await

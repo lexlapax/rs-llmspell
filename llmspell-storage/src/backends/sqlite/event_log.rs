@@ -117,8 +117,8 @@ impl SqliteEventLogStorage {
         };
 
         // Serialize full payload
-        let payload_json = serde_json::to_string(event_payload)
-            .context("Failed to serialize event payload")?;
+        let payload_json =
+            serde_json::to_string(event_payload).context("Failed to serialize event payload")?;
 
         // Insert event
         conn.execute(
@@ -169,8 +169,8 @@ impl SqliteEventLogStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to iterate events: {}", e)))?
         {
             let payload_json: String = row.get(0).context("Failed to get payload")?;
-            let event: Value = serde_json::from_str(&payload_json)
-                .context("Failed to deserialize event")?;
+            let event: Value =
+                serde_json::from_str(&payload_json).context("Failed to deserialize event")?;
             events.push(event);
         }
 
@@ -212,8 +212,8 @@ impl SqliteEventLogStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to iterate events: {}", e)))?
         {
             let payload_json: String = row.get(0).context("Failed to get payload")?;
-            let event: Value = serde_json::from_str(&payload_json)
-                .context("Failed to deserialize event")?;
+            let event: Value =
+                serde_json::from_str(&payload_json).context("Failed to deserialize event")?;
             events.push(event);
         }
 
@@ -221,7 +221,10 @@ impl SqliteEventLogStorage {
     }
 
     /// Retrieve events by correlation ID
-    pub async fn get_events_by_correlation_id(&self, correlation_id: Uuid) -> anyhow::Result<Vec<Value>> {
+    pub async fn get_events_by_correlation_id(
+        &self,
+        correlation_id: Uuid,
+    ) -> anyhow::Result<Vec<Value>> {
         let conn = self.backend.get_connection().await?;
         let tenant_id = self.tenant_id.clone();
 
@@ -249,8 +252,8 @@ impl SqliteEventLogStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to iterate events: {}", e)))?
         {
             let payload_json: String = row.get(0).context("Failed to get payload")?;
-            let event: Value = serde_json::from_str(&payload_json)
-                .context("Failed to deserialize event")?;
+            let event: Value =
+                serde_json::from_str(&payload_json).context("Failed to deserialize event")?;
             events.push(event);
         }
 
@@ -321,9 +324,7 @@ impl SqliteEventLogStorage {
                 vec![libsql::Value::Text(tenant_id)],
             )
             .await
-            .map_err(|e| {
-                SqliteError::Query(format!("Failed to get events by type: {}", e))
-            })?;
+            .map_err(|e| SqliteError::Query(format!("Failed to get events by type: {}", e)))?;
 
         let mut events_by_type = HashMap::new();
         while let Some(row) = rows
@@ -356,7 +357,8 @@ mod tests {
     use chrono::Duration;
     use serde_json::json;
 
-    async fn create_test_storage() -> (tempfile::TempDir, Arc<SqliteBackend>, SqliteEventLogStorage) {
+    async fn create_test_storage() -> (tempfile::TempDir, Arc<SqliteBackend>, SqliteEventLogStorage)
+    {
         let temp_dir = tempfile::tempdir().unwrap();
         let db_path = temp_dir.path().join("test.db");
         let config = SqliteConfig::new(db_path.to_str().unwrap());

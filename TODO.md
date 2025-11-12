@@ -3039,11 +3039,16 @@ Implementation: 8 GraphBackend methods, bi-temporal schema, tenant isolation, 7/
 - [ ] Configuration options for old backends removed
 - [ ] Zero compiler warnings, all tests passing after removal
 
-**Implementation Steps**:
+**Implementation Subtasks**:
 
-**PHASE 1: Graph Traversal Enhancement (Pre-Removal - Days 13-14, ~8 hours)**
+---
 
-0. **Enhance GraphBackend trait** (llmspell-graph/src/storage/mod.rs):
+#### Subtask 13c.2.8.1: Enhance GraphBackend trait with traverse() method ⏹ PENDING
+**Time**: 1 hour
+**Priority**: CRITICAL
+**Files**: `llmspell-graph/src/storage/mod.rs`
+
+**Task**: Add traverse() method to GraphBackend trait
    ```rust
    #[async_trait]
    pub trait GraphBackend: Send + Sync {
