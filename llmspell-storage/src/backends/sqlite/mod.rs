@@ -43,6 +43,7 @@ mod graph;
 mod kv_store;
 mod pool;
 mod procedural;
+mod session;
 mod vector;
 mod workflow_state;
 
@@ -55,5 +56,6 @@ pub use graph::SqliteGraphStorage;
 pub use kv_store::SqliteKVStorage;
 pub use pool::{PoolStats, SqlitePool};
 pub use procedural::{SqliteProceduralStorage, StoredPattern};
+pub use session::SqliteSessionStorage;
 pub use vector::SqliteVectorStorage;
 pub use workflow_state::SqliteWorkflowStateStorage;
