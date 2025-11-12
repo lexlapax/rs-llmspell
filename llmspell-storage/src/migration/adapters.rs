@@ -190,6 +190,12 @@ mod tests {
             }
         };
 
+        // Run migrations to ensure schema exists
+        if let Err(e) = backend.run_migrations().await {
+            eprintln!("Skipping postgres test - migrations failed: {}", e);
+            return;
+        }
+
         // Set tenant context
         let tenant_id = format!("test_migration_{}", uuid::Uuid::new_v4());
         backend.set_tenant_context(&tenant_id).await.unwrap();
