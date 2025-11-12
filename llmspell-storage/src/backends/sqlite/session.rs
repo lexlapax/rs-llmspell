@@ -322,7 +322,7 @@ impl SessionStorage for SqliteSessionStorage {
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to execute cleanup_expired: {}", e)))?;
 
-        Ok(rows_affected as usize)
+        Ok(rows_affected)
     }
 }
 
