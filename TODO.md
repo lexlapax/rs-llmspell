@@ -3023,7 +3023,7 @@ Implementation: 8 GraphBackend methods, bi-temporal schema, tenant isolation, 7/
 
 **Phase 1: Graph Traversal Enhancement (Pre-Removal)**:
 - [x] GraphBackend trait enhanced with traverse() method (llmspell-graph/src/storage/mod.rs)
-- [ ] KnowledgeGraph trait enhanced with traverse() method (llmspell-graph/src/traits/knowledge_graph.rs)
+- [x] KnowledgeGraph trait enhanced with traverse() method (llmspell-graph/src/traits/knowledge_graph.rs)
 - [ ] SqliteGraphStorage implements traverse() with recursive CTEs (llmspell-storage/src/backends/sqlite/graph.rs)
 - [ ] PostgresGraphStorage implements traverse() with recursive CTEs (llmspell-storage/src/backends/postgres/graph.rs)
 - [ ] SurrealDB backend implements traverse() for baseline comparison (llmspell-graph/src/storage/surrealdb.rs)
@@ -3073,7 +3073,7 @@ pub trait GraphBackend: Send + Sync {
 
 ---
 
-#### Subtask 13c.2.8.2: Enhance KnowledgeGraph trait with traverse() method ⏹ PENDING
+#### Subtask 13c.2.8.2: Enhance KnowledgeGraph trait with traverse() method ✅ COMPLETE
 **Time**: 30 min | **Priority**: CRITICAL
 **Files**: `llmspell-graph/src/traits/knowledge_graph.rs`
 
@@ -3098,6 +3098,8 @@ pub trait KnowledgeGraph: Send + Sync {
 
 **Tests**: Compilation check only
 **Commit**: "Task 13c.2.8.2: Add traverse() method to KnowledgeGraph trait"
+
+**Result**: ✅ KnowledgeGraph trait enhanced with traverse() method (9 total methods). Added unimplemented!() stub to SurrealDB backend (scheduled for removal in 13c.2.8.10). Compilation passes (2.54s).
 
 ---
 

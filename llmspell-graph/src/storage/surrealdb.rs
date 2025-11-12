@@ -732,6 +732,17 @@ impl KnowledgeGraph for SurrealDBBackend {
         );
         Ok(count)
     }
+
+    async fn traverse(
+        &self,
+        _start_entity: &str,
+        _relationship_type: Option<&str>,
+        _max_depth: usize,
+        _at_time: Option<DateTime<Utc>>,
+    ) -> Result<Vec<(Entity, usize, String)>> {
+        // Stub implementation - SurrealDB backend will be removed in Task 13c.2.8.10
+        unimplemented!("SurrealDB traverse() - backend scheduled for removal")
+    }
 }
 
 // Tests moved to integration test files:

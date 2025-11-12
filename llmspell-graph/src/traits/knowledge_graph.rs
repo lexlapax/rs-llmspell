@@ -95,4 +95,37 @@ pub trait KnowledgeGraph: Send + Sync {
     /// # Returns
     /// Number of entities deleted
     async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize>;
+
+    /// Multi-hop graph traversal with depth limit and cycle prevention
+    ///
+    /// # Arguments
+    /// * `start_entity` - Starting entity ID
+    /// * `relationship_type` - Optional relationship type filter (None = traverse all types)
+    /// * `max_depth` - Maximum traversal depth (1-4 hops recommended, 10 max)
+    /// * `at_time` - Optional temporal point for bi-temporal queries (None = current time)
+    ///
+    /// # Returns
+    /// Vector of (Entity, depth, path) tuples reachable from start_entity within max_depth hops.
+    /// Path is JSON array string of entity IDs traversed to reach this entity.
+    ///
+    /// # Performance
+    /// - 1-hop: O(k) where k = avg relationships per node
+    /// - N-hop: O(k^N) worst case, O(k*N) with cycle prevention
+    /// - Target: <50ms for 4-hop traversal on 100K node graph
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Find all entities within 2 hops connected by "knows" relationships
+    /// let results = graph.traverse("entity-1", Some("knows"), 2, None).await?;
+    /// for (entity, depth, path) in results {
+    ///     println!("Found {} at depth {} via path {}", entity.name, depth, path);
+    /// }
+    /// ```
+    async fn traverse(
+        &self,
+        start_entity: &str,
+        relationship_type: Option<&str>,
+        max_depth: usize,
+        at_time: Option<DateTime<Utc>>,
+    ) -> Result<Vec<(Entity, usize, String)>>;
 }
