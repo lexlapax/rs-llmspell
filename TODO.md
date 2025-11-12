@@ -3215,7 +3215,7 @@ SELECT *, array_to_json(path)::text AS path_json FROM graph_traversal WHERE dept
 
 ---
 
-#### Subtask 13c.2.8.6: Create synthetic graph dataset generator ⏹ PENDING
+#### Subtask 13c.2.8.6: Create synthetic graph dataset generator ✅ COMPLETE
 **Time**: 2 hours | **Priority**: MEDIUM
 **Files**: `scripts/testing/generate-graph-dataset.sh` (new)
 
@@ -3231,6 +3231,8 @@ SELECT *, array_to_json(path)::text AS path_json FROM graph_traversal WHERE dept
 **Tests**: Script execution, validate output format
 
 **Commit**: "Task 13c.2.8.6: Add synthetic graph dataset generator (100K nodes)"
+
+**Result**: ✅ Created Rust-based generator using rust-script for portability. Files: generate-graph-dataset.rs (main generator, 200 lines), generate-graph-dataset.sh (wrapper script), test-generator.rs (validation with 100 entities/500 rels), GRAPH_DATASET_README.md (documentation). Outputs entities.json (~25MB), relationships.json (~280MB), dataset-summary.txt. Power-law distribution for realistic graph structure. Bi-temporal timestamps spread over 5 years. Requires: rust-script (cargo install rust-script).
 
 ---
 
