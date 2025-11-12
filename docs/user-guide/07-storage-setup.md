@@ -120,7 +120,7 @@ cargo run -- test storage
 
 ---
 
-## Alternative: Embedded Storage (Sled)
+## Alternative: Embedded Storage (SQLite)
 
 **For single-process applications (no Docker required)**
 
@@ -129,25 +129,26 @@ cargo run -- test storage
 ```toml
 # config.toml
 [storage]
-backend = "sled"
+backend = "sqlite"
 
-[storage.sled]
-path = "/var/lib/llmspell/data"
-cache_size_mb = 512
+[storage.sqlite]
+path = "/var/lib/llmspell/data/llmspell.db"
 ```
 
 **Characteristics:**
 - ✅ No external dependencies
-- ✅ Embedded key-value store
+- ✅ Embedded relational database
 - ✅ ACID transactions
 - ✅ Automatic crash recovery
-- ⚠️ Single-process only
-- ⚠️ No vector similarity search
+- ✅ Vector similarity search (vectorlite-rs HNSW)
+- ✅ Bi-temporal graph storage
+- ⚠️ Single-process only (file locking)
 
 **When to Use:**
 - CLI applications
 - Desktop tools
 - Single-server deployments
+- Development and testing
 - Quick prototypes
 
 ---

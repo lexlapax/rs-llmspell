@@ -966,7 +966,7 @@ backup_before_deletion = true
 ```toml
 [runtime.state_persistence]
 enabled = true
-backend_type = "sled"        # memory, sled, file
+backend_type = "sqlite"      # memory, sqlite
 migration_enabled = true
 backup_enabled = true
 backup_on_migration = true
@@ -992,7 +992,7 @@ max_sessions = 100
 max_artifacts_per_session = 1000
 artifact_compression_threshold = 10240  # 10KB
 session_timeout_seconds = 3600
-storage_backend = "memory"   # memory, sled
+storage_backend = "memory"   # memory, sqlite, postgres
 ```
 
 ---
@@ -1050,7 +1050,7 @@ If `enabled = false` or section missing:
 
 ```toml
 [storage]
-backend = "postgres"  # "memory", "sled", or "postgres"
+backend = "postgres"  # "memory", "sqlite", or "postgres"
 ```
 
 **Per-component overrides** (advanced):
@@ -1063,7 +1063,7 @@ backend = "postgres"  # Default for all
 backend = "memory"    # Override: use in-memory for episodic memory (testing)
 
 [storage.state]
-backend = "sled"      # Override: use sled for agent state (embedded)
+backend = "sqlite"    # Override: use sqlite for agent state (embedded)
 ```
 
 **10 Storage Components:**
@@ -1093,20 +1093,17 @@ backend = "memory"
 - **Pros**: Fastest, no setup
 - **Cons**: Data lost on restart, no persistence
 
-**sled** - Embedded database
+**sqlite** - Embedded database
 ```toml
 [storage]
-backend = "sled"
+backend = "sqlite"
 
-[storage.sled]
-path = "./data/sled"
-cache_capacity_mb = 256
-flush_interval_secs = 5
-compression = true
+[storage.sqlite]
+path = "./data/llmspell.db"
 ```
-- **Use case**: Embedded deployments, single-user applications
-- **Pros**: No external dependencies, ACID transactions
-- **Cons**: Single-process only, limited concurrency
+- **Use case**: Embedded deployments, single-user applications, development
+- **Pros**: No external dependencies, ACID transactions, vector search (vectorlite-rs), bi-temporal graph
+- **Cons**: Single-process only (file locking), limited concurrency
 
 **postgres** - PostgreSQL 18 + VectorChord
 ```toml
@@ -1188,26 +1185,19 @@ compression_threshold_bytes = 1048576  # Compress artifacts >1 MB
 - [Performance Tuning](storage/performance-tuning.md) - HNSW optimization
 - [Backup/Restore](storage/backup-restore.md) - Disaster recovery
 
-### Sled Configuration
+### SQLite Configuration
 
 ```toml
-[storage.sled]
+[storage.sqlite]
 # Database path
-path = "./data/sled"
-
-# Performance settings
-cache_capacity_mb = 256     # In-memory cache size
-flush_interval_secs = 5     # Flush dirty pages interval
-compression = true          # zstd compression
-
-# Durability settings
-mode = "HighThroughput"     # "HighThroughput" or "LowLatency"
-use_compression = true
+path = "./data/llmspell.db"
 ```
 
-**Performance modes:**
-- **HighThroughput**: Batch writes, higher latency, better throughput
-- **LowLatency**: Immediate writes, lower latency, lower throughput
+**SQLite Configuration:**
+- Managed by libsql with optimal defaults
+- ACID transactions, WAL mode
+- vectorlite-rs extension for HNSW vector search
+- Bi-temporal graph with recursive CTEs
 
 ### Hybrid Backend Configuration
 
@@ -1221,7 +1211,7 @@ backend = "postgres"  # Default
 backend = "memory"    # Episodic memory in RAM (fast, testing)
 
 [storage.state]
-backend = "sled"      # Agent state in embedded DB (no external deps)
+backend = "sqlite"    # Agent state in embedded DB (no external deps)
 
 [storage.events]
 backend = "postgres"  # Events in PostgreSQL (durability, partitions)
@@ -1229,7 +1219,7 @@ backend = "postgres"  # Events in PostgreSQL (durability, partitions)
 
 **Use cases:**
 - **Development**: `memory` for fast iteration
-- **Embedded**: `sled` for zero-dependency deployments
+- **Embedded**: `sqlite` for zero-dependency deployments
 - **Production**: `postgres` for durability and scale
 
 ---
