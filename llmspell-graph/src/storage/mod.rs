@@ -58,7 +58,7 @@ pub trait GraphBackend: Send + Sync {
     /// * `at_time` - Optional temporal point for bi-temporal queries (None = current time)
     ///
     /// # Returns
-    /// Vector of (Entity, depth, path) tuples reachable from start_entity within max_depth hops.
+    /// Vector of (Entity, depth, path) tuples reachable from `start_entity` within `max_depth` hops.
     /// Path is JSON array string of entity IDs traversed to reach this entity.
     ///
     /// # Performance

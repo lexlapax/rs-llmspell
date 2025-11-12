@@ -239,6 +239,16 @@ mod tests {
         ) -> llmspell_graph::error::Result<usize> {
             Ok(0)
         }
+
+        async fn traverse(
+            &self,
+            _start_entity: &str,
+            _relationship_type: Option<&str>,
+            _max_depth: usize,
+            _at_time: Option<chrono::DateTime<Utc>>,
+        ) -> llmspell_graph::error::Result<Vec<(Entity, usize, String)>> {
+            Ok(vec![])
+        }
     }
 
     #[tokio::test]
