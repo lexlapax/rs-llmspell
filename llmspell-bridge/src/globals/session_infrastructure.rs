@@ -8,7 +8,7 @@ use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
 use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
 use llmspell_kernel::state::StateManager;
-use llmspell_storage::{MemoryBackend, SledBackend, StorageBackend};
+use llmspell_storage::{MemoryBackend, StorageBackend};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -151,18 +151,12 @@ fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>>
             debug!("Creating in-memory storage backend for sessions");
             Ok(Arc::new(MemoryBackend::new()))
         }
-        "sled" => {
-            debug!("Creating sled storage backend for sessions");
-            // TODO: When SledBackend supports path configuration, use config.storage_path
-            // For now, SledBackend::new() uses its default path
-            let backend = SledBackend::new().map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create sled backend: {e}"),
-                source: None,
-            })?;
-            Ok(Arc::new(backend))
-        }
         backend => {
-            warn!("Unknown backend type '{}', falling back to memory", backend);
+            warn!(
+                "Backend type '{}' not supported via Lua bridge (only 'memory'), falling back to memory. \
+                 For persistent storage, use Rust API with SQLite or PostgreSQL.",
+                backend
+            );
             Ok(Arc::new(MemoryBackend::new()))
         }
     }

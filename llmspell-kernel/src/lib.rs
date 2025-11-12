@@ -77,8 +77,8 @@ pub use execution::{ExecutionConfig, IntegratedKernel};
 pub use state::{
     circuit_breaker::{CircuitBreaker, CircuitBreakerStats, CircuitState},
     persistence::StatePersistence,
-    DebugState, ExecutionState, KernelState, MemoryBackend, SessionState,
-    StorageBackend, VectorBackend,
+    DebugState, ExecutionState, KernelState, MemoryBackend, SessionState, StorageBackend,
+    VectorBackend,
 };
 
 // Re-export session types

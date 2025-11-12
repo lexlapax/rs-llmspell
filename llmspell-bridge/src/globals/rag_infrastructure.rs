@@ -9,7 +9,7 @@ use llmspell_hooks::{HookExecutor, HookRegistry};
 use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
 use llmspell_kernel::state::StateManager;
 use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
-use llmspell_storage::{MemoryBackend, SledBackend, StorageBackend, VectorStorage};
+use llmspell_storage::{MemoryBackend, StorageBackend, VectorStorage};
 use llmspell_tenancy::MultiTenantVectorManager;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -306,17 +306,10 @@ fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>>
             debug!("Creating in-memory storage backend for RAG sessions");
             Ok(Arc::new(MemoryBackend::new()))
         }
-        "sled" => {
-            debug!("Creating sled storage backend for RAG sessions");
-            let backend = SledBackend::new().map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create sled backend for RAG: {e}"),
-                source: None,
-            })?;
-            Ok(Arc::new(backend))
-        }
         backend => {
             warn!(
-                "Unknown backend type '{}' for RAG, falling back to memory",
+                "Backend type '{}' not supported via Lua bridge for RAG (only 'memory'), falling back to memory. \
+                 For persistent storage, use Rust API with SQLite or PostgreSQL.",
                 backend
             );
             Ok(Arc::new(MemoryBackend::new()))

@@ -86,10 +86,7 @@ pub use manager::{HookReplayManager, SerializedHookExecution, StateManager};
 pub use sensitive_data::{RedactSensitiveData, SensitiveDataConfig, SensitiveDataProtector};
 
 // Re-export original kernel storage types
-pub use kernel_backends::{
-    MemoryBackend as KernelMemoryBackend, StorageBackend,
-    VectorBackend,
-};
+pub use kernel_backends::{MemoryBackend as KernelMemoryBackend, StorageBackend, VectorBackend};
 
 // Re-export comprehensive storage backends
 pub use backends::MemoryBackend;

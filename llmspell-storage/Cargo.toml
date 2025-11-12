@@ -18,7 +18,6 @@ toml.workspace = true # Phase 13b.14: For migration plan TOML (replaced YAML)
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-sled.workspace = true
 dashmap = "5.5"
 parking_lot = "0.12"
 uuid = { workspace = true }

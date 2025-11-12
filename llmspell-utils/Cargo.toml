@@ -80,9 +80,6 @@ zeroize = { version = "1.8", features = ["derive"] }
 # Core types
 llmspell-core = { path = "../llmspell-core" }
 
-# Database for persistent storage
-sled = { workspace = true }
-
 # HTTP client for rate limiting headers (optional)
 reqwest = { workspace = true, optional = true }
 

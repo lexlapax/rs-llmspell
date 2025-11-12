@@ -1,12 +1,5 @@
-//! ABOUTME: Migration adapters for existing storage backends
-//! ABOUTME: Implements MigrationSource and MigrationTarget for Sled and PostgreSQL
-
-use super::traits::MigrationSource;
-use crate::backends::sled_backend::SledBackend;
-use crate::traits::StorageBackend;
-use anyhow::Result;
-use async_trait::async_trait;
-use std::sync::Arc;
+//! ABOUTME: Migration adapters for existing storage backends (deprecated - Phase 13c)
+//! ABOUTME: Sled-to-PostgreSQL migration removed; use SQLite or PostgreSQL directly
 
 #[cfg(feature = "postgres")]
 use super::traits::MigrationTarget;
@@ -14,34 +7,19 @@ use super::traits::MigrationTarget;
 #[cfg(feature = "postgres")]
 use crate::backends::postgres::PostgresBackend;
 
-// =============================================================================
-// SledBackend → MigrationSource (Phase 1: Source for agent_state, workflow_state, sessions)
-// =============================================================================
+use crate::traits::StorageBackend;
 
-#[async_trait]
-impl MigrationSource for SledBackend {
-    async fn list_keys(&self, component: &str) -> Result<Vec<String>> {
-        let prefix = component_to_prefix(component);
-        // Disambiguate: call StorageBackend::list_keys explicitly
-        StorageBackend::list_keys(self, &prefix).await
-    }
+#[cfg(feature = "postgres")]
+use anyhow::Result;
 
-    async fn get_value(&self, _component: &str, key: &str) -> Result<Option<Vec<u8>>> {
-        // Key is already fully qualified (e.g., "agent:123" or "custom:workflow_456")
-        // Just get it directly from Sled
-        StorageBackend::get(self, key).await
-    }
+#[cfg(feature = "postgres")]
+use async_trait::async_trait;
 
-    async fn count(&self, component: &str) -> Result<usize> {
-        let prefix = component_to_prefix(component);
-        // Disambiguate: call StorageBackend::list_keys explicitly
-        let keys = StorageBackend::list_keys(self, &prefix).await?;
-        Ok(keys.len())
-    }
-}
+#[cfg(feature = "postgres")]
+use std::sync::Arc;
 
 // =============================================================================
-// PostgresBackend → MigrationTarget (Phase 1: Target for agent_state, workflow_state, sessions)
+// PostgresBackend → MigrationTarget (retained for future SQLite→PostgreSQL migrations)
 // =============================================================================
 
 #[cfg(feature = "postgres")]
@@ -70,13 +48,14 @@ impl MigrationTarget for PostgresBackend {
     }
 }
 
+#[cfg(feature = "postgres")]
 // =============================================================================
 // Component Name → Key Prefix Mapping
 // =============================================================================
 
 /// Convert component name to storage key prefix
 ///
-/// Phase 1 Components:
+/// Supported Components:
 /// - "agent_state" → "agent:"
 /// - "workflow_state" → "custom:workflow_"
 /// - "sessions" → "session:"
@@ -92,22 +71,6 @@ fn component_to_prefix(component: &str) -> String {
 // =============================================================================
 // Arc-wrapped implementations (for use in MigrationEngine)
 // =============================================================================
-
-#[async_trait]
-impl MigrationSource for Arc<SledBackend> {
-    async fn list_keys(&self, component: &str) -> Result<Vec<String>> {
-        // Call the MigrationSource trait method on the inner SledBackend
-        MigrationSource::list_keys(&**self, component).await
-    }
-
-    async fn get_value(&self, component: &str, key: &str) -> Result<Option<Vec<u8>>> {
-        MigrationSource::get_value(&**self, component, key).await
-    }
-
-    async fn count(&self, component: &str) -> Result<usize> {
-        MigrationSource::count(&**self, component).await
-    }
-}
 
 #[cfg(feature = "postgres")]
 #[async_trait]
@@ -138,39 +101,6 @@ mod tests {
         assert_eq!(component_to_prefix("agent_state"), "agent:");
         assert_eq!(component_to_prefix("workflow_state"), "custom:workflow_");
         assert_eq!(component_to_prefix("sessions"), "session:");
-    }
-
-    #[tokio::test]
-    async fn test_sled_migration_source() {
-        let sled = SledBackend::new_temporary().unwrap();
-
-        // Store test data with proper prefixes
-        StorageBackend::set(&sled, "agent:123", b"agent data".to_vec())
-            .await
-            .unwrap();
-        StorageBackend::set(&sled, "agent:456", b"agent data 2".to_vec())
-            .await
-            .unwrap();
-        StorageBackend::set(&sled, "custom:workflow_abc", b"workflow data".to_vec())
-            .await
-            .unwrap();
-
-        // Test list_keys for agent_state (using MigrationSource trait)
-        let keys = MigrationSource::list_keys(&sled, "agent_state")
-            .await
-            .unwrap();
-        assert_eq!(keys.len(), 2);
-        assert!(keys.contains(&"agent:123".to_string()));
-
-        // Test count
-        let count = MigrationSource::count(&sled, "agent_state").await.unwrap();
-        assert_eq!(count, 2);
-
-        // Test get_value
-        let value = MigrationSource::get_value(&sled, "agent_state", "agent:123")
-            .await
-            .unwrap();
-        assert_eq!(value, Some(b"agent data".to_vec()));
     }
 
     #[cfg(feature = "postgres")]

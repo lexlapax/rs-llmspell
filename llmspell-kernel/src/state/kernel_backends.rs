@@ -317,7 +317,6 @@ mod tests {
     }
 
     #[test]
-
     #[test]
     fn test_vector_backend() {
         let mut backend = VectorBackend::new();

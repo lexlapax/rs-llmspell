@@ -204,22 +204,12 @@ fn create_session_manager(
 ) -> Result<Arc<llmspell_kernel::sessions::SessionManager>, LLMSpellError> {
     debug!("Creating session manager");
 
-    // Create session storage backend based on config (Phase 13b.16.9 - Fix lock contention)
-    let session_storage_backend: Arc<dyn llmspell_storage::StorageBackend> =
-        if config.runtime.sessions.storage_backend.as_str() == "memory" {
-            debug!("Using memory backend for session storage");
-            Arc::new(llmspell_storage::MemoryBackend::new())
-        } else {
-            debug!("Using Sled backend for session storage at ./sessions");
-            Arc::new(
-                llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
-                    LLMSpellError::Component {
-                        message: format!("Failed to create session storage backend: {e}"),
-                        source: None,
-                    }
-                })?,
-            )
-        };
+    // Create session storage backend based on config (Phase 13c.2.8.12 - Sled removed)
+    // Only memory backend supported via Lua bridge (production: use Rust API with SQLite/PostgreSQL)
+    let session_storage_backend: Arc<dyn llmspell_storage::StorageBackend> = {
+        debug!("Using memory backend for session storage");
+        Arc::new(llmspell_storage::MemoryBackend::new())
+    };
 
     // Create hook infrastructure
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
