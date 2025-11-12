@@ -959,11 +959,11 @@ rs-llmspell uses a **3-tier storage architecture** with hot-swappable backends:
 
 1. **Component APIs**: Domain-specific storage interfaces (Vector, Memory, Session, etc.)
 2. **StorageBackend Trait**: Unified abstraction for key-value + vector operations
-3. **Backend Implementations**: Memory, Sled (embedded DB), PostgreSQL (production)
+3. **Backend Implementations**: Memory, SQLite (embedded DB), PostgreSQL (production)
 
 **Supported Backends** (Phase 13b.16):
 - **Memory**: In-memory HashMap (development/testing)
-- **Sled**: Embedded database (single-node production)
+- **SQLite**: Embedded database (single-node production)
 - **PostgreSQL 18**: Production-grade with HNSW vector similarity (multi-tenant, ACID)
 
 ### StorageBackend Trait
@@ -1333,7 +1333,7 @@ impl StorageBackend for PostgreSQLBackend {
 
 ```rust
 async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManager>, LLMSpellError> {
-    use llmspell_storage::{MemoryBackend, SledBackend, PostgreSQLBackend, StorageBackend};
+    use llmspell_storage::{MemoryBackend, SqliteBackend, PostgreSQLBackend, StorageBackend};
 
     // Backend selection from config
     let backend: Arc<dyn StorageBackend> = match config.storage.backend.as_str() {
@@ -1568,7 +1568,7 @@ This guide covered ALL extension patterns in rs-llmspell:
 **Next Steps**:
 1. Study the 60+ examples in `examples/`
 2. Start with tools, progress to agents, then RAG, then storage backends
-3. Use production patterns from existing implementations (Memory, Sled, PostgreSQL)
+3. Use production patterns from existing implementations (Memory, SQLite, PostgreSQL)
 4. Test thoroughly with proper categorization and testcontainers for backend isolation
 
 **Extension Patterns by Complexity**:

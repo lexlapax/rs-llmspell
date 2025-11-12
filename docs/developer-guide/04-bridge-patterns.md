@@ -686,7 +686,7 @@ async fn create_provider_manager(config: &LLMSpellConfig) -> Result<Arc<Provider
 
 ```rust
 async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManager>, LLMSpellError> {
-    use llmspell_storage::{MemoryBackend, SledBackend, PostgreSQLBackend, StorageBackend};
+    use llmspell_storage::{MemoryBackend, SqliteBackend, PostgreSQLBackend, StorageBackend};
 
     // Backend selection from config
     let backend: Arc<dyn StorageBackend> = match config.storage.backend.as_str() {
@@ -1002,7 +1002,7 @@ pub async fn run_command(config: LLMSpellConfig) -> Result<()> {
 6. RAG drops
 7. SessionManager drops
 8. ToolRegistry drops
-9. StateManager drops (flushes to disk if Sled/Postgres)
+9. StateManager drops (flushes to disk if SQLite/Postgres)
 10. ProviderManager drops (closes connections)
 ```
 

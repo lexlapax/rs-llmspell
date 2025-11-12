@@ -64,7 +64,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 **Vector and key-value storage**
 
 - HNSW vector storage for RAG
-- Multiple backend implementations (InMemory, Sled, HNSW)
+- Multiple backend implementations (InMemory, SQLite, vectorlite-rs HNSW)
 - Multi-tenant data isolation
 - Collection management
 - Bi-temporal support

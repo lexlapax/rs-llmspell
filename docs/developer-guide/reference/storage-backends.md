@@ -14,7 +14,7 @@ llmspell provides a unified storage abstraction layer with multiple backend impl
 - **StorageBackend trait**: Unified key-value interface
 - **Vector Storage**: HNSW-based similarity search for embeddings
 - **Multi-Tenant Collections**: Isolated data per tenant
-- **Persistence Options**: In-memory, Sled embedded DB, HNSW vectors
+- **Persistence Options**: In-memory, SQLite embedded DB, HNSW vectors
 
 ---
 
@@ -28,7 +28,7 @@ Application Layer
 StorageBackend Trait (abstraction)
     ↓
     ├─→ InMemoryBackend (testing, development)
-    ├─→ SledBackend (embedded persistent KV)
+    ├─→ SqliteBackend (embedded persistent KV)
     └─→ HNSWVectorStorage (RAG, similarity search)
 ```
 
@@ -44,9 +44,9 @@ let storage = InMemoryBackend::new();
 
 **Embedded Persistence**:
 ```rust
-use llmspell_storage::SledBackend;
+use llmspell_storage::SqliteBackend;
 
-let storage = SledBackend::new("/path/to/db")?;
+let storage = SqliteBackend::new("/path/to/db")?;
 // Embedded DB, persistence, single-process
 ```
 
@@ -270,7 +270,7 @@ let storage = InMemoryBackend::new();
 // Automatically cleaned up on drop
 ```
 
-### SledBackend
+### SqliteBackend
 
 **Use Case**: Embedded persistence, single-process applications
 
@@ -288,18 +288,18 @@ let storage = InMemoryBackend::new();
 - Configuration storage
 
 ```rust
-let storage = SledBackend::new("/var/lib/llmspell/data")?;
+let storage = SqliteBackend::new("/var/lib/llmspell/data")?;
 // Data persists across restarts
 ```
 
 **Configuration**:
 ```rust
-let config = SledConfig {
+let config = SqliteConfig {
     cache_capacity: 1_000_000_000,  // 1GB cache
     flush_every_ms: Some(1000),     // Flush every 1s
     ..Default::default()
 };
-let storage = SledBackend::with_config("/path", config)?;
+let storage = SqliteBackend::with_config("/path", config)?;
 ```
 
 ### HNSWVectorStorage
@@ -565,9 +565,9 @@ let episodic_memory = EpisodicMemory::builder()
 
 ```rust
 use llmspell_state_persistence::PersistentState;
-use llmspell_storage::SledBackend;
+use llmspell_storage::SqliteBackend;
 
-let storage = Arc::new(SledBackend::new("/var/lib/llmspell/state")?);
+let storage = Arc::new(SqliteBackend::new("/var/lib/llmspell/state")?);
 let state = PersistentState::new(storage);
 ```
 

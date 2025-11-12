@@ -89,8 +89,8 @@ Maximum Observed: 5ms (complex operations)
 
 #### State Persistence
 ```
-Write: <3ms (Memory: <0.1ms, Sled: <3ms, RocksDB: <2ms)
-Read: <1ms (Memory: <0.1ms, Sled: <1ms, RocksDB: <0.5ms)
+Write: <3ms (Memory: <0.1ms, SQLite: <3ms, RocksDB: <2ms)
+Read: <1ms (Memory: <0.1ms, SQLite: <1ms, RocksDB: <0.5ms)
 Migration: 2.07μs/item (483K items/sec)
 ```
 

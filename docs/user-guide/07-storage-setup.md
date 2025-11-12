@@ -12,7 +12,7 @@ llmspell supports multiple storage backends for different use cases. This guide 
 
 **Storage Backends:**
 - **InMemory**: Development and testing (fast, ephemeral)
-- **Sled**: Embedded persistence for single-process apps
+- **SQLite**: Embedded persistence for single-process apps
 - **PostgreSQL**: Production multi-tenant deployments with vector search
 
 **What You'll Learn:**

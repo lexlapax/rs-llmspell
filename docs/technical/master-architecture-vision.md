@@ -5288,7 +5288,7 @@ Phase 5 implemented comprehensive storage backends with production-ready feature
 #[derive(Debug, Clone)]
 pub enum StorageBackendType {
     Memory,                    // In-memory for development/testing
-    Sled(SledConfig),          // Embedded database for single-node
+    Sled(SqliteConfig),          // Embedded database for single-node
     RocksDB(RocksDBConfig),    // High-performance production backend
 }
 
@@ -12411,7 +12411,7 @@ mlua = { version = "0.9", features = ["async", "send", "luajit"] }
 boa_engine = "0.18"
 
 # Storage and Persistence
-sled = "0.34"
+libsql = "0.5"
 rocksdb = "0.22"
 
 # Async Runtime and Coordination
@@ -12456,7 +12456,7 @@ criterion = { version = "0.5", optional = true }
 
 ```toml
 [features]
-default = ["lua", "javascript", "sled-storage"]
+default = ["lua", "javascript", "sqlite-storage"]
 
 # Script Engine Support
 lua = ["mlua"]
@@ -12464,7 +12464,7 @@ javascript = ["boa_engine"]
 python = ["pyo3"] # Future
 
 # Storage Backends
-sled-storage = ["sled"]
+sqlite-storage = ["libsql"]
 rocksdb-storage = ["rocksdb"]
 memory-storage = [] # In-memory for testing
 
@@ -13150,8 +13150,8 @@ pub trait StorageBackend: Send + Sync {
 }
 
 // Backends implement same interface with different characteristics (no duplication)
-pub struct SledBackend {
-    db: sled::Db,
+pub struct SqliteBackend {
+    db: libsql::Database,
     // Characteristics: Simple, embedded, good for development
 }
 
@@ -13169,7 +13169,7 @@ pub struct StorageCharacteristics {
 }
 
 // No duplication - same interface, different implementations
-impl StorageBackend for SledBackend {
+impl StorageBackend for SqliteBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
         // Sled-specific implementation
         Ok(self.db.get(key)?.map(|v| v.to_vec()))
@@ -13290,16 +13290,16 @@ pub enum SimilarityMetric {
 #### Sled Backend Implementation
 
 ```rust
-use sled::{Db, Tree, transaction::TransactionResult};
+use libsql::{Db, Tree, transaction::TransactionResult};
 
-pub struct SledBackend {
+pub struct SqliteBackend {
     db: Db,
-    config: SledConfig,
+    config: SqliteConfig,
     metrics: StorageMetrics,
 }
 
-impl SledBackend {
-    pub async fn new(config: SledConfig) -> Result<Self> {
+impl SqliteBackend {
+    pub async fn new(config: SqliteConfig) -> Result<Self> {
         let db = sled::open(&config.path)
             .map_err(|e| LLMSpellError::Storage(format!("Failed to open sled database: {}", e)))?;
             
@@ -13339,7 +13339,7 @@ impl SledBackend {
 }
 
 #[async_trait]
-impl StorageBackend for SledBackend {
+impl StorageBackend for SqliteBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
         let start_time = Instant::now();
         
@@ -13507,7 +13507,7 @@ impl StorageManager {
     pub async fn new(config: StorageConfig) -> Result<Self> {
         let backend: Box<dyn StorageBackend> = match config.backend_type {
             StorageBackendType::Sled => {
-                Box::new(SledBackend::new(config.sled_config).await?)
+                Box::new(SqliteBackend::new(config.sled_config).await?)
             }
             StorageBackendType::RocksDB => {
                 Box::new(RocksDBBackend::new(config.rocksdb_config).await?)
@@ -23979,7 +23979,7 @@ rs-llmspell/
 │   ├── storage/                 # State and persistence
 │   │   ├── src/
 │   │   │   ├── lib.rs
-│   │   │   ├── sled_backend.rs  # Sled storage implementation
+│   │   │   ├── sqlite_backend.rs  # Sled storage implementation
 │   │   │   ├── memory_backend.rs# In-memory storage
 │   │   │   └── migrations.rs    # Schema migrations
 │   │   └── Cargo.toml
@@ -25604,7 +25604,7 @@ mlua = { version = "0.9", features = ["lua54", "async", "serialize"] }
 boa_engine = "0.17"
 
 # Storage and persistence
-sled = "0.34"
+libsql = "0.5"
 rocksdb = "0.21"
 
 # Async and concurrency
@@ -25878,7 +25878,7 @@ fn check_cpu_feature(feature: &str) -> bool {
 ```toml
 # Example feature flag configuration in core crate
 [features]
-default = ["lua", "javascript", "builtin-tools", "sled-storage"]
+default = ["lua", "javascript", "builtin-tools", "sqlite-storage"]
 
 # Script engine features
 lua = ["dep:mlua"]
@@ -25886,7 +25886,7 @@ javascript = ["dep:boa_engine"]
 python = ["dep:pyo3"]  # Future
 
 # Storage backends
-sled-storage = ["dep:sled"]
+sled-storage = ["dep:libsql"]
 rocksdb-storage = ["dep:rocksdb"]
 memory-storage = []
 
@@ -26746,7 +26746,7 @@ print("Result:", result.output)
 1. Complete built-in tools library (40+ tools)
 2. **JavaScriptEngine as second ScriptEngineBridge implementation**
 3. Drop-in engine switching via existing factory pattern
-4. Persistent state with sled
+4. Persistent state with SQLite
 5. Event system implementation
 
 **ARCHITECTURAL ADVANTAGE - Phase 2:**
