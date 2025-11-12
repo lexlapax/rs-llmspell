@@ -2,8 +2,8 @@
 //!
 //! This module provides a swappable backend design via the `GraphBackend` trait,
 //! allowing different storage implementations:
-//! - PostgreSQL (production, multi-tenant RLS, Phase 13b.5)
-//! - SQLite (local persistent storage, Phase 13c.2.4)
+//! - `PostgreSQL` (production, multi-tenant RLS, Phase 13b.5)
+//! - `SQLite` (local persistent storage, Phase 13c.2.4)
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};

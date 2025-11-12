@@ -26,8 +26,8 @@
 //!
 //! All storage operations are abstracted via the `GraphBackend` trait,
 //! enabling hot-swapping between different graph databases:
-//! - PostgreSQL (production, multi-tenant RLS, via llmspell-storage)
-//! - SQLite (local persistent storage, via llmspell-storage)
+//! - `PostgreSQL` (production, multi-tenant RLS, via llmspell-storage)
+//! - `SQLite` (local persistent storage, via llmspell-storage)
 //!
 //! ## Usage
 //!
@@ -84,8 +84,8 @@
 //!
 //! ## Implementation Status
 //!
-//! - ✅ Phase 13b.5: PostgreSQL bi-temporal graph backend (complete)
-//! - ✅ Phase 13c.2.4: SQLite bi-temporal graph backend (complete)
+//! - ✅ Phase 13b.5: `PostgreSQL` bi-temporal graph backend (complete)
+//! - ✅ Phase 13c.2.4: `SQLite` bi-temporal graph backend (complete)
 //! - ✅ Multi-hop graph traversal with recursive CTEs (complete)
 
 pub mod error;

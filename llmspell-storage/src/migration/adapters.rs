@@ -53,7 +53,6 @@ impl MigrationTarget for PostgresBackend {
 // =============================================================================
 // Component Name → Key Prefix Mapping
 // =============================================================================
-
 /// Convert component name to storage key prefix
 ///
 /// Supported Components:
