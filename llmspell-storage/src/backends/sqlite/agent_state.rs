@@ -327,7 +327,7 @@ impl StorageBackend for SqliteAgentStateStorage {
     }
 
     fn backend_type(&self) -> StorageBackendType {
-        StorageBackendType::Sled // Using Sled enum value for now
+        StorageBackendType::Sqlite
     }
 
     fn characteristics(&self) -> StorageCharacteristics {

@@ -222,7 +222,7 @@ impl StorageBackend for SqliteKVStorage {
     }
 
     fn backend_type(&self) -> StorageBackendType {
-        StorageBackendType::Sled // Using Sled enum value for now (replace Sled with SQLite)
+        StorageBackendType::Sqlite
     }
 
     fn characteristics(&self) -> StorageCharacteristics {

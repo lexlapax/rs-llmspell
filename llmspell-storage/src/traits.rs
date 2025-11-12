@@ -12,8 +12,8 @@ pub enum StorageBackendType {
     /// In-memory storage (for testing/development)
     Memory,
 
-    /// Sled embedded database
-    Sled,
+    /// SQLite database (Phase 13c, unified storage)
+    Sqlite,
 
     /// PostgreSQL database with VectorChord (Phase 13b.2+)
     #[cfg(feature = "postgres")]
