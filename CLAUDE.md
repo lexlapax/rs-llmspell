@@ -112,4 +112,4 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - Using unwrap() in production code
 - Skipping tests to meet deadlines
 - When writing Lua scripts, use `docs/user-guide/api/lua/README.md` for API reference - DO NOT GUESS method names
-- Never include attribution footers in git commits
+- include attribution footers in git commits
