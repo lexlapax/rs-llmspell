@@ -18,18 +18,16 @@
 //!
 //! ```text
 //! KnowledgeGraph Trait
-//! ├── SurrealDBBackend (embedded mode, Phase 13.2)
-//! ├── Neo4jBackend (future)
-//! └── InMemoryBackend (future, for testing)
+//! ├── PostgreSQL (production, multi-tenant RLS, Phase 13b.5)
+//! └── SQLite (local persistent storage, Phase 13c.2.4)
 //! ```
 //!
 //! ## Swappable Storage Backends
 //!
 //! All storage operations are abstracted via the `GraphBackend` trait,
 //! enabling hot-swapping between different graph databases:
-//! - `SurrealDB` (embedded, no external server)
-//! - `Neo4j` (future)
-//! - `InMemory` (future, for testing)
+//! - PostgreSQL (production, multi-tenant RLS, via llmspell-storage)
+//! - SQLite (local persistent storage, via llmspell-storage)
 //!
 //! ## Usage
 //!
@@ -38,8 +36,8 @@
 //! use serde_json::json;
 //!
 //! # async fn example() -> Result<()> {
-//! // Create knowledge graph with SurrealDB backend
-//! let graph = SurrealDBBackend::new("./data".into());
+//! // Create knowledge graph with storage backend (via llmspell-storage)
+//! // See llmspell-storage documentation for backend creation
 //!
 //! // Add entity
 //! let entity = Entity::new(
@@ -86,10 +84,9 @@
 //!
 //! ## Implementation Status
 //!
-//! - ✅ Phase 13.2.1: Crate structure and trait definitions
-//! - ⏳ Phase 13.2.2: Bi-temporal trait implementation (in progress)
-//! - ⏳ Phase 13.2.3: `SurrealDB` backend implementation (pending)
-//! - ⏳ Phase 13.2.5: Unit tests and benchmarks (pending)
+//! - ✅ Phase 13b.5: PostgreSQL bi-temporal graph backend (complete)
+//! - ✅ Phase 13c.2.4: SQLite bi-temporal graph backend (complete)
+//! - ✅ Multi-hop graph traversal with recursive CTEs (complete)
 
 pub mod error;
 pub mod extraction;
@@ -100,7 +97,6 @@ pub mod types;
 
 // Re-exports for convenience
 pub use error::{GraphError, Result};
-pub use storage::surrealdb::SurrealDBBackend;
 pub use storage::GraphBackend;
 pub use traits::KnowledgeGraph;
 pub use types::{Entity, Relationship, TemporalQuery};

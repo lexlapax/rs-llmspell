@@ -5,7 +5,7 @@ edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
-keywords = ["knowledge-graph", "temporal", "graph-database", "surrealdb", "llm"]
+keywords = ["knowledge-graph", "temporal", "graph-database", "postgresql", "llm"]
 categories = ["database", "data-structures", "graph"]
 description = "Bi-temporal knowledge graph with swappable backends for llmspell"
 
@@ -13,9 +13,6 @@ description = "Bi-temporal knowledge graph with swappable backends for llmspell"
 # Core dependencies
 llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
-
-# SurrealDB for graph storage (embedded mode with RocksDB)
-surrealdb = { version = "2.0", features = ["kv-rocksdb"] }
 
 # Async runtime
 tokio = { workspace = true }

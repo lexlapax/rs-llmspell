@@ -44,10 +44,6 @@ pub enum GraphError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// `SurrealDB` error
-    #[error("SurrealDB error: {0}")]
-    SurrealDB(String),
-
     /// Other error
     #[error("{0}")]
     Other(String),
@@ -62,11 +58,5 @@ impl From<String> for GraphError {
 impl From<&str> for GraphError {
     fn from(s: &str) -> Self {
         Self::Other(s.to_string())
-    }
-}
-
-impl From<surrealdb::Error> for GraphError {
-    fn from(e: surrealdb::Error) -> Self {
-        Self::SurrealDB(e.to_string())
     }
 }
