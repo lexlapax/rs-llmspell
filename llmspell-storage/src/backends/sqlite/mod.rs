@@ -35,6 +35,7 @@
 //! ```
 
 mod agent_state;
+mod artifact;
 mod backend;
 mod config;
 mod error;
@@ -48,6 +49,7 @@ mod vector;
 mod workflow_state;
 
 pub use agent_state::SqliteAgentStateStorage;
+pub use artifact::SqliteArtifactStorage;
 pub use backend::{HealthStatus, SqliteBackend, TenantContext};
 pub use config::SqliteConfig;
 pub use error::{Result, SqliteError};
