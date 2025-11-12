@@ -25,8 +25,8 @@ use crate::episodic::InMemoryEpisodicMemory;
 ///
 /// ```text
 /// DefaultMemoryManager
-/// ├── Episodic: InMemoryEpisodicMemory (HNSW vector search)
-/// ├── Semantic: GraphSemanticMemory (wraps SurrealDB)
+/// ├── Episodic: InMemoryEpisodicMemory (or SqliteEpisodicMemory with vectorlite-rs)
+/// ├── Semantic: GraphSemanticMemory (wraps SqliteGraphStorage or PostgresGraphStorage)
 /// ├── Procedural: NoopProceduralMemory (placeholder)
 /// └── Consolidation: ConsolidationEngine (NoopConsolidationEngine by default)
 /// ```
@@ -77,11 +77,13 @@ impl DefaultMemoryManager {
     /// use llmspell_memory::{DefaultMemoryManager, InMemoryEpisodicMemory};
     /// use llmspell_memory::semantic::GraphSemanticMemory;
     /// use llmspell_memory::procedural::NoopProceduralMemory;
+    /// use llmspell_storage::backends::sqlite::SqliteBackend;
     ///
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
     ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    ///     let semantic = Arc::new(GraphSemanticMemory::new_temp().await?);
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await?);
+    ///     let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(sqlite_backend));
     ///     let procedural = Arc::new(NoopProceduralMemory);
     ///
     ///     let manager = DefaultMemoryManager::new(episodic, semantic, procedural);
@@ -121,18 +123,17 @@ impl DefaultMemoryManager {
     /// use llmspell_memory::procedural::NoopProceduralMemory;
     /// use llmspell_memory::consolidation::ManualConsolidationEngine;
     /// use llmspell_graph::extraction::RegexExtractor;
-    /// use llmspell_graph::storage::surrealdb::SurrealDBBackend;
-    /// use tempfile::TempDir;
+    /// use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
     ///
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
-    ///     let temp = TempDir::new().unwrap();
     ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    ///     let semantic = Arc::new(GraphSemanticMemory::new_temp().await?);
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await?);
+    ///     let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(Arc::clone(&sqlite_backend)));
     ///     let procedural = Arc::new(NoopProceduralMemory);
     ///
     ///     let extractor = Arc::new(RegexExtractor::new());
-    ///     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+    ///     let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
     ///     let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
     ///     let manager = DefaultMemoryManager::with_consolidation(
     ///         episodic, semantic, procedural, engine
@@ -232,12 +233,12 @@ impl DefaultMemoryManager {
     ///
     /// All memory subsystems use in-memory storage:
     /// - Episodic: `InMemory` backend (test embeddings, cosine similarity)
-    /// - Semantic: Temporary `SurrealDB` instance
+    /// - Semantic: Requires explicit SQLite backend configuration
     /// - Procedural: No-op placeholder
     ///
     /// # Errors
     ///
-    /// Returns error if temporary `SurrealDB` initialization fails
+    /// Returns error if SQLite backend is not configured
     ///
     /// # Example
     ///
@@ -260,12 +261,12 @@ impl DefaultMemoryManager {
 
     /// Create memory manager with in-memory backends and real embeddings (production)
     ///
-    /// Uses HNSW episodic backend (O(log n) vector search) with real embeddings.
+    /// Uses SQLite episodic backend (O(log n) vector search via vectorlite-rs) with real embeddings.
     /// This is the recommended production configuration.
     ///
     /// All memory subsystems use in-memory storage:
-    /// - Episodic: HNSW vector index (real embeddings via `EmbeddingService`)
-    /// - Semantic: Temporary `SurrealDB` instance
+    /// - Episodic: SQLite vector index (real embeddings via `EmbeddingService`)
+    /// - Semantic: Requires explicit SQLite backend configuration
     /// - Procedural: No-op placeholder
     ///
     /// # Arguments
@@ -274,7 +275,7 @@ impl DefaultMemoryManager {
     ///
     /// # Errors
     ///
-    /// Returns error if temporary `SurrealDB` initialization fails
+    /// Returns error if SQLite backend is not configured
     ///
     /// # Example
     ///
@@ -331,12 +332,16 @@ impl DefaultMemoryManager {
         );
 
         let semantic = match config.semantic_backend {
-            SemanticBackendType::SurrealDB => {
-                debug!("Initializing SurrealDB semantic memory");
-                GraphSemanticMemory::new_temp().map_err(|e| {
-                    error!("Failed to initialize SurrealDB semantic memory: {}", e);
-                    e
-                })?
+            SemanticBackendType::Sqlite => {
+                debug!("Initializing SQLite semantic memory");
+                let sqlite_backend =
+                    config.semantic_sqlite_backend.as_ref().ok_or_else(|| {
+                        error!("SQLite semantic backend requested but not configured");
+                        crate::error::MemoryError::InvalidInput(
+                            "SQLite semantic backend not configured".to_string(),
+                        )
+                    })?;
+                GraphSemanticMemory::new_with_sqlite(Arc::clone(sqlite_backend))
             }
             #[cfg(feature = "postgres")]
             SemanticBackendType::PostgreSQL => {
@@ -818,20 +823,15 @@ mod tests {
     async fn test_has_consolidation_with_real_engine() {
         use crate::consolidation::ManualConsolidationEngine;
         use llmspell_graph::extraction::RegexExtractor;
-        use llmspell_graph::storage::surrealdb::SurrealDBBackend;
-        use tempfile::TempDir;
+        use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 
-        let temp = TempDir::new().unwrap();
         let episodic = Arc::new(InMemoryEpisodicMemory::new());
-        let semantic = Arc::new(GraphSemanticMemory::new_temp().await.unwrap());
+        let sqlite_backend = Arc::new(SqliteBackend::new_temp().await.unwrap());
+        let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(Arc::clone(&sqlite_backend)));
         let procedural = Arc::new(NoopProceduralMemory);
 
         let extractor = Arc::new(RegexExtractor::new());
-        let graph = Arc::new(
-            SurrealDBBackend::new(temp.path().to_path_buf())
-                .await
-                .unwrap(),
-        );
+        let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
         let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
 
         let mgr = DefaultMemoryManager::with_consolidation(episodic, semantic, procedural, engine);

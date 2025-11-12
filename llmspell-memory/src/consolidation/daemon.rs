@@ -27,8 +27,7 @@
 //! use llmspell_memory::consolidation::prompts::PromptVersion;
 //! use llmspell_memory::InMemoryEpisodicMemory;
 //! use llmspell_providers::{ProviderConfig, rig::RigProvider};
-//! use llmspell_graph::storage::surrealdb::SurrealDBBackend;
-//! use tempfile::TempDir;
+//! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 //!
 //! #[tokio::main]
 //! async fn main() -> llmspell_memory::Result<()> {
@@ -41,14 +40,14 @@
 //!         active_session_threshold_secs: 300,
 //!     };
 //!
-//!     let temp = TempDir::new().unwrap();
+//!     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await.unwrap());
 //!     let provider_config = ProviderConfig::new_with_type(
 //!         "test-provider",
 //!         "ollama",
 //!         "llama3.2:3b",
 //!     );
 //!     let provider = Arc::new(RigProvider::new(provider_config).unwrap());
-//!     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+//!     let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
 //!     let llm_config = LLMConsolidationConfig {
 //!         model: "ollama/llama3.2:3b".into(),
 //!         fallback_models: vec![],

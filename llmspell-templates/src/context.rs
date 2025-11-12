@@ -693,7 +693,6 @@ mod tests {
         // Create in-memory MemoryManager for testing
         let memory = Arc::new(
             llmspell_memory::DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager"),
         );
 

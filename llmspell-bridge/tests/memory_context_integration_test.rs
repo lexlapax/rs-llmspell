@@ -31,7 +31,6 @@ fn setup_integrated_lua_env() -> (Lua, Arc<DefaultMemoryManager>) {
     // Create memory manager
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
-            .await
             .expect("Failed to create memory manager")
     });
     let memory_manager = Arc::new(memory_manager);

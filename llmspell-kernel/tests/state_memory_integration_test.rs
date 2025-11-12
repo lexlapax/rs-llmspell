@@ -17,7 +17,6 @@ use std::sync::Arc;
 async fn test_state_transitions_create_patterns() {
     // Create memory manager and state manager with memory integration
     let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
         .expect("Failed to create memory manager");
     let memory_arc = Arc::new(memory_manager);
 
@@ -29,7 +28,6 @@ async fn test_state_transitions_create_patterns() {
 
     let state_manager =
         StateManager::with_backend(StorageBackendType::Memory, config, Some(memory_arc.clone()))
-            .await
             .expect("Failed to create state manager");
 
     // Perform same state transition 3 times
@@ -54,7 +52,6 @@ async fn test_state_transitions_create_patterns() {
 async fn test_pattern_threshold_detection() {
     // Create memory manager and state manager
     let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
         .expect("Failed to create memory manager");
     let memory_arc = Arc::new(memory_manager);
 
@@ -166,7 +163,6 @@ async fn test_state_without_memory_manager() {
 async fn test_multiple_scopes_and_keys() {
     // Test that different scopes and keys create separate patterns
     let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
         .expect("Failed to create memory manager");
     let memory_arc = Arc::new(memory_manager);
 
@@ -245,7 +241,6 @@ async fn test_multiple_scopes_and_keys() {
 async fn test_state_value_changes_tracked() {
     // Verify that changing from one value to another is tracked
     let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
         .expect("Failed to create memory manager");
     let memory_arc = Arc::new(memory_manager);
 

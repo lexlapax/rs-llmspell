@@ -160,7 +160,6 @@ impl ContextBridge {
         let strategy_enum = Self::parse_strategy(strategy)?;
 
         self.assemble_context_async(query, strategy_enum, max_tokens, session_id)
-            .await
     }
 
     /// Validate token budget constraints
@@ -211,8 +210,7 @@ impl ContextBridge {
         debug!("Entering async context assembly");
 
         let chunks = self
-            .retrieve_chunks(query, strategy, max_tokens, session_id)
-            .await?;
+            .retrieve_chunks(query, strategy, max_tokens, session_id)?;
 
         debug!("Retrieved {} chunks", chunks.len());
 
@@ -637,7 +635,6 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
 
@@ -674,7 +671,6 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
 
@@ -716,7 +712,6 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
 

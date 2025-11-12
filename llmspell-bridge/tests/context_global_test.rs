@@ -27,7 +27,6 @@ fn test_context_global_injection() {
     // Create memory manager using global runtime
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
-            .await
             .expect("Failed to create memory manager")
     });
 
@@ -113,7 +112,6 @@ fn test_context_assemble_semantic() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
 
@@ -171,7 +169,6 @@ fn test_context_strategy_validation() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
 
@@ -236,7 +233,6 @@ fn test_context_test() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
 
@@ -302,7 +298,6 @@ fn test_context_assemble_rag_without_pipeline() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
 
@@ -386,7 +381,6 @@ fn test_context_assemble_rag_with_pipeline() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
 

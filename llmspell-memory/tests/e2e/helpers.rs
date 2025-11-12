@@ -2,8 +2,8 @@
 //!
 //! Utilities for creating test engines, asserting graph state, and calculating DMR.
 
-use llmspell_graph::storage::surrealdb::SurrealDBBackend;
 use llmspell_graph::traits::KnowledgeGraph;
+use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 use llmspell_memory::consolidation::{
     ConsolidationMetrics, DecisionPayload, DecisionType, LLMConsolidationConfig,
     LLMConsolidationEngine,
@@ -54,9 +54,9 @@ pub struct TestEngine {
 ///
 /// Test engine bundle with LLM engine, metrics, knowledge graph, and temp directory
 pub async fn create_test_engine() -> TestEngine {
-    // Create knowledge graph with temp directory
-    let knowledge_graph =
-        Arc::new(SurrealDBBackend::new_temp().await.unwrap()) as Arc<dyn KnowledgeGraph>;
+    // Create knowledge graph with temp SQLite backend
+    let sqlite_backend = Arc::new(SqliteBackend::new_temp().await.unwrap());
+    let knowledge_graph = Arc::new(SqliteGraphStorage::new(sqlite_backend)) as Arc<dyn KnowledgeGraph>;
 
     // Create temp dir for test cleanup
     let temp_dir = TempDir::new().unwrap();

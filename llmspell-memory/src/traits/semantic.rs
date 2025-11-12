@@ -39,12 +39,15 @@ pub use llmspell_graph::types::{Entity, Relationship};
 /// ```rust,no_run
 /// use llmspell_memory::prelude::*;
 /// use llmspell_memory::semantic::GraphSemanticMemory;
+/// use llmspell_storage::backends::sqlite::SqliteBackend;
 /// use serde_json::json;
 /// use chrono::Utc;
+/// use std::sync::Arc;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
-///     let semantic = GraphSemanticMemory::new_temp().await?;
+///     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await?);
+///     let semantic = GraphSemanticMemory::new_with_sqlite(sqlite_backend);
 ///
 ///     // Add an entity
 ///     semantic.upsert_entity(Entity::new(

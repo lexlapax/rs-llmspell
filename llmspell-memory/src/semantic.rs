@@ -40,16 +40,33 @@ impl GraphSemanticMemory {
         Self { graph }
     }
 
-    /// Create semantic memory with temporary `SQLite` backend (for testing)
+    /// Create semantic memory with `SQLite` backend
     ///
-    /// # Errors
-    /// Returns error if `SQLite` initialization fails
-    pub fn new_temp() -> Result<Self> {
-        // For testing, create temp SQLite backend
-        // Note: requires llmspell-storage SqliteBackend setup
-        Err(MemoryError::InvalidInput(
-            "new_temp() requires SQLite backend - use new() with SqliteBackend::new() from llmspell-storage".to_string()
-        ))
+    /// Uses `SQLite` bi-temporal graph storage with transaction-level isolation.
+    ///
+    /// # Arguments
+    ///
+    /// * `sqlite_backend` - `SQLite` backend instance
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use std::sync::Arc;
+    /// # use llmspell_storage::backends::sqlite::SqliteBackend;
+    /// # use llmspell_memory::semantic::GraphSemanticMemory;
+    /// # async fn example() -> llmspell_memory::Result<()> {
+    /// let sqlite_backend = Arc::new(SqliteBackend::new_temp().await?);
+    /// let semantic = GraphSemanticMemory::new_with_sqlite(sqlite_backend);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn new_with_sqlite(
+        sqlite_backend: Arc<llmspell_storage::backends::sqlite::SqliteBackend>,
+    ) -> Self {
+        use llmspell_storage::backends::sqlite::SqliteGraphStorage;
+        let graph = SqliteGraphStorage::new(sqlite_backend);
+        Self::new(Arc::new(graph))
     }
 
     /// Create semantic memory with `PostgreSQL` backend
@@ -203,14 +220,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_graph_semantic_memory_create() {
-        let memory = GraphSemanticMemory::new_temp().await.unwrap();
+        let backend = Arc::new(
+            llmspell_storage::backends::sqlite::SqliteBackend::new_temp()
+                .await
+                .unwrap(),
+        );
+        let memory = GraphSemanticMemory::new_with_sqlite(backend);
         // Just verify it was created without panicking
         assert!(Arc::strong_count(&memory.graph) > 0);
     }
 
     #[tokio::test]
     async fn test_upsert_and_get_entity() {
-        let memory = GraphSemanticMemory::new_temp().await.unwrap();
+        let backend = Arc::new(
+            llmspell_storage::backends::sqlite::SqliteBackend::new_temp()
+                .await
+                .unwrap(),
+        );
+        let memory = GraphSemanticMemory::new_with_sqlite(backend);
 
         let entity = Entity::new(
             "Rust".into(),
@@ -230,7 +257,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_nonexistent_entity() {
-        let memory = GraphSemanticMemory::new_temp().await.unwrap();
+        let backend = Arc::new(
+            llmspell_storage::backends::sqlite::SqliteBackend::new_temp()
+                .await
+                .unwrap(),
+        );
+        let memory = GraphSemanticMemory::new_with_sqlite(backend);
 
         let result = memory.get_entity("nonexistent").await.unwrap();
         assert!(result.is_none());
@@ -238,7 +270,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_by_type() {
-        let memory = GraphSemanticMemory::new_temp().await.unwrap();
+        let backend = Arc::new(
+            llmspell_storage::backends::sqlite::SqliteBackend::new_temp()
+                .await
+                .unwrap(),
+        );
+        let memory = GraphSemanticMemory::new_with_sqlite(backend);
 
         memory
             .upsert_entity(Entity::new("Rust".into(), "language".into(), json!({})))

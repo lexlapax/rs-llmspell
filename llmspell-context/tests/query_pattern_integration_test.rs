@@ -17,7 +17,6 @@ use std::sync::Arc;
 async fn setup_memory_with_entries() -> Arc<DefaultMemoryManager> {
     let memory = Arc::new(
         DefaultMemoryManager::new_in_memory()
-            .await
             .expect("Failed to create memory manager"),
     );
 

@@ -28,7 +28,6 @@ fn test_memory_global_injection() {
     // Create memory manager using global runtime
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
-            .await
             .expect("Failed to create memory manager")
     });
 
@@ -104,7 +103,6 @@ fn test_memory_episodic_search() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
         let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
@@ -136,7 +134,6 @@ fn test_memory_semantic_query() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
         let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
@@ -196,7 +193,6 @@ fn test_memory_stats() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager")
         });
         let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));

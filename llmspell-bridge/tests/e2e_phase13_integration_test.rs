@@ -21,7 +21,6 @@ async fn setup_test_env() -> (
 ) {
     let memory_manager = Arc::new(
         DefaultMemoryManager::new_in_memory()
-            .await
             .expect("Failed to create memory manager"),
     );
     let memory_bridge = Arc::new(MemoryBridge::new(memory_manager.clone()));

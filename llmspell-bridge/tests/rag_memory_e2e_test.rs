@@ -104,7 +104,6 @@ async fn create_memory_with_test_data(session_id: &str) -> Arc<DefaultMemoryMana
 
     let memory = Arc::new(
         DefaultMemoryManager::new_in_memory()
-            .await
             .expect("Failed to create memory manager"),
     );
 
@@ -136,7 +135,6 @@ async fn create_memory_with_test_data(session_id: &str) -> Arc<DefaultMemoryMana
         memory
             .episodic()
             .add(entry)
-            .await
             .expect("Failed to add episodic entry");
     }
 
@@ -270,7 +268,6 @@ async fn test_rag_memory_session_isolation() {
     // Setup: Create memory with entries in two different sessions
     let memory = Arc::new(
         DefaultMemoryManager::new_in_memory()
-            .await
             .expect("Failed to create memory manager"),
     );
 

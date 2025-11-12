@@ -36,13 +36,13 @@ pub enum EpisodicBackendType {
 ///
 /// # Backend Characteristics
 ///
-/// - **`SurrealDB`**: Default bi-temporal graph database with embedded storage
+/// - **`Sqlite`**: Default bi-temporal graph database with embedded storage (via `SqliteGraphStorage`)
 /// - **`PostgreSQL`**: Production-ready with `PostgreSQL` bi-temporal graph tables, multi-tenant `RLS`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SemanticBackendType {
-    /// `SurrealDB` embedded graph database (default, for development and production)
+    /// `SQLite` bi-temporal graph database (default, for development and production)
     #[default]
-    SurrealDB,
+    Sqlite,
 
     /// `PostgreSQL` bi-temporal graph tables (for production, multi-tenant, `RLS`-enabled)
     #[cfg(feature = "postgres")]
@@ -61,7 +61,7 @@ pub enum SemanticBackendType {
 /// // Testing configuration (no embeddings required)
 /// let test_config = MemoryConfig::for_testing();
 ///
-/// // Production configuration with custom HNSW tuning
+/// // Production configuration with SQLite backend
 /// # use llmspell_memory::embeddings::EmbeddingService;
 /// # use llmspell_core::traits::embedding::EmbeddingProvider;
 /// # use std::sync::Arc;
@@ -92,6 +92,9 @@ pub struct MemoryConfig {
     /// `SQLite` backend for episodic memory (used if `episodic_backend` = `Sqlite`)
     pub sqlite_backend: Option<Arc<llmspell_storage::backends::sqlite::SqliteBackend>>,
 
+    /// `SQLite` backend for semantic memory (used if `semantic_backend` = `Sqlite`)
+    pub semantic_sqlite_backend: Option<Arc<llmspell_storage::backends::sqlite::SqliteBackend>>,
+
     /// `PostgreSQL` backend for episodic memory (used if `episodic_backend` = `PostgreSQL`)
     #[cfg(feature = "postgres")]
     pub postgres_backend: Option<Arc<llmspell_storage::PostgresBackend>>,
@@ -105,9 +108,10 @@ impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
             episodic_backend: EpisodicBackendType::Sqlite,
-            semantic_backend: SemanticBackendType::SurrealDB,
+            semantic_backend: SemanticBackendType::Sqlite,
             embedding_service: None,
             sqlite_backend: None,
+            semantic_sqlite_backend: None,
             #[cfg(feature = "postgres")]
             postgres_backend: None,
             #[cfg(feature = "postgres")]
@@ -133,9 +137,10 @@ impl MemoryConfig {
     pub const fn for_testing() -> Self {
         Self {
             episodic_backend: EpisodicBackendType::InMemory,
-            semantic_backend: SemanticBackendType::SurrealDB,
+            semantic_backend: SemanticBackendType::Sqlite,
             embedding_service: None,
             sqlite_backend: None,
+            semantic_sqlite_backend: None,
             #[cfg(feature = "postgres")]
             postgres_backend: None,
             #[cfg(feature = "postgres")]
@@ -176,9 +181,10 @@ impl MemoryConfig {
     pub const fn for_production(embedding_service: Arc<EmbeddingService>) -> Self {
         Self {
             episodic_backend: EpisodicBackendType::Sqlite,
-            semantic_backend: SemanticBackendType::SurrealDB,
+            semantic_backend: SemanticBackendType::Sqlite,
             embedding_service: Some(embedding_service),
             sqlite_backend: None,
+            semantic_sqlite_backend: None,
             #[cfg(feature = "postgres")]
             postgres_backend: None,
             #[cfg(feature = "postgres")]

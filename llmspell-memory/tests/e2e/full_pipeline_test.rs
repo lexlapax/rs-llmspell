@@ -3,7 +3,7 @@
 //! This test validates the complete memory lifecycle:
 //! 1. Add episodic memories (`InMemoryEpisodicMemory`)
 //! 2. Trigger LLM consolidation (`LLMConsolidationEngine` + Ollama)
-//! 3. Verify semantic graph updates (`SurrealDBBackend`)
+//! 3. Verify semantic graph updates (`SqliteGraphStorage`)
 //! 4. Retrieve and assemble context (`BM25Retriever` + `ContextAssembler`)
 //!
 //! # Requirements
@@ -14,7 +14,7 @@
 //!
 //! # Performance Target
 //!
-//! - Complete in <40 seconds (with Ollama + `SurrealDB` temp + BM25)
+//! - Complete in <40 seconds (with Ollama + SQLite temp + BM25)
 
 use llmspell_context::assembly::ContextAssembler;
 use llmspell_context::retrieval::BM25Retriever;
@@ -79,7 +79,7 @@ async fn test_full_pipeline_episodic_to_context() {
     let test_engine = create_test_engine().await;
     let episodic_memory = InMemoryEpisodicMemory::default();
 
-    debug!("Test engine created with LLM consolidation + SurrealDB backend");
+    debug!("Test engine created with LLM consolidation + SQLite backend");
 
     // ============================================================================
     // STEP 2: Add episodic memories (Turn 1 & 2)

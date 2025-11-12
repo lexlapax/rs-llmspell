@@ -18,7 +18,6 @@ fn dmr_benchmark(c: &mut Criterion) {
                 // Setup: Create 100 interactions with known facts at positions 1, 25, 50, 75, 100
                 rt.block_on(async {
                     let mm = DefaultMemoryManager::new_in_memory()
-                        .await
                         .expect("Failed to create memory manager");
 
                     let facts = [
@@ -62,7 +61,6 @@ fn dmr_benchmark(c: &mut Criterion) {
                         let results = mm
                             .episodic()
                             .search(black_box(query), black_box(5))
-                            .await
                             .unwrap();
 
                         // Check if correct fact is in top-5 results

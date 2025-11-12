@@ -34,7 +34,6 @@ fn context_creation_benchmark(c: &mut Criterion) {
     let memory_manager = rt.block_on(async {
         Arc::new(
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager"),
         )
     });
@@ -128,7 +127,6 @@ fn memory_enabled_context_assembly_benchmark(c: &mut Criterion) {
     let memory_manager = rt.block_on(async {
         let mm = Arc::new(
             DefaultMemoryManager::new_in_memory()
-                .await
                 .expect("Failed to create memory manager"),
         );
 

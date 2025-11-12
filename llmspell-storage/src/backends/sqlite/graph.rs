@@ -892,6 +892,91 @@ impl GraphBackend for SqliteGraphStorage {
     }
 }
 
+// Implement KnowledgeGraph trait by delegating to GraphBackend implementation
+#[async_trait]
+impl llmspell_graph::traits::KnowledgeGraph for SqliteGraphStorage {
+    async fn add_entity(&self, entity: Entity) -> llmspell_graph::error::Result<String> {
+        <Self as GraphBackend>::add_entity(self, entity)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn update_entity(
+        &self,
+        id: &str,
+        changes: HashMap<String, Value>,
+    ) -> llmspell_graph::error::Result<()> {
+        <Self as GraphBackend>::update_entity(self, id, changes)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn get_entity(&self, id: &str) -> llmspell_graph::error::Result<Entity> {
+        <Self as GraphBackend>::get_entity(self, id)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn get_entity_at(
+        &self,
+        id: &str,
+        event_time: DateTime<Utc>,
+    ) -> llmspell_graph::error::Result<Entity> {
+        <Self as GraphBackend>::get_entity_at(self, id, event_time)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn add_relationship(
+        &self,
+        relationship: Relationship,
+    ) -> llmspell_graph::error::Result<String> {
+        <Self as GraphBackend>::add_relationship(self, relationship)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn get_related(
+        &self,
+        entity_id: &str,
+        relationship_type: &str,
+    ) -> llmspell_graph::error::Result<Vec<Entity>> {
+        <Self as GraphBackend>::get_related(self, entity_id, relationship_type)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn query_temporal(
+        &self,
+        query: TemporalQuery,
+    ) -> llmspell_graph::error::Result<Vec<Entity>> {
+        <Self as GraphBackend>::query_temporal(self, query)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn delete_before(
+        &self,
+        timestamp: DateTime<Utc>,
+    ) -> llmspell_graph::error::Result<usize> {
+        <Self as GraphBackend>::delete_before(self, timestamp)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn traverse(
+        &self,
+        start_entity_id: &str,
+        relationship_type: Option<&str>,
+        max_depth: usize,
+        at_time: Option<DateTime<Utc>>,
+    ) -> llmspell_graph::error::Result<Vec<(Entity, usize, String)>> {
+        <Self as GraphBackend>::traverse(self, start_entity_id, relationship_type, max_depth, at_time)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
