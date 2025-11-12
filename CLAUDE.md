@@ -25,8 +25,9 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
   - ✅ 13c.2.4: Graph Storage (1,230 lines, bi-temporal)
   - ✅ 13c.2.5: Procedural Storage (885 lines, V5)
   - ✅ 13c.2.6: State Storage (1,619 lines, V6/V7/V8, agent/KV/workflow)
-  - ⏳ 13c.2.7: Auxiliary Tables (V9/V10/V11/V13) (NEXT)
-  - Pending: 13c.2.8-13c.2.12 (Legacy Removal, Testing, Docs)
+  - ✅ 13c.2.7: Auxiliary Tables (3,598 lines, V9/V10/V11/V13, 31 tests, zero warnings)
+  - ⏳ 13c.2.8: Legacy Removal + Graph Traversal Enhancement (NEXT)
+  - Pending: 13c.2.9-13c.2.12 (Testing, Integration, Compatibility, Docs)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
