@@ -127,7 +127,7 @@ impl Infrastructure {
 
         // 5. Create memory manager if enabled
         let memory_manager = if config.runtime.memory.enabled {
-            Some(create_memory_manager(config).await?)
+            Some(create_memory_manager(config)?)
         } else {
             debug!("Memory disabled in config, skipping creation");
             None
@@ -244,7 +244,7 @@ fn create_session_manager(
 ///
 /// # Errors
 ///
-/// Returns an error if SQLite backend or vector storage initialization fails
+/// Returns an error if `SQLite` backend or vector storage initialization fails
 async fn create_rag(
     config: &LLMSpellConfig,
 ) -> Result<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>, LLMSpellError> {
@@ -306,19 +306,19 @@ async fn create_rag(
 /// # Errors
 ///
 /// Returns an error if memory manager initialization fails
-async fn create_memory_manager(
+fn create_memory_manager(
     _config: &LLMSpellConfig,
 ) -> Result<Arc<llmspell_memory::DefaultMemoryManager>, LLMSpellError> {
     debug!("Creating memory manager (enabled via config)");
 
     // Use in-memory implementation (testing/development mode)
     // For production with HNSW and real embeddings, use DefaultMemoryManager::new_in_memory_with_embeddings()
-    let manager = llmspell_memory::DefaultMemoryManager::new_in_memory()
-        .await
-        .map_err(|e| LLMSpellError::Component {
+    let manager = llmspell_memory::DefaultMemoryManager::new_in_memory().map_err(|e| {
+        LLMSpellError::Component {
             message: format!("Failed to create memory manager: {e}"),
             source: None,
-        })?;
+        }
+    })?;
 
     debug!("Memory manager created successfully");
 

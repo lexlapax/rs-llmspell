@@ -1,7 +1,7 @@
 //! ABOUTME: Shared RAG infrastructure initialization for multi-tenant vector storage
 //! ABOUTME: Provides `get_or_create` pattern for RAG management following session infrastructure pattern
 //!
-//! Phase 13c.2.8.13a: Migrated from HNSWVectorStorage to SqliteVectorStorage (vectorlite-rs)
+//! Phase 13c.2.8.13a: Migrated from `HNSWVectorStorage` to `SqliteVectorStorage` (vectorlite-rs)
 
 use crate::globals::GlobalContext;
 use llmspell_config::RAGConfig;
@@ -168,11 +168,11 @@ fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
 
 /// Create vector storage based on RAG configuration
 ///
-/// Returns both the trait object and concrete SqliteVectorStorage for save operations
+/// Returns both the trait object and concrete `SqliteVectorStorage` for save operations
 ///
 /// # Errors
 ///
-/// Returns an error if SQLite backend or vector storage initialization fails
+/// Returns an error if `SQLite` backend or vector storage initialization fails
 async fn create_vector_storage(
     config: &RAGConfig,
     _context: &GlobalContext,
@@ -243,14 +243,14 @@ fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>>
 pub struct RAGInfrastructure {
     pub multi_tenant_rag: Arc<MultiTenantRAG>,
     pub vector_storage: Option<Arc<dyn VectorStorage>>,
-    /// Keep a reference to the concrete SQLite storage for save/load operations
+    /// Keep a reference to the concrete `SQLite` storage for save/load operations
     pub sqlite_storage: Option<Arc<SqliteVectorStorage>>,
 }
 
 impl RAGInfrastructure {
     /// Save vector storage to disk if persistence is configured
     ///
-    /// Note: SQLite storage auto-persists via transactions, so this is a no-op.
+    /// Note: `SQLite` storage auto-persists via transactions, so this is a no-op.
     /// Kept for API compatibility with existing code.
     ///
     /// # Errors

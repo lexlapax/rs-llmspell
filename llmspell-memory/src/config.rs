@@ -14,7 +14,7 @@ use crate::embeddings::EmbeddingService;
 /// # Performance Characteristics
 ///
 /// - **`InMemory`**: O(n) search, good for <1K entries, testing only
-/// - **Sqlite**: O(log n) search with SQLite + vectorlite HNSW, persistent local storage
+/// - **Sqlite**: O(log n) search with `SQLite` + vectorlite HNSW, persistent local storage
 /// - **`PostgreSQL`**: O(log n) search with pgvector, multi-tenant RLS support
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EpisodicBackendType {
@@ -130,7 +130,7 @@ impl MemoryConfig {
     /// assert_eq!(config.episodic_backend, llmspell_memory::config::EpisodicBackendType::InMemory);
     /// ```
     #[must_use]
-    pub fn for_testing() -> Self {
+    pub const fn for_testing() -> Self {
         Self {
             episodic_backend: EpisodicBackendType::InMemory,
             semantic_backend: SemanticBackendType::SurrealDB,
@@ -173,7 +173,7 @@ impl MemoryConfig {
     /// let config = MemoryConfig::for_production(service);
     /// ```
     #[must_use]
-    pub fn for_production(embedding_service: Arc<EmbeddingService>) -> Self {
+    pub const fn for_production(embedding_service: Arc<EmbeddingService>) -> Self {
         Self {
             episodic_backend: EpisodicBackendType::Sqlite,
             semantic_backend: SemanticBackendType::SurrealDB,

@@ -44,7 +44,7 @@ impl GraphSemanticMemory {
     ///
     /// # Errors
     /// Returns error if `SQLite` initialization fails
-    pub async fn new_temp() -> Result<Self> {
+    pub fn new_temp() -> Result<Self> {
         // For testing, create temp SQLite backend
         // Note: requires llmspell-storage SqliteBackend setup
         Err(MemoryError::InvalidInput(

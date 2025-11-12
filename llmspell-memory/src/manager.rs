@@ -183,7 +183,7 @@ impl DefaultMemoryManager {
     /// # async fn example() -> llmspell_memory::Result<()> {
     /// // Testing configuration (InMemory backend, no embeddings)
     /// let test_config = MemoryConfig::for_testing();
-    /// let test_manager = DefaultMemoryManager::with_config(test_config).await?;
+    /// let test_manager = DefaultMemoryManager::with_config(test_config)?;
     ///
     /// // Production configuration (HNSW backend with embeddings)
     /// # use llmspell_memory::embeddings::EmbeddingService;
@@ -201,11 +201,11 @@ impl DefaultMemoryManager {
     /// # let provider: Arc<dyn EmbeddingProvider> = Arc::new(MockProvider);
     /// let service = Arc::new(EmbeddingService::new(provider));
     /// let prod_config = MemoryConfig::for_production(service);
-    /// let prod_manager = DefaultMemoryManager::with_config(prod_config).await?;
+    /// let prod_manager = DefaultMemoryManager::with_config(prod_config)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn with_config(config: crate::config::MemoryConfig) -> Result<Self> {
+    pub fn with_config(config: crate::config::MemoryConfig) -> Result<Self> {
         use crate::episodic::EpisodicBackend;
 
         info!(
@@ -218,7 +218,7 @@ impl DefaultMemoryManager {
         info!("Episodic backend created: {}", episodic.backend_name());
 
         // Create other subsystems
-        let semantic = Self::create_semantic_memory(&config).await?;
+        let semantic = Self::create_semantic_memory(&config)?;
         let procedural = Self::create_procedural_memory();
 
         info!("DefaultMemoryManager initialized successfully with config");
@@ -246,16 +246,16 @@ impl DefaultMemoryManager {
     ///
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
-    ///     let manager = DefaultMemoryManager::new_in_memory().await?;
+    ///     let manager = DefaultMemoryManager::new_in_memory()?;
     ///     Ok(())
     /// }
     /// ```
-    pub async fn new_in_memory() -> Result<Self> {
+    pub fn new_in_memory() -> Result<Self> {
         info!("Initializing DefaultMemoryManager with InMemory backends (testing mode)");
 
         // Use InMemory backend for testing
         let config = crate::config::MemoryConfig::for_testing();
-        Self::with_config(config).await
+        Self::with_config(config)
     }
 
     /// Create memory manager with in-memory backends and real embeddings (production)
@@ -302,11 +302,11 @@ impl DefaultMemoryManager {
     ///     let service = Arc::new(EmbeddingService::new(provider));
     ///
     ///     // Create manager with HNSW backend and real embeddings
-    ///     let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).await?;
+    ///     let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service)?;
     ///     Ok(())
     /// }
     /// ```
-    pub async fn new_in_memory_with_embeddings(
+    pub fn new_in_memory_with_embeddings(
         embedding_service: Arc<crate::embeddings::EmbeddingService>,
     ) -> Result<Self> {
         info!(
@@ -316,11 +316,11 @@ impl DefaultMemoryManager {
 
         // Use HNSW backend for production
         let config = crate::config::MemoryConfig::for_production(embedding_service);
-        Self::with_config(config).await
+        Self::with_config(config)
     }
 
     /// Helper: Create semantic memory from configuration
-    async fn create_semantic_memory(
+    fn create_semantic_memory(
         config: &crate::config::MemoryConfig,
     ) -> Result<Arc<dyn SemanticMemory>> {
         use crate::config::SemanticBackendType;
@@ -333,7 +333,7 @@ impl DefaultMemoryManager {
         let semantic = match config.semantic_backend {
             SemanticBackendType::SurrealDB => {
                 debug!("Initializing SurrealDB semantic memory");
-                GraphSemanticMemory::new_temp().await.map_err(|e| {
+                GraphSemanticMemory::new_temp().map_err(|e| {
                     error!("Failed to initialize SurrealDB semantic memory: {}", e);
                     e
                 })?

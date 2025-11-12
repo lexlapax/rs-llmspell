@@ -96,12 +96,12 @@ fn extract_memory_manager(
 }
 
 /// Create in-memory fallback memory manager
-async fn create_fallback_memory_manager() -> Option<Arc<dyn llmspell_memory::MemoryManager>> {
+fn create_fallback_memory_manager() -> Option<Arc<dyn llmspell_memory::MemoryManager>> {
     use llmspell_memory::DefaultMemoryManager;
     use tracing::{debug, info, warn};
 
     info!("No memory_manager in context, creating in-memory fallback");
-    match DefaultMemoryManager::new_in_memory().await {
+    match DefaultMemoryManager::new_in_memory() {
         Ok(manager) => {
             debug!("Created in-memory MemoryManager successfully");
             Some(Arc::new(manager) as Arc<dyn llmspell_memory::MemoryManager>)
@@ -146,8 +146,7 @@ async fn register_memory_context_globals(
     let memory_manager_opt = if memory_manager_from_context.is_some() {
         memory_manager_from_context
     } else {
-        let fallback = create_fallback_memory_manager().await;
-        fallback
+        create_fallback_memory_manager()
     };
 
     if let Some(memory_manager) = memory_manager_opt {

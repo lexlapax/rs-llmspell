@@ -1,7 +1,7 @@
 //! Episodic memory implementations (vector-indexed interaction history)
 //!
 //! This module provides multiple storage backends for episodic memory:
-//! - `SqliteEpisodicMemory` (production default, O(log n) search with SQLite + vectorlite HNSW, persistent local storage)
+//! - `SqliteEpisodicMemory` (production default, O(log n) search with `SQLite` + vectorlite HNSW, persistent local storage)
 //! - `PostgreSQLEpisodicMemory` (production, O(log n) search with pgvector, RLS multi-tenancy)
 //! - `InMemoryEpisodicMemory` (testing/development, simple `HashMap` with O(n) search)
 //! - `EpisodicBackend` (enum dispatch over backends, selected via config)
