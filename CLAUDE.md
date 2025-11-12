@@ -15,12 +15,18 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
 ## Current Status (Phase 13c - Storage Consolidation)
-- ✅ **Phases 7-13**: Complete (Infrastructure, Services, LLM, Templates, Memory, Context)
-- 🚧 **Phase 13c**: Storage Consolidation & Production Readiness (towards v0.14.0)
-  - ✅ 13c.1: Cargo Dependencies (-60MB)
-  - ✅ 13c.2.0-13c.2.5: Vector + Graph + Procedural Storage Complete (vectorlite-rs, SqliteVectorStorage, SqliteEpisodicMemory, SqliteGraphStorage, SqliteProceduralStorage, 5,575 lines)
-  - ⏳ 13c.2.6: SqliteStateStorage (Agent V6 + KV V7 + Workflow V8) (NEXT)
-  - Pending: 13c.2.7-13c.2.12 (Auxiliary, Legacy Removal, Testing, Docs)
+- ✅ **Phases 7-13**: Complete
+- 🚧 **Phase 13c**: Storage Consolidation → v0.14.0
+  - ✅ 13c.1: Dependencies (-60MB)
+  - ✅ 13c.2.0: Trait Architecture (3 traits, llmspell-core)
+  - ✅ 13c.2.1: libsql Foundation (SqliteBackend, migrations)
+  - ✅ 13c.2.2a: vectorlite-rs (1,098 lines, HNSW)
+  - ✅ 13c.2.3/3a: Vector Storage (1,174 lines, MessagePack persistence, <2ms)
+  - ✅ 13c.2.4: Graph Storage (1,230 lines, bi-temporal)
+  - ✅ 13c.2.5: Procedural Storage (885 lines, V5)
+  - ✅ 13c.2.6: State Storage (1,619 lines, V6/V7/V8, agent/KV/workflow)
+  - ⏳ 13c.2.7: Auxiliary Tables (V9/V10/V11/V13) (NEXT)
+  - Pending: 13c.2.8-13c.2.12 (Legacy Removal, Testing, Docs)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
@@ -95,8 +101,8 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 4. Update TODO.md sub-tasks as completed
 
 ## Recent Releases
-- **v0.13.0** (Phase 13): 3-tier memory (episodic/semantic/procedural), hot-swap backends, context engineering, <2ms overhead, 149 tests
-- **v0.12.0** (Phase 12): 10 experimental templates, multi-agent workflows, CLI+Lua integration, <2ms overhead
+- **v0.13.0**: 3-tier memory, hot-swap backends, context engineering, 149 tests
+- **v0.12.0**: 10 templates, multi-agent workflows, CLI+Lua
 
 ## Banned Project Behaviors
 - Creating new files (edit existing)
