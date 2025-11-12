@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS event_log (
     -- Unique constraint: One event per (tenant, event_id)
     UNIQUE(tenant_id, event_id),
 
-    -- Unique constraint: Prevent duplicate sequences
-    UNIQUE(sequence)
+    -- Unique constraint: Prevent duplicate sequences per tenant
+    UNIQUE(tenant_id, sequence)
 );
 
 -- ============================================================================

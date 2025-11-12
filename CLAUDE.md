@@ -104,12 +104,12 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - **v0.13.0**: 3-tier memory, hot-swap backends, context engineering, 149 tests
 - **v0.12.0**: 10 templates, multi-agent workflows, CLI+Lua
 
-## Banned Project Behaviors
-- Creating new files (edit existing)
-- Adding dependencies (use existing or llmspell-utils)
-- Implementing features from future phases
-- Leaving TODO comments in code
-- Using unwrap() in production code
-- Skipping tests to meet deadlines
-- When writing Lua scripts, use `docs/user-guide/api/lua/README.md` for API reference - DO NOT GUESS method names
-- include attribution footers in git commits
+## Strict Project Behaviors
+- Do not Create new files (edit existing if possible)
+- Do Not add dependencies (use existing or llmspell-utils if possible)
+- Do not Implement features from future phases
+- Never Leave TODO comments in code, implement in place
+- No Using unwrap() in production code
+- No Skipping tests to meet deadlines
+- Never guess method names when writing Lua scripts, use `docs/user-guide/appendix/lua-api-reference.md` for API reference 
+- Never include claude attribution footers in git commits or in code

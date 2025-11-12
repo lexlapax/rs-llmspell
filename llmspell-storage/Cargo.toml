@@ -25,6 +25,7 @@ uuid = { workspace = true }
 chrono = { workspace = true } # Phase 13b.5.2: For bi-temporal timestamps
 tempfile = { workspace = true, optional = true }
 rand.workspace = true # Phase 13b.14: For checksum sampling
+lz4_flex.workspace = true # Phase 13c.2.7: For hook history compression
 
 # HNSW implementation dependencies
 hnsw_rs = { version = "0.3.2" }
