@@ -124,18 +124,12 @@ impl Default for PersistenceConfigBuilder {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StorageBackendType {
     Memory,
-    Sled(SledConfig),
     RocksDB(RocksDBConfig),
     #[cfg(feature = "postgres")]
     Postgres(PostgresConfig),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SledConfig {
-    pub path: std::path::PathBuf,
-    pub cache_capacity: u64,
-    pub use_compression: bool,
-}
+// SledConfig removed - Sled backend deprecated in Phase 13c
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RocksDBConfig {

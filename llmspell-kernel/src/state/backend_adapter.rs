@@ -23,11 +23,6 @@ pub async fn create_storage_backend(
             let backend = llmspell_storage::MemoryBackend::new();
             Ok(Arc::new(backend) as Arc<dyn StorageBackend>)
         }
-        StorageBackendType::Sled(config) => {
-            let backend = llmspell_storage::SledBackend::new_with_path(&config.path)
-                .map_err(|e| StateError::storage(e.to_string()))?;
-            Ok(Arc::new(backend) as Arc<dyn StorageBackend>)
-        }
         StorageBackendType::RocksDB(_config) => {
             // RocksDB backend to be implemented in future phase
             Err(StateError::storage(

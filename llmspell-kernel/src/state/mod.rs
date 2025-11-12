@@ -80,19 +80,19 @@ pub use agent_state::{
 pub use backend_adapter::StateStorageAdapter;
 pub use config::{
     BackupConfig, EncryptionConfig, PerformanceConfig, PersistenceConfig, RocksDBConfig,
-    SledConfig, StorageBackendType,
+    StorageBackendType,
 };
 pub use manager::{HookReplayManager, SerializedHookExecution, StateManager};
 pub use sensitive_data::{RedactSensitiveData, SensitiveDataConfig, SensitiveDataProtector};
 
 // Re-export original kernel storage types
 pub use kernel_backends::{
-    MemoryBackend as KernelMemoryBackend, SledBackend as KernelSledBackend, StorageBackend,
+    MemoryBackend as KernelMemoryBackend, StorageBackend,
     VectorBackend,
 };
 
 // Re-export comprehensive storage backends
-pub use backends::{MemoryBackend, SledBackend};
+pub use backends::MemoryBackend;
 
 // Re-export vector storage types
 pub use vector_storage::{

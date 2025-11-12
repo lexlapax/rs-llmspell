@@ -74,8 +74,8 @@ where
             .expect("Failed to create SqliteBackend"),
     );
 
-    let config = MemoryConfig::for_production(embedding_service)
-        .with_sqlite_backend(sqlite_backend);
+    let config =
+        MemoryConfig::for_production(embedding_service).with_sqlite_backend(sqlite_backend);
     let backend = EpisodicBackend::from_config(&config).expect("Sqlite backend creation failed");
     let backend_arc: Arc<dyn EpisodicMemory> = Arc::new(backend);
     test_fn(backend_arc).await;
@@ -277,8 +277,8 @@ async fn test_backend_name() {
             .expect("Failed to create SqliteBackend"),
     );
 
-    let config = MemoryConfig::for_production(embedding_service)
-        .with_sqlite_backend(sqlite_backend);
+    let config =
+        MemoryConfig::for_production(embedding_service).with_sqlite_backend(sqlite_backend);
     let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
     assert_eq!(backend.backend_name(), "Sqlite");
 }
@@ -307,8 +307,8 @@ async fn test_config_for_production() {
             .expect("Failed to create SqliteBackend"),
     );
 
-    let config = MemoryConfig::for_production(embedding_service)
-        .with_sqlite_backend(sqlite_backend);
+    let config =
+        MemoryConfig::for_production(embedding_service).with_sqlite_backend(sqlite_backend);
     let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
     assert_eq!(backend.backend_name(), "Sqlite");
 }

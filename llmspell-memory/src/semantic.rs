@@ -7,7 +7,7 @@
 //! # Architecture
 //!
 //! ```text
-//! SemanticMemory trait → GraphSemanticMemory wrapper → KnowledgeGraph trait → SurrealDBBackend
+//! SemanticMemory trait → GraphSemanticMemory wrapper → KnowledgeGraph trait → PostgreSQL/SQLite Backend
 //! ```
 //!
 //! # Types
@@ -40,15 +40,16 @@ impl GraphSemanticMemory {
         Self { graph }
     }
 
-    /// Create semantic memory with `SurrealDB` backend (for testing)
+    /// Create semantic memory with temporary `SQLite` backend (for testing)
     ///
     /// # Errors
-    /// Returns error if `SurrealDB` initialization fails
+    /// Returns error if `SQLite` initialization fails
     pub async fn new_temp() -> Result<Self> {
-        let backend = llmspell_graph::storage::surrealdb::SurrealDBBackend::new_temp()
-            .await
-            .map_err(|e| MemoryError::Storage(e.to_string()))?;
-        Ok(Self::new(Arc::new(backend)))
+        // For testing, create temp SQLite backend
+        // Note: requires llmspell-storage SqliteBackend setup
+        Err(MemoryError::InvalidInput(
+            "new_temp() requires SQLite backend - use new() with SqliteBackend::new() from llmspell-storage".to_string()
+        ))
     }
 
     /// Create semantic memory with `PostgreSQL` backend

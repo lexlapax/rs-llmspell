@@ -84,9 +84,6 @@ lru = "0.12"
 # Phase 13c.1.6: blake3 removed (unused in production code)
 lz4_flex = { workspace = true }
 
-# Storage
-sled = "0.34"
-
 # Compression libraries (for consolidated state persistence)
 zstd = "0.13"
 
