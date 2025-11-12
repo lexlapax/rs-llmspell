@@ -357,7 +357,7 @@ pub async fn from_config(config: &LLMSpellConfig) -> Result<Self> {
 
 3. SessionManager          [Depends on: StateManager]
    ├─ StateManager (injected)
-   ├─ StorageBackend (memory or sled)
+   ├─ StorageBackend (memory, sqlite, or postgres)
    ├─ HookRegistry
    ├─ HookExecutor
    └─ EventBus

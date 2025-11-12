@@ -102,7 +102,7 @@ Rs-LLMSpell is a **complete AI system with adaptive memory** that revolutionizes
 
 **📦 Comprehensive Built-in Library**: 40+ production-ready tools across 8 categories, multiple agent templates, and proven workflow patterns—no need to reinvent common functionality.
 
-**🔌 Bridge-First Philosophy**: Leverages the best existing Rust crates (rig for LLM providers, mlua for Lua, sled/rocksdb for storage) rather than reimplementing. Standing on the shoulders of giants.
+**🔌 Bridge-First Philosophy**: Leverages the best existing Rust crates (rig for LLM providers, mlua for Lua, sqlite/postgres for storage) rather than reimplementing. Standing on the shoulders of giants.
 
 **🚀 Zero-Compilation Development**: Test complex AI behaviors instantly without recompilation cycles. Perfect for rapid experimentation and production deployments alike.
 
@@ -1239,7 +1239,7 @@ base_url = "http://localhost:11434"
 timeout = 120
 
 [storage]
-backend = "sled"
+backend = "sqlite"
 path = "./llmspell_data"
 max_size = "1GB"
 
@@ -2188,7 +2188,7 @@ llmspell-state-traits: [NEW - Phase 5]
     ↓
 llmspell-storage:
   - Backend-agnostic persistence layer
-  - StorageBackend trait with Memory, Sled, RocksDB implementations
+  - StorageBackend trait with Memory, SQLite, PostgreSQL implementations
   - Type-safe serialization abstractions (StorageSerialize trait)
   - Used by agent registry and state persistence
     ↓
@@ -2429,7 +2429,7 @@ When running a Lua script from the command line, the following sequence occurs:
 
 3. Phased Initialization
    ├─> Phase 1: Infrastructure
-   │   ├─> Storage backend (sled/rocksdb)
+   │   ├─> Storage backend (sqlite/postgres)
    │   ├─> Network configuration
    │   ├─> Resource limits setup
    │   └─> Security manager
@@ -5678,7 +5678,7 @@ Phase 5 achieved exceptional performance metrics:
 ### Production Features Summary
 
 This state management architecture provides:
-- **Flexibility**: Multiple storage backends (Memory, Sled, RocksDB) and synchronization strategies
+- **Flexibility**: Multiple storage backends (Memory, SQLite, PostgreSQL) and synchronization strategies
 - **Reliability**: Automatic conflict resolution and migration support with rollback
 - **Performance**: 6-tier optimization architecture with StateClass system
 - **Security**: Circular reference detection, sensitive data protection, encryption
@@ -28910,7 +28910,7 @@ cors_enabled = true                 # Enable CORS
 cors_origins = ["*"]                # Allowed CORS origins
 
 [storage]
-backend = "sled"                    # Storage backend: "sled", "rocksdb", "memory"
+backend = "sqlite"                    # Storage backend: "sqlite", "postgres", "memory"
 path = "/var/lib/rs-llmspell/db"   # Database path
 connection_pool_size = 10           # Connection pool size
 query_timeout = 5000                # Query timeout in milliseconds
