@@ -5,9 +5,9 @@
 //! [dependencies]
 //! serde = { version = "1.0", features = ["derive"] }
 //! serde_json = "1.0"
-//! chrono = "0.4"
+//! chrono = { version = "0.4", features = ["serde"] }
 //! rand = "0.8"
-//! uuid = { version = "1.0", features = ["v4"] }
+//! uuid = { version = "1.0", features = ["v4", "serde"] }
 //! ```
 
 use chrono::{DateTime, Duration, Utc};

@@ -937,7 +937,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
                 FROM llmspell.entities e
                 WHERE e.entity_id = $1
                   AND e.tenant_id = $2
-                  AND tstzrange(e.valid_time_start, e.valid_time_end) @> $3
+                  AND tstzrange(e.valid_time_start, e.valid_time_end) @> $3::timestamptz
                   AND tstzrange(e.transaction_time_start, e.transaction_time_end) @> now()
 
                 UNION ALL
@@ -958,9 +958,9 @@ impl KnowledgeGraph for PostgresGraphStorage {
                 JOIN llmspell.entities e ON r.to_entity = e.entity_id
                 WHERE gt.depth < $4
                   AND r.tenant_id = $2
-                  AND tstzrange(r.valid_time_start, r.valid_time_end) @> $3
+                  AND tstzrange(r.valid_time_start, r.valid_time_end) @> $3::timestamptz
                   AND tstzrange(r.transaction_time_start, r.transaction_time_end) @> now()
-                  AND tstzrange(e.valid_time_start, e.valid_time_end) @> $3
+                  AND tstzrange(e.valid_time_start, e.valid_time_end) @> $3::timestamptz
                   AND tstzrange(e.transaction_time_start, e.transaction_time_end) @> now()
                   {}
                   AND NOT (e.entity_id = ANY(gt.path))

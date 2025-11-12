@@ -37,3 +37,6 @@ hnsw_indices
 
 sessions/
 .cargo/config.toml
+
+# Benchmark datasets
+benchmarks/graph-dataset/*.json

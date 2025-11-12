@@ -7,9 +7,9 @@
 //! [dependencies]
 //! serde = { version = "1.0", features = ["derive"] }
 //! serde_json = "1.0"
-//! chrono = "0.4"
+//! chrono = { version = "0.4", features = ["serde"] }
 //! rand = "0.8"
-//! uuid = { version = "1.0", features = ["v4"] }
+//! uuid = { version = "1.0", features = ["v4", "serde"] }
 //! ```
 
 use chrono::{DateTime, Duration, Utc};
@@ -70,8 +70,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut entities = Vec::new();
     let mut entity_ids = Vec::new();
 
-    for (entity_type, count) in entity_types {
-        for i in 0..count {
+    for (entity_type, count) in &entity_types {
+        for i in 0..*count {
             let id = Uuid::new_v4().to_string();
             let event_time = five_years_ago
                 + Duration::seconds(rng.gen_range(0..(365 * 5 * 24 * 3600)));
@@ -167,13 +167,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     writeln!(summary_file)?;
     writeln!(summary_file, "Entity Types:")?;
-    for (entity_type, count) in entity_types {
+    for (entity_type, count) in &entity_types {
         writeln!(
             summary_file,
             "  - {}: {} ({:.1}%)",
             entity_type,
             count,
-            (count as f64 / entities.len() as f64) * 100.0
+            (*count as f64 / entities.len() as f64) * 100.0
         )?;
     }
     writeln!(summary_file)?;
