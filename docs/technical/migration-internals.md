@@ -721,7 +721,7 @@ Phase 1 (current release) supports:
 - **Components**: `agent_state`, `workflow_state`, `sessions` only
 
 **Unsupported Components** (Phase 2/3 - see preview below):
-- **Phase 2**: `episodic_memory` (HNSW files), `semantic_memory` (SurrealDB)
+- **Phase 2**: `episodic_memory` (SQLite HNSW via vectorlite-rs), `semantic_memory` (SQLite/PostgreSQL graph)
 - **Phase 3**: `artifacts` (filesystem), `events`, `hooks`, `api_keys`
 
 **Solution**: Wait for Phase 2/3 release (estimated Q1 2025) or use PostgreSQL backend directly (no migration needed).
@@ -1065,10 +1065,11 @@ Phase 1 (current release) supports critical production state migration. Phase 2/
 - **Components**: `episodic_memory`
 - **Estimated Effort**: 2-3 days implementation + testing
 
-**Semantic Memory** (SurrealDB embedded → PostgreSQL):
-- **Challenge**: SurrealDB query translation, bi-temporal graph preservation
-- **Solution**: SurrealDB storage adapter, bi-temporal CTE migration, time-travel query equivalence
+**Semantic Memory** (SQLite/PostgreSQL graph storage):
+- **Challenge**: Bi-temporal graph preservation, query translation
+- **Solution**: Bi-temporal CTE migration, time-travel query equivalence, graph traversal optimization
 - **Components**: `semantic_memory`
+- **Current Status**: Implemented via llmspell-graph with SQLite (libsql) and PostgreSQL backends
 - **Estimated Effort**: 2-3 days implementation + testing
 
 ### Phase 3: Specialized Migrations (Q1 2025)

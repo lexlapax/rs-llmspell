@@ -12,9 +12,9 @@ llmspell provides a unified storage abstraction layer with multiple backend impl
 
 **Core Storage Components**:
 - **StorageBackend trait**: Unified key-value interface
-- **Vector Storage**: HNSW-based similarity search for embeddings
+- **Vector Storage**: HNSW-based similarity search via vectorlite-rs SQLite extension
 - **Multi-Tenant Collections**: Isolated data per tenant
-- **Persistence Options**: In-memory, SQLite embedded DB, HNSW vectors
+- **Persistence Options**: In-memory, SQLite (libsql with HNSW), PostgreSQL
 
 ---
 
@@ -106,17 +106,19 @@ storage.batch(vec![
 
 ---
 
-## Vector Storage (HNSW)
+## Vector Storage (HNSW via vectorlite-rs)
 
-**Purpose**: Fast similarity search for embeddings (Phase 8 RAG foundation)
+**Purpose**: Fast similarity search for embeddings (Phase 8 RAG foundation, Phase 13c SQLite integration)
 
 ### Architecture
 
 **HNSW (Hierarchical Navigable Small World)**:
+- Implemented via vectorlite-rs pure Rust SQLite extension
 - Graph-based approximate nearest neighbor search
 - O(log N) search complexity
 - Multi-layer structure for fast traversal
 - Configurable precision vs speed trade-offs
+- Integrated with SQLite for persistence and SQL querying
 
 **Dimension Routing**:
 Automatic routing based on embedding dimensions:
@@ -243,7 +245,7 @@ let config = HNSWConfig {
 };
 ```
 
-📚 **Full Details**: [llmspell-storage.md](llmspell-storage.md#hnswvectorstorage)
+📚 **Full Details**: [llmspell-storage.md](llmspell-storage.md#vector-storage-hnsw)
 
 ---
 
@@ -275,11 +277,12 @@ let storage = InMemoryBackend::new();
 **Use Case**: Embedded persistence, single-process applications
 
 **Characteristics**:
-- Embedded key-value store (like RocksDB)
+- Embedded relational database with key-value abstractions
 - ACID transactions
 - Crash recovery
 - Low memory footprint
 - File-based persistence
+- Integrated vector search via vectorlite-rs HNSW extension
 
 **When to Use**:
 - CLI applications needing persistence
