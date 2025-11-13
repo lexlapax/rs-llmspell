@@ -235,6 +235,16 @@ impl StorageBackend for SqliteKVStorage {
             avg_write_latency_us: 3000, // <10ms target = <10000us
         }
     }
+
+    async fn run_migrations(&self) -> anyhow::Result<()> {
+        // Delegate to underlying SqliteBackend
+        self.backend.run_migrations().await
+    }
+
+    async fn migration_version(&self) -> anyhow::Result<usize> {
+        // Delegate to underlying SqliteBackend
+        self.backend.migration_version().await
+    }
 }
 
 impl std::fmt::Debug for SqliteKVStorage {

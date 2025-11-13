@@ -77,6 +77,27 @@ pub trait StorageBackend: Send + Sync + std::fmt::Debug {
 
     /// Get backend characteristics
     fn characteristics(&self) -> StorageCharacteristics;
+
+    /// Run database migrations
+    ///
+    /// Applies all necessary schema migrations for this backend.
+    /// For Memory backend, this is a no-op.
+    /// For Sqlite/Postgres, this applies versioned SQL migrations.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if migrations fail to apply
+    async fn run_migrations(&self) -> Result<()>;
+
+    /// Get current migration version
+    ///
+    /// Returns the highest applied migration version.
+    /// Returns 0 if no migrations have been applied or backend doesn't support migrations.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if unable to query migration version
+    async fn migration_version(&self) -> Result<usize>;
 }
 
 /// Helper trait for serialization/deserialization

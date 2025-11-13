@@ -112,6 +112,16 @@ impl StorageBackend for MemoryBackend {
             avg_write_latency_us: 1,
         }
     }
+
+    async fn run_migrations(&self) -> Result<()> {
+        // No migrations needed for in-memory backend
+        Ok(())
+    }
+
+    async fn migration_version(&self) -> Result<usize> {
+        // No migrations for in-memory backend
+        Ok(0)
+    }
 }
 
 #[cfg(test)]

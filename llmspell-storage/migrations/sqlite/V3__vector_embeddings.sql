@@ -14,26 +14,12 @@
 -- =============================================================================
 -- Vector Embeddings Virtual Tables (sqlite-vec vec0 module)
 -- =============================================================================
-
--- 384-dimensional vectors (sentence-transformers/all-MiniLM-L6-v2)
-CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings_384 USING vec0(
-    embedding float[384]
-);
-
--- 768-dimensional vectors (OpenAI ada-002, BERT-base)
-CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings_768 USING vec0(
-    embedding float[768]
-);
-
--- 1536-dimensional vectors (OpenAI text-embedding-3-small)
-CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings_1536 USING vec0(
-    embedding float[1536]
-);
-
--- 3072-dimensional vectors (OpenAI text-embedding-3-large)
-CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings_3072 USING vec0(
-    embedding float[3072]
-);
+-- NOTE: Task 13c.2.8.16 - vec0 tables creation moved to runtime (optional)
+-- These tables are only created if vec0 extension is available
+-- Default vector storage now uses vectorlite-rs (HNSW-indexed, Task 13c.2.2a)
+--
+-- vec0 tables are created at runtime by SqliteVectorStorage when needed
+-- This allows tests to run without vec0.so extension file
 
 -- =============================================================================
 -- Vector Metadata Table

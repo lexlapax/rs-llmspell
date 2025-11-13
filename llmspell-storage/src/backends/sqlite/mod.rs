@@ -44,6 +44,7 @@ mod extensions;
 mod graph;
 mod hook_history;
 mod kv_store;
+mod migrations;
 mod pool;
 mod procedural;
 mod session;

@@ -36,6 +36,9 @@ mod tests {
             .await?,
         );
 
+        // Run migrations before using the state manager
+        state_manager.run_migrations().await?;
+
         // Create multiple agents with same state manager
         let config1 = AgentBuilder::basic("agent-1")
             .description("First test agent")
@@ -143,6 +146,9 @@ mod tests {
             .await?,
         );
 
+        // Run migrations before using the state manager
+        state_manager.run_migrations().await?;
+
         // Create shared context in global scope
         state_manager
             .set(
@@ -221,6 +227,9 @@ mod tests {
                 .await?,
             );
 
+            // Run migrations before using the state manager
+            state_manager.run_migrations().await?;
+
             let config = AgentBuilder::basic(agent_id)
                 .description("Agent with persistent state")
                 .build()?;
@@ -266,6 +275,9 @@ mod tests {
                 )
                 .await?,
             );
+
+            // Run migrations (idempotent - safe to run again)
+            state_manager.run_migrations().await?;
 
             let config = AgentBuilder::basic(agent_id)
                 .description("Agent with persistent state")
@@ -313,6 +325,9 @@ mod tests {
             )
             .await?,
         );
+
+        // Run migrations before using the state manager
+        state_manager.run_migrations().await?;
 
         // Shared task queue
         let task_queue = Arc::new(RwLock::new(vec![
@@ -420,6 +435,9 @@ mod tests {
                 .await?,
             );
 
+            // Run migrations before using the state manager
+            state_manager.run_migrations().await?;
+
             // Save state in old format
             state_manager
                 .set(
@@ -448,6 +466,9 @@ mod tests {
                 )
                 .await?,
             );
+
+            // Run migrations (idempotent - safe to run again)
+            state_manager.run_migrations().await?;
 
             // Read old state
             let old_state = state_manager

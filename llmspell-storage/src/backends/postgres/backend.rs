@@ -469,6 +469,16 @@ impl crate::traits::StorageBackend for PostgresBackend {
             avg_write_latency_us: 3000, // ~3ms for network + query + fsync
         }
     }
+
+    async fn run_migrations(&self) -> anyhow::Result<()> {
+        // Delegate to existing run_migrations method in migrations.rs
+        PostgresBackend::run_migrations(self).await
+    }
+
+    async fn migration_version(&self) -> anyhow::Result<usize> {
+        // Delegate to existing migration_version method in migrations.rs
+        PostgresBackend::migration_version(self).await
+    }
 }
 
 // =============================================================================
