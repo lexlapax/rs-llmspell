@@ -563,10 +563,10 @@ EXAMPLES:
 
     /// Storage migration and management operations
     #[command(
-        long_about = "Manage storage migrations between backends (Sled, PostgreSQL).
+        long_about = "Manage storage migrations between backends (SQLite, PostgreSQL).
 
 Migration operations enable safe data migration with plan-based workflow, validation,
-and rollback capabilities. Phase 1 supports Sled→PostgreSQL for Agent State, Workflow
+and rollback capabilities. Phase 1 supports SQLite→PostgreSQL for Agent State, Workflow
 State, and Sessions.
 
 Workflow:
@@ -1569,7 +1569,7 @@ pub enum StorageCommands {
     #[command(
         long_about = "Migrate data between storage backends with plan-based workflow.
 
-Phase 1 supports Sled→PostgreSQL for Agent State, Workflow State, and Sessions.
+Phase 1 supports SQLite→PostgreSQL for Agent State, Workflow State, and Sessions.
 
 Workflow:
   1. Generate plan with estimated record counts

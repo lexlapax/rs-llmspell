@@ -1,5 +1,5 @@
 //! ABOUTME: Storage migration CLI commands (deprecated - Phase 13c)
-//! ABOUTME: Sled backend removed, use SQLite or PostgreSQL backends directly
+//! ABOUTME: SQLite-based storage implemented, use SQLite or PostgreSQL backends directly
 
 use crate::cli::OutputFormat;
 use anyhow::{anyhow, Result};

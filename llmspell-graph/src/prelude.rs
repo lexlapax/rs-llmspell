@@ -11,4 +11,4 @@ pub use crate::types::{Entity, Relationship, TemporalQuery};
 
 // Re-export storage backends
 pub use crate::storage::GraphBackend;
-// Note: SurrealDB backend removed - use PostgreSQL or SQLite storage via llmspell-storage
+// Note: SQLite-based graph storage implemented - use SQLite or PostgreSQL storage via llmspell-storage
