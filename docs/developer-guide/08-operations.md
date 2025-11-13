@@ -450,7 +450,7 @@ thresholds:
 ```toml
 [performance]
 event_buffer_size = 10000
-state_backend = "rocksdb"
+state_backend = "sqlite"
 migration_batch_size = 1000
 
 [security]
