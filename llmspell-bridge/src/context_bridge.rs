@@ -647,9 +647,7 @@ mod tests {
     fn test_strategy_validation() {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .await
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let bridge = ContextBridge::new(Arc::new(memory_manager));
@@ -690,9 +688,7 @@ mod tests {
     fn test_assemble_episodic_empty() {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .await
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let bridge = ContextBridge::new(Arc::new(memory_manager));
@@ -728,9 +724,7 @@ mod tests {
     fn test_assemble_hybrid_empty() {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .await
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let bridge = ContextBridge::new(Arc::new(memory_manager));

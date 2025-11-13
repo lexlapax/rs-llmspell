@@ -14,7 +14,7 @@
 //!
 //! # Performance Target
 //!
-//! - Complete in <40 seconds (with Ollama + SQLite temp + BM25)
+//! - Complete in <40 seconds (with Ollama + `SQLite` temp + BM25)
 
 use llmspell_context::assembly::ContextAssembler;
 use llmspell_context::retrieval::BM25Retriever;

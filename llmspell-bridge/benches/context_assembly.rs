@@ -45,6 +45,7 @@ fn context_assemble_benchmark(c: &mut Criterion) {
                                 black_box(*budget),
                                 Some(black_box("bench-session")),
                             )
+                            .await
                             .unwrap();
                         }
                     });

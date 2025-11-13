@@ -83,10 +83,7 @@ fn template_infrastructure_overhead_benchmark(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let registry = TemplateRegistry::with_builtin_templates().expect("Failed to load templates");
     let memory_manager = rt.block_on(async {
-        Arc::new(
-            DefaultMemoryManager::new_in_memory()
-                .expect("Failed to create memory manager"),
-        )
+        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"))
     });
 
     c.bench_function("template_infrastructure_overhead", |b| {

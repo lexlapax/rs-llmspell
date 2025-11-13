@@ -28,6 +28,7 @@ async fn test_state_transitions_create_patterns() {
 
     let state_manager =
         StateManager::with_backend(StorageBackendType::Memory, config, Some(memory_arc.clone()))
+            .await
             .expect("Failed to create state manager");
 
     // Perform same state transition 3 times

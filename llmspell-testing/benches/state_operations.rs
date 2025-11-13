@@ -3,11 +3,10 @@
 
 // Benchmark file
 
-use base64::Engine;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use llmspell_agents::{agents::basic::BasicAgent, builder::AgentBuilder, state::StatePersistence};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_kernel::state::{PersistenceConfig, StateManager, StateScope, StorageBackendType};
+use llmspell_kernel::state::{StateManager, StateScope};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -295,9 +294,9 @@ fn bench_memory_usage_scaling(c: &mut Criterion) {
 
 /// Benchmark state compression effectiveness
 fn bench_compression_effectiveness(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let _rt = Runtime::new().unwrap();
 
-    let mut group = c.benchmark_group("compression_effectiveness");
+    let group = c.benchmark_group("compression_effectiveness");
 
     // Use SQLite backend for compression testing if needed
 

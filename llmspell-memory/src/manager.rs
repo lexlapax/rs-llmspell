@@ -789,9 +789,7 @@ mod tests {
         let service = Arc::new(EmbeddingService::new(provider));
 
         // Create manager with embeddings
-        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service)
-            .await
-            .unwrap();
+        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).unwrap();
 
         // Verify all subsystems are accessible
         let _ = manager.episodic();

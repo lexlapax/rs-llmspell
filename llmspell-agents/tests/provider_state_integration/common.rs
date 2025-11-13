@@ -35,7 +35,7 @@ impl ProviderTestContext {
     /// - State manager initialization fails
     pub async fn new() -> Result<Self> {
         let temp_dir = TempDir::new()?;
-        let storage_path = temp_dir.path().to_path_buf();
+        let _storage_path = temp_dir.path().to_path_buf();
 
         // Create state manager with in-memory storage (tests don't need persistence)
         let state_manager = Arc::new(

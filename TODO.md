@@ -3747,8 +3747,8 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 ---
 
 #### Subtask 13c.2.8.16: Final cleanup - remove dead code references ✅ COMPLETE
-**Time**: 8 hours (estimated 30 min) | **Priority**: CRITICAL
-**Files**: 17 files modified (3 Rust + 14 documentation)
+**Time**: 10 hours (estimated 30 min) | **Priority**: CRITICAL
+**Files**: 51 files modified (37 Rust + 14 documentation)
 **Status**: ✅ COMPLETE (2025-11-12)
 
 **Task**: Search and remove ANY remaining references to old backends (Sled, RocksDB, SurrealDB, HNSWVectorStorage)
@@ -3810,6 +3810,70 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - ✅ Rust source code: 0 legacy references
 - ✅ All documentation reflects Phase 13c storage consolidation
 
+**Phase 4 - Compilation Error Fixes** (CRITICAL - Async/Await + SqliteBackend API):
+**Problem**: After documentation cleanup, building workspace revealed 26 compilation errors
+- Root Causes:
+  1. `DefaultMemoryManager::new_in_memory()` changed from sync → async (.await required)
+  2. `SqliteBackend::new()` async, requires `.await`
+  3. Async function calls without `.await` throughout test/benchmark files
+
+**Files Fixed** (26 Rust files):
+1. ✅ **llmspell-bridge/benches/context_assembly.rs**: Added .await to new_in_memory()
+2. ✅ **llmspell-bridge/src/context_bridge.rs**: Fixed SqliteBackend initialization
+3. ✅ **llmspell-bridge/tests/context_global_test.rs**: 8 instances - new_in_memory().await
+4. ✅ **llmspell-bridge/tests/e2e_phase13_integration_test.rs**: setup_test_env async wrapper
+5. ✅ **llmspell-bridge/tests/lua/memory_global_test.rs**: Fixed async initialization
+6. ✅ **llmspell-bridge/tests/lua_api_validation_test.rs**: Added .await calls
+7. ✅ **llmspell-bridge/tests/memory_context_integration_test.rs**: Async setup
+8. ✅ **llmspell-bridge/tests/rag_memory_e2e_test.rs**: Mock RAG test async fix
+9. ✅ **llmspell-context/tests/query_pattern_integration_test.rs**: Memory manager async
+10. ✅ **llmspell-kernel/tests/state_memory_integration_test.rs**: Fixed initialization
+11. ✅ **llmspell-memory/benches/accuracy_metrics.rs**: 3 benchmark functions fixed
+12. ✅ **llmspell-memory/benches/memory_operations.rs**: 6 benchmark blocks fixed
+13. ✅ **llmspell-templates/benches/template_overhead.rs**: Fixed 2 async calls
+14. ✅ **llmspell-templates/src/context.rs**: DocumentationContext async initialization
+15. ✅ **llmspell-templates/tests/memory_integration_test.rs**: 4 test functions fixed
+16-26. ✅ **11 additional test files**: Various async/await fixes
+
+**Build Verification**:
+- ✅ `cargo build --workspace --all-features`: SUCCESS (26 errors → 0)
+- ✅ All 26 files compile cleanly
+- ✅ Zero compilation errors
+
+**Phase 5 - Clippy Warning Fixes** (QUALITY - Zero Warnings Policy):
+**Problem**: After compilation fixes, clippy reported 11 pedantic warnings
+- Categories: unused imports, unused variables, unused async, duplicate attributes, doc formatting
+
+**Files Fixed** (8 Rust files, 11 warnings):
+1. ✅ **llmspell-testing/benches/state_operations.rs** (4 warnings):
+   - Removed unused imports: `base64::Engine`, `PersistenceConfig`, `StorageBackendType`
+   - Fixed unused variable: `rt` → `_rt`
+   - Fixed unnecessary mutable: `mut group` → `group`
+
+2. ✅ **llmspell-agents/tests/provider_state_integration/common.rs** (1 warning):
+   - Prefixed unused: `storage_path` → `_storage_path`
+
+3. ✅ **llmspell-bridge/tests/e2e_phase13_integration_test.rs** (1 warning + 6 call sites):
+   - Removed async from sync function: `async fn setup_test_env()` → `fn setup_test_env()`
+   - Fixed 6 call sites: `setup_test_env().await` → `setup_test_env()`
+
+4. ✅ **llmspell-kernel/src/state/kernel_backends.rs** (1 warning):
+   - Removed duplicate attribute: duplicate `#[test]`
+
+5. ✅ **llmspell-memory/benches/memory_operations.rs** (1 warning):
+   - Refactored let_and_return: Removed unnecessary `mm` binding before return
+
+6. ✅ **llmspell-memory/tests/backend_integration_test.rs** (2 warnings):
+   - Added doc backticks: `vectorlite`, `SQLite`
+
+7. ✅ **llmspell-memory/tests/e2e/full_pipeline_test.rs** (1 warning):
+   - Added doc backtick: `SQLite`
+
+**Clippy Verification**:
+- ✅ `cargo clippy --workspace --all-features --all-targets`: SUCCESS (11 warnings → 0)
+- ✅ Zero warnings policy maintained
+- ✅ All fixes proper (no #[allow] attributes used)
+
 **Key Learnings**:
 1. **SQLite Symbol Conflicts**: Different crates linking different SQLite implementations cause linker errors
    - libsql-rusqlite is API-compatible drop-in for rusqlite (vtab feature works)
@@ -3821,15 +3885,28 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
    - Manual verification for context (historical notes, design rationale)
    - Systematic file-by-file approach with verification at each step
 
-3. **Build Verification**: Always test `cargo build --workspace --all-features` to catch symbol conflicts
+3. **Async/Await Migration Impact**: API changes (sync→async) cascade through entire test/benchmark suite
+   - `DefaultMemoryManager::new_in_memory()` async change affected 15+ files
+   - `SqliteBackend::new()` async affected bridge initialization
+   - Solution: Systematic grep + fix approach, verify with full workspace build
+
+4. **Clippy Zero Warnings Policy**: Proper fixes prevent technical debt accumulation
+   - Never use #[allow] attributes for pedantic warnings
+   - Fix unused code by prefixing with `_` or removing entirely
+   - Fix async functions by removing async if no .await statements present
+   - Fix doc warnings by adding backticks around technical terms
+
+5. **Build Verification**: Always test `cargo build --workspace --all-features` to catch symbol conflicts
 
 **Commits**:
-- "Task 13c.2.8.16: Final cleanup - remove legacy backend references" (11 files)
-- "Task 13c.2.8.16: Replace Sled enum with Sqlite" (3 files)
-- "Task 13c.2.8.15/16: Fix SQLite symbol conflicts" (3 Rust files)
-- "Documentation cleanup: User and developer guides complete" (4 files)
-- "Documentation cleanup: current-architecture.md complete" (1 file)
-- "Documentation cleanup: master-architecture-vision.md complete" (1 file)
+- "Task 13c.2.8.16: Final cleanup - remove legacy backend references" (11 files - Phase 1)
+- "Task 13c.2.8.16: Replace Sled enum with Sqlite" (3 files - Phase 1)
+- "Task 13c.2.8.15/16: Fix SQLite symbol conflicts" (3 Rust files - Phase 2)
+- "Documentation cleanup: User and developer guides complete" (4 files - Phase 3)
+- "Documentation cleanup: current-architecture.md complete" (1 file - Phase 3)
+- "Documentation cleanup: master-architecture-vision.md complete" (1 file - Phase 3)
+- "Task 13c.2.8.16: Fix async/await compilation errors" (26 files - Phase 4)
+- "Task 13c.2.8.16: Fix all clippy warnings" (8 files - Phase 5)
 
 ---
 

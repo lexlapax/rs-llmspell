@@ -131,6 +131,7 @@ async fn test_episodic_memory_storage() {
     memory_manager
         .episodic()
         .add(entry1)
+        .await
         .expect("Failed to add entry 1");
 
     let entry2 = EpisodicEntry::new(

@@ -6,8 +6,8 @@
 //! ## Sqlite Backend Architecture
 //!
 //! The Sqlite backend uses vectorlite-rs for vector search:
-//! - **vectorlite HNSW**: O(log n) vector similarity search via SQLite extension
-//! - **SQLite**: ACID-compliant persistent storage with full SQL metadata queries
+//! - **`vectorlite` HNSW**: O(log n) vector similarity search via `SQLite` extension
+//! - **`SQLite`**: ACID-compliant persistent storage with full SQL metadata queries
 //!
 //! This provides complete `EpisodicMemory` trait implementation with optimal performance
 //! for both vector search (primary use case) and metadata operations.

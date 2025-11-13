@@ -61,6 +61,7 @@ fn dmr_benchmark(c: &mut Criterion) {
                         let results = mm
                             .episodic()
                             .search(black_box(query), black_box(5))
+                            .await
                             .unwrap();
 
                         // Check if correct fact is in top-5 results

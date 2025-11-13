@@ -67,9 +67,7 @@ fn test_context_global_injection() {
 fn test_context_assemble_episodic() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .await
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         // Add some episodic memory entries first
@@ -137,9 +135,7 @@ fn test_context_assemble_semantic() {
 fn test_context_assemble_hybrid() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .await
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
@@ -195,9 +191,7 @@ fn test_context_strategy_validation() {
 fn test_context_token_budget_validation() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .await
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
@@ -256,9 +250,7 @@ fn test_context_test() {
 fn test_context_strategy_stats() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .await
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
