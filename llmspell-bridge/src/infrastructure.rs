@@ -248,7 +248,7 @@ fn create_session_manager(
 ///
 /// # Returns
 ///
-/// Returns a tuple of (MultiTenantRAG, SqliteVectorStorage)
+/// Returns a tuple of (`MultiTenantRAG`, `SqliteVectorStorage`)
 ///
 /// # Errors
 ///

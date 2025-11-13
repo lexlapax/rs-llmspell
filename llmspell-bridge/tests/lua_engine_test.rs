@@ -1,5 +1,4 @@
 //! ABOUTME: Integration tests for `LuaEngine` implementation
-use llmspell_bridge::engine::bridge::ApiDependencies;
 //! ABOUTME: Validates basic script execution and API injection
 
 mod test_helpers;
@@ -7,6 +6,7 @@ mod test_helpers;
 #[cfg(feature = "lua")]
 mod tests {
     use crate::test_helpers::create_test_infrastructure;
+    use llmspell_bridge::engine::bridge::ApiDependencies;
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,

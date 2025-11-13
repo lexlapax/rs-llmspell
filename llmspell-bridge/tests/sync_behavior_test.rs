@@ -4,6 +4,7 @@
 mod test_helpers;
 use test_helpers::create_test_infrastructure;
 
+use llmspell_bridge::engine::bridge::ApiDependencies;
 use llmspell_bridge::engine::factory::LuaConfig;
 use llmspell_bridge::engine::ScriptEngineBridge;
 use llmspell_bridge::lua::LuaEngine;
@@ -45,16 +46,15 @@ async fn test_agent_sync_api_available() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test that Agent API is available and synchronous
     let result = engine
@@ -90,16 +90,15 @@ async fn test_tool_sync_behavior() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test that Tool operations are synchronous
     let result = engine
@@ -142,16 +141,15 @@ async fn test_workflow_sync_behavior() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test that Workflow operations are synchronous
     let result = engine
@@ -189,16 +187,15 @@ async fn test_error_handling_sync() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test that errors are thrown synchronously
     let result = engine
@@ -256,16 +253,15 @@ async fn test_api_synchronous_return_patterns() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test that API methods return values immediately, not promises
     let result = engine
@@ -306,16 +302,15 @@ async fn test_sync_timeout_behavior() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test timeout behavior in sync context with tools
     let result = engine

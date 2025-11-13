@@ -4,6 +4,7 @@
 #[path = "../test_helpers.rs"]
 mod test_helpers;
 
+use llmspell_bridge::engine::bridge::ApiDependencies;
 use llmspell_bridge::{
     engine::{
         bridge::ScriptOutput,
@@ -33,16 +34,15 @@ async fn test_api_availability_for_workflows() {
     // Try basic API injection (may fail for some APIs)
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    let _ = engine.inject_apis(
-        &registry,
-        &providers,
-        &tool_registry,
-        &agent_registry,
-        &workflow_factory,
-        None,
-        None,
-        None,
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
     );
+
+    let _ = engine.inject_apis(&api_deps);
 
     let lua_code = r"
         -- Test API availability for workflows
@@ -123,16 +123,15 @@ async fn test_state_management_integration() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    let _ = engine.inject_apis(
-        &registry,
-        &providers,
-        &tool_registry,
-        &agent_registry,
-        &workflow_factory,
-        None,
-        None,
-        None,
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
     );
+
+    let _ = engine.inject_apis(&api_deps);
 
     let lua_code = r#"
         -- Test state management integration
@@ -216,16 +215,15 @@ async fn test_memory_leak_prevention() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    let _ = engine.inject_apis(
-        &registry,
-        &providers,
-        &tool_registry,
-        &agent_registry,
-        &workflow_factory,
-        None,
-        None,
-        None,
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
     );
+
+    let _ = engine.inject_apis(&api_deps);
 
     // Test creating multiple script executions without memory leaks
     let lua_code = r#"
@@ -307,16 +305,15 @@ async fn test_performance_requirements() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    let _ = engine.inject_apis(
-        &registry,
-        &providers,
-        &tool_registry,
-        &agent_registry,
-        &workflow_factory,
-        None,
-        None,
-        None,
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
     );
+
+    let _ = engine.inject_apis(&api_deps);
 
     // Test script execution performance
     let start_time = Instant::now();
@@ -402,16 +399,15 @@ async fn test_error_conditions_and_recovery() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    let _ = engine.inject_apis(
-        &registry,
-        &providers,
-        &tool_registry,
-        &agent_registry,
-        &workflow_factory,
-        None,
-        None,
-        None,
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
     );
+
+    let _ = engine.inject_apis(&api_deps);
 
     let lua_code = r#"
         -- Error condition tests
@@ -493,16 +489,15 @@ async fn test_concurrent_operations() {
 
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-        let _ = engine.inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
         );
+
+        let _ = engine.inject_apis(&api_deps);
 
         let lua_code = format!(
             r"
@@ -578,16 +573,15 @@ async fn test_comprehensive_api_methods() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    let _ = engine.inject_apis(
-        &registry,
-        &providers,
-        &tool_registry,
-        &agent_registry,
-        &workflow_factory,
-        None,
-        None,
-        None,
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
     );
+
+    let _ = engine.inject_apis(&api_deps);
 
     let lua_code = r"
         -- Comprehensive API method availability test

@@ -9,6 +9,7 @@ use llmspell_core::test_utils::TestLogger;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio;
+use llmspell_bridge::engine::bridge::ApiDependencies;
 
 /// Test artifact storage and retrieval
 #[tokio::test]

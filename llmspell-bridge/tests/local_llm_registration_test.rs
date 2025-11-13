@@ -5,6 +5,7 @@
 
 #[cfg(feature = "lua")]
 mod local_llm_registration {
+
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext};
     use llmspell_bridge::{ComponentRegistry, ProviderManager};
     use llmspell_config::ProviderManagerConfig;

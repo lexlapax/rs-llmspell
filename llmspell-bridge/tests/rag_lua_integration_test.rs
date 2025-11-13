@@ -3,6 +3,7 @@
 
 #[cfg(feature = "lua")]
 mod rag_lua_tests {
+
     use llmspell_bridge::globals::GlobalContext;
     use llmspell_bridge::{ComponentRegistry, ProviderManager, ScriptRuntime};
     use llmspell_config::providers::ProviderManagerConfig;

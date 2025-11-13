@@ -4,6 +4,7 @@
 mod test_helpers;
 use test_helpers::create_test_infrastructure;
 
+use llmspell_bridge::engine::bridge::ApiDependencies;
 use llmspell_bridge::{
     engine::{
         bridge::{EngineFeatures, ExecutionContext, ScriptEngineBridge, SecurityContext},
@@ -114,16 +115,15 @@ async fn test_api_injection() {
     // Inject APIs - should succeed
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    let result = engine.inject_apis(
-        &registry,
-        &providers,
-        &tool_registry,
-        &agent_registry,
-        &workflow_factory,
-        None,
-        None,
-        None,
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
     );
+
+    let result = engine.inject_apis(&api_deps);
     assert!(result.is_ok(), "API injection should succeed");
 
     // Verify APIs are available
@@ -148,18 +148,15 @@ async fn test_bridge_error_handling() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test syntax error
     let syntax_error = engine.execute_script("invalid syntax {{").await;
@@ -197,18 +194,15 @@ async fn test_output_format_consistency() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test various output types
     let test_cases = vec![
@@ -240,18 +234,15 @@ async fn test_console_output_capture() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     let script = r#"
         print("Line 1")
@@ -279,18 +270,15 @@ async fn test_output_metadata() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     let output = engine.execute_script("return 42").await.unwrap();
 

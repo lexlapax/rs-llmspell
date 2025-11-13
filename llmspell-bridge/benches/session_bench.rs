@@ -4,6 +4,7 @@
 // Benchmark for llmspell-bridge sessions
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use llmspell_bridge::engine::bridge::ApiDependencies;
 use llmspell_bridge::engine::LuaConfig;
 use llmspell_bridge::lua::engine::LuaEngine;
 use llmspell_bridge::{ComponentRegistry, ProviderManager, ScriptEngineBridge};
@@ -71,18 +72,15 @@ async fn create_setup_engine() -> LuaEngine {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
     engine
 }
 

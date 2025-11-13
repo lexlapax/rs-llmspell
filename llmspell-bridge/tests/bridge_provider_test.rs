@@ -1,8 +1,8 @@
 //! ABOUTME: Tests for provider access through the script engine bridge
-use llmspell_bridge::engine::bridge::ApiDependencies;
 //! ABOUTME: Validates that scripts can access and use providers correctly
 
 mod test_helpers;
+use llmspell_bridge::engine::bridge::ApiDependencies;
 use test_helpers::create_test_infrastructure;
 
 use llmspell_bridge::{
@@ -37,14 +37,15 @@ async fn test_inject_providers() {
     // Should inject successfully
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    let result = engine.inject_apis(
-        &registry,
-        &providers,
-        &tool_registry,
-        &agent_registry,
-        &workflow_factory,
-        None,
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers,
+        tool_registry,
+        agent_registry,
+        workflow_factory.clone(),
     );
+
+    let result = engine.inject_apis(&api_deps);
     assert!(result.is_ok(), "API injection should succeed");
 }
 
@@ -60,16 +61,15 @@ async fn test_script_provider_access() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Check that Agent API exists (providers are accessed through agents)
     let script = "return type(Agent) == 'table'";
@@ -93,16 +93,15 @@ async fn test_script_list_providers() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Agent.create should be available
     let script = "return type(Agent.create) == 'function'";
@@ -190,16 +189,15 @@ async fn test_concurrent_provider_access() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Create multiple tasks that access providers
     let engine = Arc::new(engine);
@@ -233,16 +231,15 @@ async fn test_script_provider_error_handling() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Try to create an agent without a provider configured
     let script = r#"

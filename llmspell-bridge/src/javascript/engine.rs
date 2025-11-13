@@ -4,11 +4,9 @@
 use crate::engine::{
     EngineFeatures, ExecutionContext, JSConfig, ScriptEngineBridge, ScriptOutput, ScriptStream,
 };
-use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// JavaScript script engine implementation
 pub struct JSEngine {

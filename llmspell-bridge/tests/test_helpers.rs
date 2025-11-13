@@ -28,6 +28,10 @@ pub fn create_test_infrastructure() -> (
 /// Returns fully configured `ApiDependencies` struct that can be passed to `inject_apis()`.
 /// This is a convenience wrapper around `create_test_infrastructure()` that creates all
 /// required dependencies and bundles them into the struct.
+///
+/// # Panics
+///
+/// Panics if `ProviderManager` creation fails (e.g., invalid default configuration).
 #[must_use]
 #[allow(dead_code)] // Used in test files
 pub async fn create_test_api_deps() -> ApiDependencies {

@@ -8,6 +8,7 @@ use test_helpers::create_test_infrastructure;
 #[allow(clippy::too_many_lines)]
 async fn test_simple_tool_integration() {
     use llmspell_bridge::{
+        engine::bridge::ApiDependencies,
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,
         ComponentRegistry,
@@ -34,18 +35,15 @@ async fn test_simple_tool_integration() {
     // Inject APIs
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test 1: Basic tool execution with JSON parsing
     let test_script = r#"
@@ -971,6 +969,7 @@ async fn test_simple_tool_integration() {
 #[cfg(feature = "lua")]
 async fn test_tool_performance() {
     use llmspell_bridge::{
+        engine::bridge::ApiDependencies,
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,
         ComponentRegistry,
@@ -994,18 +993,15 @@ async fn test_tool_performance() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Warm up
     let warmup_script = r#"

@@ -1,9 +1,9 @@
 //! ABOUTME: External API integration tests requiring real LLM providers
-use llmspell_bridge::engine::bridge::ApiDependencies;
 //! ABOUTME: Tests LLM-based workflows using actual OpenAI/Anthropic APIs
 //! ABOUTME: All tests marked with #[ignore = "external"] to skip in CI without API keys
 
 mod test_helpers;
+use llmspell_bridge::engine::bridge::ApiDependencies;
 use test_helpers::create_test_infrastructure;
 
 use llmspell_bridge::engine::factory::LuaConfig;
@@ -48,16 +48,15 @@ async fn test_real_llm_content_classification() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test with real LLM agent for classification
     let script = r#"
@@ -141,16 +140,15 @@ async fn test_multi_model_classification_routing() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test with multiple LLM models for robust classification
     let script = r#"
@@ -236,16 +234,15 @@ async fn test_production_content_pipeline() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Full production-like content generation pipeline
     let script = r#"

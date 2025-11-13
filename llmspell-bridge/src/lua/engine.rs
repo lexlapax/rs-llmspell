@@ -12,7 +12,6 @@ use crate::engine::{
 use crate::lua::completion::LuaCompletionProvider;
 use crate::lua::globals::args::inject_args_global;
 use crate::lua::output_capture::{install_output_capture, ConsoleCapture};
-use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
 use llmspell_core::traits::debug_context::DebugContext;
@@ -409,6 +408,7 @@ impl ScriptEngineBridge for LuaEngine {
             rag_provided = deps.rag.is_some()
         )
     )]
+    #[allow(clippy::too_many_lines)]
     fn inject_apis(
         &mut self,
         deps: &crate::engine::bridge::ApiDependencies,

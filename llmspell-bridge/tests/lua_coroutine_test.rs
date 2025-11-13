@@ -7,6 +7,7 @@ mod test_helpers;
 mod tests {
     use crate::test_helpers::create_test_infrastructure;
     use futures::StreamExt;
+    use llmspell_bridge::engine::bridge::ApiDependencies;
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,
@@ -26,19 +27,16 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+
         // Inject APIs
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+        engine.inject_apis(&api_deps).unwrap();
 
         // Test streaming with coroutine iteration
         let script = r#"
@@ -103,19 +101,16 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+
         // Inject APIs
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+        engine.inject_apis(&api_deps).unwrap();
 
         // Test collect method
         let script = r#"
@@ -165,19 +160,16 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+
         // Inject APIs
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+        engine.inject_apis(&api_deps).unwrap();
 
         // Script that would produce streaming output
         let script = r#"
@@ -238,19 +230,16 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+
         // Inject APIs
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+        engine.inject_apis(&api_deps).unwrap();
 
         // Test error in coroutine
         let script = r#"

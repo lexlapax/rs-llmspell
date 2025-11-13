@@ -55,6 +55,7 @@ impl ApiDependencies {
     }
 
     /// Add session manager to dependencies (builder pattern)
+    #[must_use]
     pub fn with_session_manager(
         mut self,
         session_manager: Arc<dyn std::any::Any + Send + Sync>,
@@ -64,6 +65,7 @@ impl ApiDependencies {
     }
 
     /// Add state manager to dependencies (builder pattern)
+    #[must_use]
     pub fn with_state_manager(
         mut self,
         state_manager: Arc<dyn std::any::Any + Send + Sync>,
@@ -73,6 +75,7 @@ impl ApiDependencies {
     }
 
     /// Add RAG infrastructure to dependencies (builder pattern)
+    #[must_use]
     pub fn with_rag(mut self, rag: Arc<dyn std::any::Any + Send + Sync>) -> Self {
         self.rag = Some(rag);
         self

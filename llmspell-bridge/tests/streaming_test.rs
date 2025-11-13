@@ -6,6 +6,7 @@ mod test_helpers;
 #[cfg(feature = "lua")]
 mod tests {
     use crate::test_helpers::create_test_infrastructure;
+    use llmspell_bridge::engine::bridge::ApiDependencies;
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,
@@ -27,16 +28,15 @@ mod tests {
         // Inject APIs including streaming
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-        let result = engine.inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-            None,
-            None,
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
         );
+
+        let result = engine.inject_apis(&api_deps);
         assert!(result.is_ok(), "Failed to inject APIs with streaming");
 
         // Test that Streaming global exists
@@ -68,18 +68,15 @@ mod tests {
         // Inject APIs
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+
+        engine.inject_apis(&api_deps).unwrap();
 
         // Test creating a stream with coroutines
         let script = r#"
@@ -147,18 +144,15 @@ mod tests {
         // Inject APIs
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+
+        engine.inject_apis(&api_deps).unwrap();
 
         // Test Tool API
         let script = r#"
@@ -225,18 +219,15 @@ mod tests {
         // Inject APIs
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+
+        engine.inject_apis(&api_deps).unwrap();
 
         // Test Workflow API
         let script = r#"
@@ -318,18 +309,15 @@ mod tests {
         // Inject APIs first
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+
+        engine.inject_apis(&api_deps).unwrap();
 
         // Test that streaming execution returns appropriate error for now
         let script = "return 'test'";
