@@ -5288,8 +5288,8 @@ Phase 5 implemented comprehensive storage backends with production-ready feature
 #[derive(Debug, Clone)]
 pub enum StorageBackendType {
     Memory,                    // In-memory for development/testing
-    Sled(SqliteConfig),          // Embedded database for single-node
-    RocksDB(RocksDBConfig),    // High-performance production backend
+    Sqlite(SqliteConfig),          // Embedded database for single-node
+    Postgres(PostgresConfig),    // High-performance production backend
 }
 
 // Backend adapter with automatic failover
@@ -10076,7 +10076,7 @@ Specialized tools for managing artifacts - binary data, generated files, and per
 
 | Tool Name | Description | Storage Backends | Features |
 |-----------|-------------|------------------|----------|
-| `artifact_store` | Store and retrieve artifacts | S3, filesystem, RocksDB | Versioning, metadata |
+| `artifact_store` | Store and retrieve artifacts | S3, filesystem, PostgreSQL | Versioning, metadata |
 | `artifact_browser` | Browse and search artifacts | All backends | Full-text search, filtering |
 | `artifact_versioner` | Version control for artifacts | Git LFS, custom | Diff, merge, history |
 | `artifact_migrator` | Migrate artifacts between stores | All backends | Batch ops, validation |
@@ -12412,7 +12412,7 @@ boa_engine = "0.18"
 
 # Storage and Persistence
 libsql = "0.5"
-rocksdb = "0.22"
+deadpool-postgres = "0.22"
 
 # Async Runtime and Coordination
 tokio = { version = "1.0", features = ["full"] }
@@ -13155,7 +13155,7 @@ pub struct SqliteBackend {
     // Characteristics: Simple, embedded, good for development
 }
 
-pub struct RocksDbBackend {
+pub struct PostgresBackend {
     db: libsql::Database,
     // Characteristics: High-performance, production, tunable
 }
@@ -13171,7 +13171,7 @@ pub struct StorageCharacteristics {
 // No duplication - same interface, different implementations
 impl StorageBackend for SqliteBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
-        // Sled-specific implementation
+        // SQLite-specific implementation
         Ok(self.db.get(key)?.map(|v| v.to_vec()))
     }
     
@@ -13185,9 +13185,9 @@ impl StorageBackend for SqliteBackend {
     }
 }
 
-impl StorageBackend for RocksDbBackend {
+impl StorageBackend for PostgresBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
-        // RocksDB-specific implementation
+        // PostgreSQL-specific implementation
         Ok(self.db.get(key.as_bytes())?)
     }
     
@@ -13287,7 +13287,7 @@ pub enum SimilarityMetric {
 // - ExternalVectorBackend: Adapters for Qdrant, Weaviate, Pinecone
 ```
 
-#### Sled Backend Implementation
+#### SQLite Backend Implementation
 
 ```rust
 use libsql::{Db, Tree, transaction::TransactionResult};
@@ -13303,7 +13303,7 @@ impl SqliteBackend {
         let db = SqliteBackend::new(&config.path)
             .map_err(|e| LLMSpellError::Storage(format!("Failed to open SQLite database: {}", e)))?;
             
-        // Configure sled for optimal performance
+        // Configure SQLite (libsql) for optimal performance
         db.set_merge_operator(Self::merge_operator);
         
         Ok(Self {
@@ -13362,7 +13362,7 @@ impl StorageBackend for SqliteBackend {
     }
     
     async fn transaction(&self) -> Result<Box<dyn StorageTransaction>> {
-        Ok(Box::new(SledTransaction::new(&self.db)))
+        Ok(Box::new(SqliteTransaction::new(&self.db)))
     }
     
     async fn scan_prefix(&self, prefix: &str) -> Result<Vec<(String, Vec<u8>)>> {
@@ -13381,19 +13381,19 @@ impl StorageBackend for SqliteBackend {
 }
 ```
 
-#### RocksDB Backend Implementation
+#### PostgreSQL Backend Implementation
 
 ```rust
 use libsql::{DB, Options, WriteBatch, ReadOptions, IteratorMode};
 
 pub struct PostgresBackend {
     db: Arc<DB>,
-    config: RocksDBConfig,
+    config: PostgresConfig,
     metrics: StorageMetrics,
 }
 
 impl PostgresBackend {
-    pub async fn new(config: RocksDBConfig) -> Result<Self> {
+    pub async fn new(config: PostgresConfig) -> Result<Self> {
         let mut opts = Options::default();
         
         // Optimize for rs-llmspell workload
@@ -13419,7 +13419,7 @@ impl PostgresBackend {
         opts.set_block_based_table_factory(&block_opts);
         
         let db = DB::open(&opts, &config.path)
-            .map_err(|e| LLMSpellError::Storage(format!("Failed to open RocksDB: {}", e)))?;
+            .map_err(|e| LLMSpellError::Storage(format!("Failed to connect to PostgreSQL: {}", e)))?;
             
         Ok(Self {
             db: Arc::new(db),
@@ -13441,7 +13441,7 @@ impl StorageBackend for PostgresBackend {
             db.get(key.as_bytes())
         }).await
         .map_err(|e| LLMSpellError::Runtime(format!("Task join error: {}", e)))?
-        .map_err(|e| LLMSpellError::Storage(format!("RocksDB get failed: {}", e)))?;
+        .map_err(|e| LLMSpellError::Storage(format!("PostgreSQL query failed: {}", e)))?;
         
         self.metrics.record_operation("get", start_time.elapsed());
         Ok(result)
@@ -13460,7 +13460,7 @@ impl StorageBackend for PostgresBackend {
             db.write(batch)
         }).await
         .map_err(|e| LLMSpellError::Runtime(format!("Task join error: {}", e)))?
-        .map_err(|e| LLMSpellError::Storage(format!("RocksDB batch write failed: {}", e)))?;
+        .map_err(|e| LLMSpellError::Storage(format!("PostgreSQL transaction failed: {}", e)))?;
         
         self.metrics.record_operation("set_batch", start_time.elapsed());
         Ok(())
@@ -13506,11 +13506,11 @@ pub struct StorageManager {
 impl StorageManager {
     pub async fn new(config: StorageConfig) -> Result<Self> {
         let backend: Box<dyn StorageBackend> = match config.backend_type {
-            StorageBackendType::Sled => {
+            StorageBackendType::Sqlite => {
                 Box::new(SqliteBackend::new(config.sqlite_config).await?)
             }
-            StorageBackendType::RocksDB => {
-                Box::new(PostgresBackend::new(config.rocksdb_config).await?)
+            StorageBackendType::Postgres => {
+                Box::new(PostgresBackend::new(config.postgres_config).await?)
             }
             StorageBackendType::Memory => {
                 Box::new(MemoryBackend::new())
@@ -23979,7 +23979,7 @@ rs-llmspell/
 │   ├── storage/                 # State and persistence
 │   │   ├── src/
 │   │   │   ├── lib.rs
-│   │   │   ├── sqlite_backend.rs  # Sled storage implementation
+│   │   │   ├── sqlite_backend.rs  # SQLite storage (libsql) implementation
 │   │   │   ├── memory_backend.rs# In-memory storage
 │   │   │   └── migrations.rs    # Schema migrations
 │   │   └── Cargo.toml
@@ -25605,7 +25605,7 @@ boa_engine = "0.17"
 
 # Storage and persistence
 libsql = "0.5"
-rocksdb = "0.21"
+deadpool-postgres = "0.21"
 
 # Async and concurrency
 crossbeam = "0.8"
@@ -25887,7 +25887,7 @@ python = ["dep:pyo3"]  # Future
 
 # Storage backends
 sqlite-storage = ["dep:libsql"]
-postgres-storage = ["dep:rocksdb"]
+postgres-storage = ["dep:deadpool-postgres"]
 memory-storage = []
 
 # Built-in component features
@@ -29110,7 +29110,7 @@ pub const VALIDATION_RULES: &[ValidationRule] = &[
     },
     ValidationRule::OneOf { 
         field: "storage.backend".to_string(), 
-        values: vec!["sled".to_string(), "sqlite".to_string(), "memory".to_string()] 
+        values: vec!["sqlite".to_string(), "sqlite".to_string(), "memory".to_string()] 
     },
     ValidationRule::Pattern { 
         field: "server.host".to_string(), 
