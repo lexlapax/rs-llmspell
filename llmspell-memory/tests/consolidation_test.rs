@@ -209,7 +209,7 @@ async fn test_multiple_relationship_extraction() {
 #[tokio::test]
 async fn test_consolidation_with_no_op_engine() {
     // Test that default manager (with no-op engine) returns empty result
-    let manager = DefaultMemoryManager::new_in_memory().unwrap();
+    let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
 
     let entry = EpisodicEntry::new(
         "session-1".to_string(),

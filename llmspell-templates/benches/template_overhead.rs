@@ -32,7 +32,11 @@ fn context_creation_benchmark(c: &mut Criterion) {
 
     let rt = Runtime::new().unwrap();
     let memory_manager = rt.block_on(async {
-        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"))
+        Arc::new(
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager"),
+        )
     });
 
     c.bench_function("context_creation_with_memory", |b| {
@@ -83,7 +87,11 @@ fn template_infrastructure_overhead_benchmark(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let registry = TemplateRegistry::with_builtin_templates().expect("Failed to load templates");
     let memory_manager = rt.block_on(async {
-        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"))
+        Arc::new(
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager"),
+        )
     });
 
     c.bench_function("template_infrastructure_overhead", |b| {
@@ -119,7 +127,9 @@ fn memory_enabled_context_assembly_benchmark(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let memory_manager = rt.block_on(async {
         let mm = Arc::new(
-            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"),
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager"),
         );
 
         // Preload some episodic entries

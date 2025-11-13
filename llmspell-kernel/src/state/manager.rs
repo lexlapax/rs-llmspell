@@ -301,13 +301,17 @@ impl StateManager {
             match &backend_type {
                 crate::state::config::StorageBackendType::Sqlite(_) => {
                     storage_backend.run_migrations().await.map_err(|e| {
-                        StateError::storage(format!("Failed to run migrations during initialization: {e}"))
+                        StateError::storage(format!(
+                            "Failed to run migrations during initialization: {e}"
+                        ))
                     })?;
                 }
                 #[cfg(feature = "postgres")]
                 crate::state::config::StorageBackendType::Postgres(_) => {
                     storage_backend.run_migrations().await.map_err(|e| {
-                        StateError::storage(format!("Failed to run migrations during initialization: {e}"))
+                        StateError::storage(format!(
+                            "Failed to run migrations during initialization: {e}"
+                        ))
                     })?;
                 }
                 crate::state::config::StorageBackendType::Memory => {

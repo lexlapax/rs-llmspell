@@ -86,7 +86,7 @@ fn setup_tracing() -> (Arc<Mutex<Vec<LogEvent>>>, tracing::subscriber::DefaultGu
 async fn test_manager_init_produces_info_log() {
     let (events, _guard) = setup_tracing();
 
-    let _manager = DefaultMemoryManager::new_in_memory().unwrap();
+    let _manager = DefaultMemoryManager::new_in_memory().await.unwrap();
 
     let info_logs: Vec<_> = events
         .lock()
@@ -109,7 +109,7 @@ async fn test_manager_init_produces_info_log() {
 async fn test_episodic_add_produces_info_log() {
     let (events, _guard) = setup_tracing();
 
-    let manager = DefaultMemoryManager::new_in_memory().unwrap();
+    let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
     let entry = EpisodicEntry::new(
         "test-session".to_string(),
         "user".to_string(),
@@ -138,7 +138,7 @@ async fn test_episodic_add_produces_info_log() {
 async fn test_vector_search_produces_debug_log() {
     let (events, _guard) = setup_tracing();
 
-    let manager = DefaultMemoryManager::new_in_memory().unwrap();
+    let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
 
     // Add an entry first
     let entry = EpisodicEntry::new(

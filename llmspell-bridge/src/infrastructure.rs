@@ -127,7 +127,7 @@ impl Infrastructure {
 
         // 5. Create memory manager if enabled
         let memory_manager = if config.runtime.memory.enabled {
-            Some(create_memory_manager(config)?)
+            Some(create_memory_manager(config).await?)
         } else {
             debug!("Memory disabled in config, skipping creation");
             None
@@ -305,19 +305,19 @@ async fn create_rag(
 /// # Errors
 ///
 /// Returns an error if memory manager initialization fails
-fn create_memory_manager(
+async fn create_memory_manager(
     _config: &LLMSpellConfig,
 ) -> Result<Arc<llmspell_memory::DefaultMemoryManager>, LLMSpellError> {
     debug!("Creating memory manager (enabled via config)");
 
     // Use in-memory implementation (testing/development mode)
     // For production with HNSW and real embeddings, use DefaultMemoryManager::new_in_memory_with_embeddings()
-    let manager = llmspell_memory::DefaultMemoryManager::new_in_memory().map_err(|e| {
-        LLMSpellError::Component {
+    let manager = llmspell_memory::DefaultMemoryManager::new_in_memory()
+        .await
+        .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create memory manager: {e}"),
             source: None,
-        }
-    })?;
+        })?;
 
     debug!("Memory manager created successfully");
 

@@ -101,7 +101,13 @@ fn create_fallback_memory_manager() -> Option<Arc<dyn llmspell_memory::MemoryMan
     use tracing::{debug, info, warn};
 
     info!("No memory_manager in context, creating in-memory fallback");
-    match DefaultMemoryManager::new_in_memory() {
+
+    // Use sync_utils to block on async creation
+    match crate::lua::sync_utils::block_on_async(
+        "create_fallback_memory_manager",
+        DefaultMemoryManager::new_in_memory(),
+        None,
+    ) {
         Ok(manager) => {
             debug!("Created in-memory MemoryManager successfully");
             Some(Arc::new(manager) as Arc<dyn llmspell_memory::MemoryManager>)

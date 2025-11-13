@@ -47,7 +47,9 @@ fn episodic_add_benchmark(c: &mut Criterion) {
 
     let rt = Runtime::new().unwrap();
     let memory_manager = rt.block_on(async {
-        DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
     });
     let memory_manager = Arc::new(memory_manager);
 
@@ -74,7 +76,9 @@ fn episodic_search_benchmark(c: &mut Criterion) {
 
     let rt = Runtime::new().unwrap();
     let memory_manager = rt.block_on(async {
-        let mm = DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
+        let mm = DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager");
 
         // Preload 1000 entries for realistic search
         for i in 0..1000 {
@@ -124,6 +128,7 @@ fn consolidation_benchmark(c: &mut Criterion) {
                 // Setup: Create memory manager with 100 unprocessed entries
                 rt.block_on(async {
                     let mm = DefaultMemoryManager::new_in_memory()
+                        .await
                         .expect("Failed to create memory manager");
 
                     for i in 0..100 {
@@ -159,7 +164,9 @@ fn semantic_query_benchmark(c: &mut Criterion) {
     let memory_manager = rt.block_on(async {
         // Preload semantic entities (simulated)
         // Note: Requires SemanticMemory.add() method
-        DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
     });
     let memory_manager = Arc::new(memory_manager);
 
@@ -195,7 +202,9 @@ fn memory_footprint_benchmark(c: &mut Criterion) {
         b.iter(|| {
             // Measure idle memory footprint (empty memory manager)
             let mm = rt.block_on(async {
-                DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
+                DefaultMemoryManager::new_in_memory()
+                    .await
+                    .expect("Failed to create memory manager")
             });
 
             info!("Memory footprint (idle): ~minimal (empty DashMaps + Arc overhead)");
@@ -207,8 +216,9 @@ fn memory_footprint_benchmark(c: &mut Criterion) {
         b.iter(|| {
             // Measure loaded memory footprint (1000 entries)
             let mm = rt.block_on(async {
-                let mm =
-                    DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
+                let mm = DefaultMemoryManager::new_in_memory()
+                    .await
+                    .expect("Failed to create memory manager");
 
                 for i in 0..1000 {
                     let entry = EpisodicEntry::new(
@@ -236,8 +246,9 @@ fn memory_footprint_benchmark(c: &mut Criterion) {
         b.iter(|| {
             // Measure loaded memory footprint (10000 entries)
             let mm = rt.block_on(async {
-                let mm =
-                    DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
+                let mm = DefaultMemoryManager::new_in_memory()
+                    .await
+                    .expect("Failed to create memory manager");
 
                 for i in 0..10000 {
                     let entry = EpisodicEntry::new(

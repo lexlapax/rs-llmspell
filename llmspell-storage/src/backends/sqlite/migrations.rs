@@ -63,11 +63,9 @@ impl SqliteBackend {
         .map_err(|e| anyhow::anyhow!("V6 migration failed: {}", e))?;
 
         // V7: KV store
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V7__kv_store.sql"
-        ))
-        .await
-        .map_err(|e| anyhow::anyhow!("V7 migration failed: {}", e))?;
+        conn.execute_batch(include_str!("../../../migrations/sqlite/V7__kv_store.sql"))
+            .await
+            .map_err(|e| anyhow::anyhow!("V7 migration failed: {}", e))?;
 
         // V8: Workflow states
         conn.execute_batch(include_str!(
@@ -77,11 +75,9 @@ impl SqliteBackend {
         .map_err(|e| anyhow::anyhow!("V8 migration failed: {}", e))?;
 
         // V9: Sessions
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V9__sessions.sql"
-        ))
-        .await
-        .map_err(|e| anyhow::anyhow!("V9 migration failed: {}", e))?;
+        conn.execute_batch(include_str!("../../../migrations/sqlite/V9__sessions.sql"))
+            .await
+            .map_err(|e| anyhow::anyhow!("V9 migration failed: {}", e))?;
 
         // V10: Artifacts
         conn.execute_batch(include_str!(
@@ -172,7 +168,10 @@ mod tests {
             .await
             .unwrap();
         let mut rows = stmt.query(()).await.unwrap();
-        assert!(rows.next().await.unwrap().is_some(), "kv_store table should exist");
+        assert!(
+            rows.next().await.unwrap().is_some(),
+            "kv_store table should exist"
+        );
 
         // Check agent_state table
         let stmt = conn
@@ -180,7 +179,10 @@ mod tests {
             .await
             .unwrap();
         let mut rows = stmt.query(()).await.unwrap();
-        assert!(rows.next().await.unwrap().is_some(), "agent_state table should exist");
+        assert!(
+            rows.next().await.unwrap().is_some(),
+            "agent_state table should exist"
+        );
     }
 
     #[tokio::test]

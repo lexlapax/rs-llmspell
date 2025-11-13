@@ -233,12 +233,12 @@ impl DefaultMemoryManager {
     ///
     /// All memory subsystems use in-memory storage:
     /// - Episodic: `InMemory` backend (test embeddings, cosine similarity)
-    /// - Semantic: Requires explicit `SQLite` backend configuration
-    /// - Procedural: No-op placeholder
+    /// - Semantic: `SQLite` in-memory backend (`:memory:`)
+    /// - Procedural: `InMemoryPatternTracker`
     ///
     /// # Errors
     ///
-    /// Returns error if `SQLite` backend is not configured
+    /// Returns error if backends fail to initialize
     ///
     /// # Example
     ///
@@ -247,16 +247,38 @@ impl DefaultMemoryManager {
     ///
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
-    ///     let manager = DefaultMemoryManager::new_in_memory()?;
+    ///     let manager = DefaultMemoryManager::new_in_memory().await?;
     ///     Ok(())
     /// }
     /// ```
-    pub fn new_in_memory() -> Result<Self> {
+    pub async fn new_in_memory() -> Result<Self> {
         info!("Initializing DefaultMemoryManager with InMemory backends (testing mode)");
 
-        // Use InMemory backend for testing
-        let config = crate::config::MemoryConfig::for_testing();
-        Self::with_config(&config)
+        // Create in-memory backends directly
+        let episodic = crate::episodic::InMemoryEpisodicMemory::new();
+
+        // Create in-memory SQLite backend for semantic memory
+        let sqlite_backend = Arc::new(
+            llmspell_storage::backends::sqlite::SqliteBackend::new(
+                llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+            )
+            .await
+            .map_err(|e| crate::error::MemoryError::Storage(e.to_string()))?,
+        );
+
+        // Run migrations for semantic backend
+        sqlite_backend
+            .run_migrations()
+            .await
+            .map_err(|e| crate::error::MemoryError::Storage(e.to_string()))?;
+
+        let semantic = Arc::new(crate::semantic::GraphSemanticMemory::new_with_sqlite(
+            Arc::clone(&sqlite_backend),
+        ));
+
+        let procedural = Arc::new(crate::procedural::InMemoryPatternTracker::new());
+
+        Ok(Self::new(Arc::new(episodic), semantic, procedural))
     }
 
     /// Create memory manager with in-memory backends and real embeddings (production)

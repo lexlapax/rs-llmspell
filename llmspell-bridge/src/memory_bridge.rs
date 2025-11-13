@@ -498,7 +498,9 @@ mod tests {
         // Create in-memory backend for testing
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
-            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
         });
 
         let bridge = MemoryBridge::new(Arc::new(memory_manager));
@@ -515,7 +517,9 @@ mod tests {
     fn test_episodic_add_and_search() {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
-            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
         });
 
         let bridge = MemoryBridge::new(Arc::new(memory_manager));
@@ -545,7 +549,9 @@ mod tests {
     fn test_semantic_query_empty() {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
-            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
         });
 
         let bridge = MemoryBridge::new(Arc::new(memory_manager));
@@ -563,7 +569,9 @@ mod tests {
     fn test_consolidate() {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let memory_manager = runtime.block_on(async {
-            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
         });
 
         let bridge = MemoryBridge::new(Arc::new(memory_manager));
