@@ -55,7 +55,7 @@ impl GraphSemanticMemory {
     /// # use llmspell_storage::backends::sqlite::SqliteBackend;
     /// # use llmspell_memory::semantic::GraphSemanticMemory;
     /// # async fn example() -> llmspell_memory::Result<()> {
-    /// let sqlite_backend = Arc::new(SqliteBackend::new_temp().await?);
+    /// let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await?);
     /// let semantic = GraphSemanticMemory::new_with_sqlite(sqlite_backend);
     /// # Ok(())
     /// # }
@@ -221,9 +221,11 @@ mod tests {
     #[tokio::test]
     async fn test_graph_semantic_memory_create() {
         let backend = Arc::new(
-            llmspell_storage::backends::sqlite::SqliteBackend::new_temp()
-                .await
-                .unwrap(),
+            llmspell_storage::backends::sqlite::SqliteBackend::new(
+                llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+            )
+            .await
+            .unwrap(),
         );
         let memory = GraphSemanticMemory::new_with_sqlite(backend);
         // Just verify it was created without panicking
@@ -233,9 +235,11 @@ mod tests {
     #[tokio::test]
     async fn test_upsert_and_get_entity() {
         let backend = Arc::new(
-            llmspell_storage::backends::sqlite::SqliteBackend::new_temp()
-                .await
-                .unwrap(),
+            llmspell_storage::backends::sqlite::SqliteBackend::new(
+                llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+            )
+            .await
+            .unwrap(),
         );
         let memory = GraphSemanticMemory::new_with_sqlite(backend);
 
@@ -258,9 +262,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_nonexistent_entity() {
         let backend = Arc::new(
-            llmspell_storage::backends::sqlite::SqliteBackend::new_temp()
-                .await
-                .unwrap(),
+            llmspell_storage::backends::sqlite::SqliteBackend::new(
+                llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+            )
+            .await
+            .unwrap(),
         );
         let memory = GraphSemanticMemory::new_with_sqlite(backend);
 
@@ -271,9 +277,11 @@ mod tests {
     #[tokio::test]
     async fn test_query_by_type() {
         let backend = Arc::new(
-            llmspell_storage::backends::sqlite::SqliteBackend::new_temp()
-                .await
-                .unwrap(),
+            llmspell_storage::backends::sqlite::SqliteBackend::new(
+                llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+            )
+            .await
+            .unwrap(),
         );
         let memory = GraphSemanticMemory::new_with_sqlite(backend);
 

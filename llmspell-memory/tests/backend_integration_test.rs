@@ -69,9 +69,11 @@ where
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let db_path = temp_dir.path().join("test_episodic.db");
     let sqlite_backend = Arc::new(
-        llmspell_storage::backends::sqlite::SqliteBackend::new(db_path)
-            .await
-            .expect("Failed to create SqliteBackend"),
+        llmspell_storage::backends::sqlite::SqliteBackend::new(
+            llmspell_storage::backends::sqlite::SqliteConfig::new(&db_path),
+        )
+        .await
+        .expect("Failed to create SqliteBackend"),
     );
 
     let config =
@@ -272,9 +274,11 @@ async fn test_backend_name() {
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let db_path = temp_dir.path().join("test_backend_name.db");
     let sqlite_backend = Arc::new(
-        llmspell_storage::backends::sqlite::SqliteBackend::new(db_path)
-            .await
-            .expect("Failed to create SqliteBackend"),
+        llmspell_storage::backends::sqlite::SqliteBackend::new(
+            llmspell_storage::backends::sqlite::SqliteConfig::new(&db_path),
+        )
+        .await
+        .expect("Failed to create SqliteBackend"),
     );
 
     let config =
@@ -302,9 +306,11 @@ async fn test_config_for_production() {
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let db_path = temp_dir.path().join("test_production.db");
     let sqlite_backend = Arc::new(
-        llmspell_storage::backends::sqlite::SqliteBackend::new(db_path)
-            .await
-            .expect("Failed to create SqliteBackend"),
+        llmspell_storage::backends::sqlite::SqliteBackend::new(
+            llmspell_storage::backends::sqlite::SqliteConfig::new(&db_path),
+        )
+        .await
+        .expect("Failed to create SqliteBackend"),
     );
 
     let config =

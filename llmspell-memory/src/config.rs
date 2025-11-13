@@ -320,7 +320,11 @@ impl std::fmt::Debug for MemoryConfig {
                     .as_ref()
                     .map(|s| s.provider_name().to_string()),
             )
-            .field("sqlite_backend", &self.sqlite_backend.is_some());
+            .field("sqlite_backend", &self.sqlite_backend.is_some())
+            .field(
+                "semantic_sqlite_backend",
+                &self.semantic_sqlite_backend.is_some(),
+            );
 
         #[cfg(feature = "postgres")]
         {

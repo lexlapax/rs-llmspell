@@ -3,11 +3,11 @@
 //! Utilities for creating test engines, asserting graph state, and calculating DMR.
 
 use llmspell_graph::traits::KnowledgeGraph;
-use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 use llmspell_memory::consolidation::{
     ConsolidationMetrics, DecisionPayload, DecisionType, LLMConsolidationConfig,
     LLMConsolidationEngine,
 };
+use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -57,7 +57,8 @@ pub async fn create_test_engine() -> TestEngine {
     // Create knowledge graph with in-memory SQLite backend
     let sqlite_config = llmspell_storage::backends::sqlite::SqliteConfig::in_memory();
     let sqlite_backend = Arc::new(SqliteBackend::new(sqlite_config).await.unwrap());
-    let knowledge_graph = Arc::new(SqliteGraphStorage::new(sqlite_backend)) as Arc<dyn KnowledgeGraph>;
+    let knowledge_graph =
+        Arc::new(SqliteGraphStorage::new(sqlite_backend)) as Arc<dyn KnowledgeGraph>;
 
     // Create temp dir for test cleanup
     let temp_dir = TempDir::new().unwrap();

@@ -260,3 +260,4 @@ fn test_memory_parameter_types() {
     }
 
     info!("✓ Test passed: Memory Parameter Types");
+}

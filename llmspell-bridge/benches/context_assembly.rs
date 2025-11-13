@@ -12,8 +12,7 @@ fn context_assemble_benchmark(c: &mut Criterion) {
 
     let rt = Runtime::new().unwrap();
     let context_bridge = rt.block_on(async {
-        let mm = DefaultMemoryManager::new_in_memory()
-            .expect("Failed to create memory manager");
+        let mm = DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
 
         // Preload memory for realistic context assembly
         for i in 0..500 {
@@ -62,8 +61,7 @@ fn context_parallel_retrieval_benchmark(c: &mut Criterion) {
 
     let rt = Runtime::new().unwrap();
     let context_bridge = rt.block_on(async {
-        let mm = DefaultMemoryManager::new_in_memory()
-            .expect("Failed to create memory manager");
+        let mm = DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
         Arc::new(ContextBridge::new(Arc::new(mm)))
     });
 

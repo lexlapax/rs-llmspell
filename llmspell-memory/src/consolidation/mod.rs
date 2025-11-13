@@ -21,7 +21,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> llmspell_memory::Result<()> {
-//!     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await.unwrap());
+//!     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.unwrap());
 //!     let extractor = Arc::new(RegexExtractor::new());
 //!     let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
 //!     let engine = ManualConsolidationEngine::new(extractor, graph);
@@ -96,7 +96,7 @@ pub trait ConsolidationEngine: Send + Sync {
     ///
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
-    ///     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await.unwrap());
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.unwrap());
     ///     let extractor = Arc::new(RegexExtractor::new());
     ///     let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
     ///     let engine = ManualConsolidationEngine::new(extractor, graph);

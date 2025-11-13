@@ -971,9 +971,15 @@ impl llmspell_graph::traits::KnowledgeGraph for SqliteGraphStorage {
         max_depth: usize,
         at_time: Option<DateTime<Utc>>,
     ) -> llmspell_graph::error::Result<Vec<(Entity, usize, String)>> {
-        <Self as GraphBackend>::traverse(self, start_entity_id, relationship_type, max_depth, at_time)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+        <Self as GraphBackend>::traverse(
+            self,
+            start_entity_id,
+            relationship_type,
+            max_depth,
+            at_time,
+        )
+        .await
+        .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
     }
 }
 

@@ -40,7 +40,7 @@ use crate::episodic::InMemoryEpisodicMemory;
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
 ///     // Create manager with in-memory backends (testing)
-///     let manager = DefaultMemoryManager::new_in_memory().await?;
+///     let manager = DefaultMemoryManager::new_in_memory()?;
 ///
 ///     // Access subsystems
 ///     let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Hello".into());
@@ -82,7 +82,7 @@ impl DefaultMemoryManager {
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
     ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    ///     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await?);
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await?);
     ///     let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(sqlite_backend));
     ///     let procedural = Arc::new(NoopProceduralMemory);
     ///
@@ -128,7 +128,7 @@ impl DefaultMemoryManager {
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
     ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    ///     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await?);
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await?);
     ///     let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(Arc::clone(&sqlite_backend)));
     ///     let procedural = Arc::new(NoopProceduralMemory);
     ///
@@ -233,12 +233,12 @@ impl DefaultMemoryManager {
     ///
     /// All memory subsystems use in-memory storage:
     /// - Episodic: `InMemory` backend (test embeddings, cosine similarity)
-    /// - Semantic: Requires explicit SQLite backend configuration
+    /// - Semantic: Requires explicit `SQLite` backend configuration
     /// - Procedural: No-op placeholder
     ///
     /// # Errors
     ///
-    /// Returns error if SQLite backend is not configured
+    /// Returns error if `SQLite` backend is not configured
     ///
     /// # Example
     ///
@@ -261,12 +261,12 @@ impl DefaultMemoryManager {
 
     /// Create memory manager with in-memory backends and real embeddings (production)
     ///
-    /// Uses SQLite episodic backend (O(log n) vector search via vectorlite-rs) with real embeddings.
+    /// Uses `SQLite` episodic backend (O(log n) vector search via vectorlite-rs) with real embeddings.
     /// This is the recommended production configuration.
     ///
     /// All memory subsystems use in-memory storage:
-    /// - Episodic: SQLite vector index (real embeddings via `EmbeddingService`)
-    /// - Semantic: Requires explicit SQLite backend configuration
+    /// - Episodic: `SQLite` vector index (real embeddings via `EmbeddingService`)
+    /// - Semantic: Requires explicit `SQLite` backend configuration
     /// - Procedural: No-op placeholder
     ///
     /// # Arguments
@@ -275,7 +275,7 @@ impl DefaultMemoryManager {
     ///
     /// # Errors
     ///
-    /// Returns error if SQLite backend is not configured
+    /// Returns error if `SQLite` backend is not configured
     ///
     /// # Example
     ///
@@ -334,13 +334,12 @@ impl DefaultMemoryManager {
         let semantic = match config.semantic_backend {
             SemanticBackendType::Sqlite => {
                 debug!("Initializing SQLite semantic memory");
-                let sqlite_backend =
-                    config.semantic_sqlite_backend.as_ref().ok_or_else(|| {
-                        error!("SQLite semantic backend requested but not configured");
-                        crate::error::MemoryError::InvalidInput(
-                            "SQLite semantic backend not configured".to_string(),
-                        )
-                    })?;
+                let sqlite_backend = config.semantic_sqlite_backend.as_ref().ok_or_else(|| {
+                    error!("SQLite semantic backend requested but not configured");
+                    crate::error::MemoryError::InvalidInput(
+                        "SQLite semantic backend not configured".to_string(),
+                    )
+                })?;
                 GraphSemanticMemory::new_with_sqlite(Arc::clone(sqlite_backend))
             }
             #[cfg(feature = "postgres")]
@@ -380,7 +379,7 @@ impl DefaultMemoryManager {
     /// ```rust
     /// # use llmspell_memory::DefaultMemoryManager;
     /// # async fn example() {
-    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// let manager = DefaultMemoryManager::new_in_memory().unwrap();
     /// if manager.has_consolidation() {
     ///     println!("Real consolidation engine enabled");
     /// }
@@ -400,7 +399,7 @@ impl DefaultMemoryManager {
     /// ```rust
     /// # use llmspell_memory::DefaultMemoryManager;
     /// # async fn example() {
-    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// let manager = DefaultMemoryManager::new_in_memory().unwrap();
     /// assert!(manager.has_episodic());
     /// # }
     /// ```
@@ -418,7 +417,7 @@ impl DefaultMemoryManager {
     /// ```rust
     /// # use llmspell_memory::DefaultMemoryManager;
     /// # async fn example() {
-    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// let manager = DefaultMemoryManager::new_in_memory().unwrap();
     /// assert!(manager.has_semantic());
     /// # }
     /// ```
@@ -439,7 +438,7 @@ impl DefaultMemoryManager {
     /// ```rust
     /// # use llmspell_memory::DefaultMemoryManager;
     /// # async fn example() {
-    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// let manager = DefaultMemoryManager::new_in_memory().unwrap();
     /// if let Some(engine) = manager.consolidation_engine_arc() {
     ///     println!("Consolidation engine available for daemon");
     /// }
@@ -464,7 +463,7 @@ impl DefaultMemoryManager {
     /// ```rust
     /// # use llmspell_memory::DefaultMemoryManager;
     /// # async fn example() {
-    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// let manager = DefaultMemoryManager::new_in_memory().unwrap();
     /// let episodic = manager.episodic_arc();
     /// println!("Episodic memory Arc obtained");
     /// # }
@@ -675,7 +674,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_in_memory_manager() {
-        let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+        let manager = DefaultMemoryManager::new_in_memory().unwrap();
 
         // Verify all subsystems are accessible
         let _ = manager.episodic();
@@ -685,7 +684,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_episodic_memory_integration() {
-        let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+        let manager = DefaultMemoryManager::new_in_memory().unwrap();
 
         let entry = EpisodicEntry::new("test-session".into(), "user".into(), "Hello world".into());
 
@@ -698,7 +697,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_semantic_memory_integration() {
-        let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+        let manager = DefaultMemoryManager::new_in_memory().unwrap();
 
         let entity = llmspell_graph::types::Entity::new(
             "Rust".into(),
@@ -716,7 +715,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_consolidation_stub() {
-        let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+        let manager = DefaultMemoryManager::new_in_memory().unwrap();
 
         let result = manager
             .consolidate("test-session", ConsolidationMode::Immediate, None)
@@ -730,7 +729,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_shutdown() {
-        let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+        let manager = DefaultMemoryManager::new_in_memory().unwrap();
         manager.shutdown().await.unwrap();
     }
 
@@ -812,7 +811,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_has_consolidation_with_noop() {
-        let mgr = DefaultMemoryManager::new_in_memory().await.unwrap();
+        let mgr = DefaultMemoryManager::new_in_memory().unwrap();
         assert!(!mgr.has_consolidation()); // Uses noop by default
         assert!(mgr.has_episodic());
         assert!(mgr.has_semantic());
@@ -826,8 +825,14 @@ mod tests {
         use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 
         let episodic = Arc::new(InMemoryEpisodicMemory::new());
-        let sqlite_backend = Arc::new(SqliteBackend::new_temp().await.unwrap());
-        let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(Arc::clone(&sqlite_backend)));
+        let sqlite_backend = Arc::new(
+            SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory())
+                .await
+                .unwrap(),
+        );
+        let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(Arc::clone(
+            &sqlite_backend,
+        )));
         let procedural = Arc::new(NoopProceduralMemory);
 
         let extractor = Arc::new(RegexExtractor::new());
@@ -842,7 +847,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_episodic_arc_returns_same_instance() {
-        let mgr = DefaultMemoryManager::new_in_memory().await.unwrap();
+        let mgr = DefaultMemoryManager::new_in_memory().unwrap();
         let arc1 = mgr.episodic_arc();
         let arc2 = mgr.episodic_arc();
         assert!(Arc::ptr_eq(&arc1, &arc2)); // Should be same Arc instance

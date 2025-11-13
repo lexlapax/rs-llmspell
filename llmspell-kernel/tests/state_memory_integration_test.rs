@@ -16,8 +16,8 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_state_transitions_create_patterns() {
     // Create memory manager and state manager with memory integration
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .expect("Failed to create memory manager");
+    let memory_manager =
+        DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
     let memory_arc = Arc::new(memory_manager);
 
     // Use memory backend with persistence disabled to force synchronous hook execution
@@ -51,8 +51,8 @@ async fn test_state_transitions_create_patterns() {
 #[tokio::test]
 async fn test_pattern_threshold_detection() {
     // Create memory manager and state manager
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .expect("Failed to create memory manager");
+    let memory_manager =
+        DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
     let memory_arc = Arc::new(memory_manager);
 
     let config = PersistenceConfig {
@@ -162,8 +162,8 @@ async fn test_state_without_memory_manager() {
 #[tokio::test]
 async fn test_multiple_scopes_and_keys() {
     // Test that different scopes and keys create separate patterns
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .expect("Failed to create memory manager");
+    let memory_manager =
+        DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
     let memory_arc = Arc::new(memory_manager);
 
     let config = PersistenceConfig {
@@ -240,8 +240,8 @@ async fn test_multiple_scopes_and_keys() {
 #[tokio::test]
 async fn test_state_value_changes_tracked() {
     // Verify that changing from one value to another is tracked
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .expect("Failed to create memory manager");
+    let memory_manager =
+        DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
     let memory_arc = Arc::new(memory_manager);
 
     let config = PersistenceConfig {

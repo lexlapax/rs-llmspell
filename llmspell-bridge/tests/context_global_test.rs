@@ -26,8 +26,7 @@ fn create_test_context() -> GlobalContext {
 fn test_context_global_injection() {
     // Create memory manager using global runtime
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .expect("Failed to create memory manager")
+        DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
     });
 
     // Create bridge
@@ -111,8 +110,7 @@ fn test_context_assemble_episodic() {
 fn test_context_assemble_semantic() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
@@ -168,8 +166,7 @@ fn test_context_assemble_hybrid() {
 fn test_context_strategy_validation() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
@@ -232,8 +229,7 @@ fn test_context_token_budget_validation() {
 fn test_context_test() {
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
@@ -297,8 +293,7 @@ fn test_context_assemble_rag_without_pipeline() {
     // Test RAG strategy without RAG pipeline configured - should fallback to hybrid
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         // Create ContextBridge WITHOUT RAG pipeline
@@ -380,8 +375,7 @@ fn test_context_assemble_rag_with_pipeline() {
 
     with_runtime_context(|| {
         let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-            DefaultMemoryManager::new_in_memory()
-                .expect("Failed to create memory manager")
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager")
         });
 
         // Create ContextBridge WITH mock RAG pipeline

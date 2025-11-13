@@ -19,10 +19,8 @@ async fn setup_test_env() -> (
     Arc<MemoryBridge>,
     Arc<ContextBridge>,
 ) {
-    let memory_manager = Arc::new(
-        DefaultMemoryManager::new_in_memory()
-            .expect("Failed to create memory manager"),
-    );
+    let memory_manager =
+        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"));
     let memory_bridge = Arc::new(MemoryBridge::new(memory_manager.clone()));
     let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));
 

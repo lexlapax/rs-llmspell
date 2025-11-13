@@ -102,10 +102,8 @@ async fn create_memory_with_test_data(session_id: &str) -> Arc<DefaultMemoryMana
         session_id
     );
 
-    let memory = Arc::new(
-        DefaultMemoryManager::new_in_memory()
-            .expect("Failed to create memory manager"),
-    );
+    let memory =
+        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"));
 
     // Add conversation about Rust to episodic memory
     let entries = vec![
@@ -267,10 +265,8 @@ async fn test_rag_memory_session_isolation() {
     let session_b = "session-beta";
 
     // Setup: Create memory with entries in two different sessions
-    let memory = Arc::new(
-        DefaultMemoryManager::new_in_memory()
-            .expect("Failed to create memory manager"),
-    );
+    let memory =
+        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"));
 
     // Add entries to Session A
     info!("Adding entries to Session A");

@@ -40,7 +40,7 @@
 //!         active_session_threshold_secs: 300,
 //!     };
 //!
-//!     let sqlite_backend = Arc::new(SqliteBackend::new_temp().await.unwrap());
+//!     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.unwrap());
 //!     let provider_config = ProviderConfig::new_with_type(
 //!         "test-provider",
 //!         "ollama",

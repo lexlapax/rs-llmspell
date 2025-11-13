@@ -15,10 +15,8 @@ use std::sync::Arc;
 
 /// Create in-memory memory manager with test data
 async fn setup_memory_with_entries() -> Arc<DefaultMemoryManager> {
-    let memory = Arc::new(
-        DefaultMemoryManager::new_in_memory()
-            .expect("Failed to create memory manager"),
-    );
+    let memory =
+        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"));
 
     // Add 5 episodic entries for testing
     let entries = vec![

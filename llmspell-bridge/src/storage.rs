@@ -79,7 +79,9 @@ impl StorageDiscovery {
             "postgres".to_string(),
             StorageInfo {
                 name: "postgres".to_string(),
-                description: "High-performance production database for multi-tenant and large datasets".to_string(),
+                description:
+                    "High-performance production database for multi-tenant and large datasets"
+                        .to_string(),
                 backend_type: "Postgres".to_string(),
                 persistent: true,
                 supports_compression: true,
@@ -314,9 +316,10 @@ impl StorageConfigBuilder {
     #[must_use]
     pub fn postgres_backend(mut self, connection_string: impl Into<String>) -> Self {
         self.config.backend = "postgres".to_string();
-        self.config
-            .parameters
-            .insert("connection_string".to_string(), serde_json::Value::String(connection_string.into()));
+        self.config.parameters.insert(
+            "connection_string".to_string(),
+            serde_json::Value::String(connection_string.into()),
+        );
         self
     }
 
@@ -419,7 +422,9 @@ mod tests {
         assert_eq!(config.performance_preset, "fast");
         assert_eq!(
             config.parameters.get("connection_string"),
-            Some(&serde_json::Value::String("postgresql://user:pass@localhost/test".to_string()))
+            Some(&serde_json::Value::String(
+                "postgresql://user:pass@localhost/test".to_string()
+            ))
         );
         assert_eq!(
             config.parameters.get("pool_size"),
@@ -436,7 +441,9 @@ mod tests {
         assert_eq!(postgres_config.backend, "postgres");
         assert_eq!(
             postgres_config.parameters.get("connection_string"),
-            Some(&serde_json::Value::String("postgresql://localhost/db".to_string()))
+            Some(&serde_json::Value::String(
+                "postgresql://localhost/db".to_string()
+            ))
         );
     }
 }

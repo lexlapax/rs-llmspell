@@ -13,8 +13,8 @@ use std::sync::Arc;
 /// # Errors
 ///
 /// Returns `StateError::StorageError` if:
-/// - SQLite backend cannot be created at the specified path
-/// - PostgreSQL backend is not yet fully implemented
+/// - `SQLite` backend cannot be created at the specified path
+/// - `PostgreSQL` backend is not yet fully implemented
 pub async fn create_storage_backend(
     backend_type: &StorageBackendType,
 ) -> StateResult<Arc<dyn StorageBackend>> {
@@ -25,13 +25,16 @@ pub async fn create_storage_backend(
         }
         StorageBackendType::Sqlite(config) => {
             let sqlite_config = llmspell_storage::backends::sqlite::SqliteConfig::new(&config.path);
-            let sqlite_backend = llmspell_storage::backends::sqlite::SqliteBackend::new(sqlite_config)
-                .await
-                .map_err(|e| StateError::storage(format!("Failed to create SQLite backend: {}", e)))?;
+            let sqlite_backend =
+                llmspell_storage::backends::sqlite::SqliteBackend::new(sqlite_config)
+                    .await
+                    .map_err(|e| {
+                        StateError::storage(format!("Failed to create SQLite backend: {e}"))
+                    })?;
             // Wrap in SqliteKVStorage with "system" tenant for kernel state
             let kv_storage = llmspell_storage::backends::sqlite::SqliteKVStorage::new(
                 Arc::new(sqlite_backend),
-                "system".to_string()
+                "system".to_string(),
             );
             Ok(Arc::new(kv_storage) as Arc<dyn StorageBackend>)
         }

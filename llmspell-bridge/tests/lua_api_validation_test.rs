@@ -18,8 +18,8 @@ use tracing::{debug, info};
 async fn setup_lua_with_memory_context() -> (Lua, Arc<DefaultMemoryManager>) {
     info!("Setting up Lua environment for API validation");
 
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .expect("Failed to create memory manager");
+    let memory_manager =
+        DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
     let memory_manager = Arc::new(memory_manager);
 
     let memory_bridge = Arc::new(MemoryBridge::new(memory_manager.clone()));
