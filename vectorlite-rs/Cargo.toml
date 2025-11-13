@@ -17,10 +17,12 @@ crate-type = ["cdylib", "rlib"]
 # HNSW vector indexing
 hnsw_rs = "0.3.2"
 
-# SQLite virtual table API
-# bundled feature: Embed SQLite for cdylib (avoids runtime libsqlite3 dependency)
+# SQLite virtual table API (using libsql's fork to avoid symbol conflicts)
 # vtab feature: Virtual table trait implementations
-rusqlite = { version = "0.32", features = ["vtab"] }
+# Note: libsql-rusqlite provides same API as rusqlite but uses libsql's SQLite
+libsql-rusqlite = { version = "0.9", default-features = false, features = ["vtab"] }
+# Re-export as rusqlite for compatibility
+rusqlite = { package = "libsql-rusqlite", version = "0.9", default-features = false, features = ["vtab"] }
 
 # Serialization for metadata and configuration
 serde = { workspace = true, features = ["derive"] }
@@ -40,7 +42,7 @@ tracing = { workspace = true }
 
 [features]
 default = []
-bundled = ["rusqlite/bundled"]
+# bundled feature removed - libsql-rusqlite uses libsql's SQLite implementation
 
 [dev-dependencies]
 tempfile = { workspace = true }

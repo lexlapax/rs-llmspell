@@ -269,6 +269,7 @@ impl MemoryConfig {
             semantic_backend: SemanticBackendType::PostgreSQL,
             embedding_service: Some(embedding_service),
             sqlite_backend: None,
+            semantic_sqlite_backend: None,
             postgres_backend: Some(postgres_backend.clone()),
             semantic_postgres_backend: Some(postgres_backend),
         }

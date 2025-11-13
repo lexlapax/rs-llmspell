@@ -127,7 +127,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Entity and relationship storage
 - Event time and ingestion time tracking
 - Temporal queries and time-travel
-- SurrealDB embedded backend
+- SQLite (embedded) and PostgreSQL (production) backends
 - Corrections without losing history
 - Semantic memory backend for llmspell-memory
 
