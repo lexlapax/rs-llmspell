@@ -376,7 +376,7 @@ cargo doc --workspace --all-features --no-deps --open
 **Key Phase 13 Additions**:
 - 21 crates (not 18) - added llmspell-memory, llmspell-graph, llmspell-context
 - 3-tier memory system (episodic, semantic, procedural)
-- Hot-swappable backends (InMemory, HNSW, SurrealDB)
+- Hot-swappable backends (InMemory, HNSW via vectorlite-rs, SQLite/PostgreSQL graph)
 - <2ms memory overhead (50x faster than target)
 - 149 tests passing, zero warnings
 

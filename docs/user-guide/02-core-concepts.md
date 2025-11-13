@@ -298,8 +298,8 @@ local keys = State.list()
 
 State can be persisted using different backends:
 - **Memory**: Fast, ephemeral (default)
-- **Sled**: Embedded database
-- **RocksDB**: High-performance embedded
+- **SQLite**: Embedded database (libsql with HNSW vector search)
+- **PostgreSQL**: Production database with multi-tenant support
 - **Redis**: Distributed caching (planned)
 
 ---

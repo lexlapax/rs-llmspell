@@ -151,8 +151,8 @@ cargo doc --package llmspell-core --all-features --open
 ## 🆕 What's New in Phase 13
 
 ### Experimental Memory & Context Engineering (Complete) ⭐
-- **3-Tier Memory System**: Episodic (HNSW), Semantic (SurrealDB), Procedural (patterns)
-- **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SurrealDB (bi-temporal graph)
+- **3-Tier Memory System**: Episodic (HNSW), Semantic (SQLite/PostgreSQL graph), Procedural (patterns)
+- **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SQLite/PostgreSQL (bi-temporal graph)
 - **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
 - **<2ms Memory Overhead**: 50x faster than target, production-quality validation at scale
 - **149 Tests**: 100% pass rate, zero warnings, comprehensive validation
@@ -353,7 +353,7 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 
 ### Phase 13 (✅ Complete)
 - 3-Tier Memory System (Episodic, Semantic, Procedural)
-- Hot-Swappable Backends (InMemory, HNSW, SurrealDB)
+- Hot-Swappable Backends (InMemory, HNSW via vectorlite-rs, SQLite/PostgreSQL graph)
 - Context Engineering (4 strategies with parallel retrieval)
 - <2ms Memory Overhead (50x faster than target)
 

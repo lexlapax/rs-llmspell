@@ -89,8 +89,8 @@ Maximum Observed: 5ms (complex operations)
 
 #### State Persistence
 ```
-Write: <3ms (Memory: <0.1ms, SQLite: <3ms, RocksDB: <2ms)
-Read: <1ms (Memory: <0.1ms, SQLite: <1ms, RocksDB: <0.5ms)
+Write: <3ms (Memory: <0.1ms, SQLite: <3ms, PostgreSQL: <5ms)
+Read: <1ms (Memory: <0.1ms, SQLite: <1ms, PostgreSQL: <2ms)
 Migration: 2.07μs/item (483K items/sec)
 ```
 
@@ -154,7 +154,7 @@ HNSW Search (1000 vectors): 8.47ms (8.47x faster than InMemory baseline)
 Backend Performance:
 - InMemory: 71.68ms (baseline, development/testing)
 - HNSW: 8.47ms (8.47x speedup, production)
-- SurrealDB: Not yet benchmarked (graph queries, bi-temporal)
+- SQLite/PostgreSQL: Production backends for bi-temporal graph queries
 ```
 
 ### Resource Usage
@@ -280,8 +280,8 @@ ef_search = 300
 
 #### Backend Selection
 - **Memory**: Development, <1K items
-- **Sled**: Production, <100K items
-- **RocksDB**: High-scale, >100K items
+- **SQLite**: Production embedded, <1M items
+- **PostgreSQL**: Production scale, multi-tenant deployments
 
 #### Migration Optimization
 ```rust
@@ -295,12 +295,12 @@ const OPTIMAL_BATCH_SIZE: usize = 1000;
 #### Backend Selection
 - **InMemory**: Development/testing, unlimited scale for experiments
 - **HNSW**: Production, 1M+ vectors with 8.47x speedup
-- **SurrealDB**: Bi-temporal graph queries, relationship-rich data
+- **SQLite/PostgreSQL**: Bi-temporal graph queries, relationship-rich data
 
 #### Configuration
 ```toml
 [memory]
-backend = "hnsw"  # or "inmemory", "surrealdb"
+backend = "hnsw"  # or "inmemory",  "sqlite", "postgres"
 max_entries = 10000
 ttl_seconds = 3600
 
@@ -401,7 +401,7 @@ pub struct AuditEntry {
 - Memory storage latency (P50, P95, P99)
 - Memory retrieval latency
 - Context assembly time
-- Backend-specific metrics (HNSW index size, SurrealDB query time)
+- Backend-specific metrics (HNSW index size, graph query time)
 
 #### Template System Performance (Phase 12)
 - Template lookup latency
