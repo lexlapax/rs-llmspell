@@ -3724,25 +3724,76 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 
 ---
 
-#### Subtask 13c.2.8.15: Validate compilation and full test suite ⏹ PENDING
-**Time**: 1 hour | **Priority**: CRITICAL
-**Files**: Entire workspace
+#### Subtask 13c.2.8.15: Validate compilation and full test suite 🚧 IN PROGRESS
+**Time**: 2 hours (estimated 1 hour) | **Priority**: CRITICAL
+**Files**: 3 files modified (sqlite-vec removal)
+**Status**: 🚧 IN PROGRESS (2025-11-12)
 
 **Task**: Full workspace validation after legacy backend removal
 
-**Actions**:
-1. Clean rebuild: `cargo clean && cargo build --workspace --all-features`
-2. Run all tests: `cargo test --workspace --all-features`
-3. Run clippy: `cargo clippy --workspace --all-features --all-targets`
-4. Verify binary size: `cargo build --release --bin llmspell && ls -lh target/release/llmspell`
+**CRITICAL BLOCKER DISCOVERED** (2025-11-12):
+**Problem**: Building with `--all-features` caused duplicate SQLite symbol errors
+- Root Cause: `sqlite-vec` crate (added in Task 13c.2.2) depends on `libsqlite3-sys`
+- Conflict: Both `libsqlite3-sys` (from sqlite-vec) and `libsql` (production default) linked simultaneously
+- Linker errors: 20+ duplicate symbols (sqlite3_status64, sqlite3_mutex_enter, etc.)
 
-**Validation**:
-- Zero compiler warnings
-- Zero clippy warnings
-- All tests passing (149+ tests)
-- Binary size ~12MB (down from ~60MB, -76% reduction)
+**Analysis** (from TODO.md Tasks 13c.2.2 and 13c.2.2a):
+- **Task 13c.2.2**: Added `sqlite-vec` as "temporary baseline" for brute-force vector search
+  - Uses `libsqlite3-sys` underneath (⚠️ conflicts with libsql)
+  - Was intended as throwaway code while vectorlite-rs was developed
 
-**Commit**: "Task 13c.2.8.15: Validate workspace after legacy backend removal"
+- **Task 13c.2.2a**: Built `vectorlite-rs` as "MVP COMPLETE" and "DEFAULT"
+  - Pure Rust SQLite extension using hnsw_rs (HNSW indexing, 3-100x faster)
+  - Uses libsql (compatible with our stack)
+  - Became the production implementation (sqlite-vec relegated to fallback)
+
+**Key Insight**: sqlite-vec Rust crate vs vec0.so extension file
+- The `sqlite-vec` **Rust crate** was only used for `sqlite3_auto_extension()` (abandoned approach)
+- Runtime fallback loads `vec0.so` extension **file** via `load_extension()` (no crate needed)
+- We can keep the runtime fallback without the conflicting Rust crate dependency
+
+**Solution Applied** (Phase 6 - sqlite-vec Removal):
+1. ✅ Removed `sqlite-vec = "0.1.6"` from workspace Cargo.toml
+2. ✅ Removed `sqlite-vec` from llmspell-storage/Cargo.toml dependencies
+3. ✅ Removed `sqlite-vec` from llmspell-storage `sqlite` feature
+4. ✅ Kept runtime fallback logic in backend.rs (loads vec0.so if vectorlite unavailable)
+5. ✅ Kept `SqliteVecExtension` struct (queries if extension loaded at runtime)
+6. ✅ Added comments explaining pure Rust approach (vectorlite-rs only)
+
+**Files Modified**:
+1. ✅ `Cargo.toml`: Removed sqlite-vec, added comment about vectorlite-rs only
+2. ✅ `llmspell-storage/Cargo.toml`: Removed from dependencies + sqlite feature
+3. ⏸️ Runtime code unchanged (backend.rs fallback logic still works)
+
+**Build Verification**:
+- ✅ `cargo build --workspace --all-features`: SUCCESS (3m 14s, zero errors)
+- ✅ No SQLite symbol conflicts
+- ⏳ Tests running (background)
+
+**Actions** (Original + Additional):
+1. ✅ Clean rebuild: `cargo clean && cargo build --workspace --all-features` (SUCCESS)
+2. 🚧 Run all tests: `cargo test --workspace --all-features` (IN PROGRESS)
+3. ⏳ Run clippy: `cargo clippy --workspace --all-features --all-targets`
+4. ⏳ Verify binary size: `cargo build --release --bin llmspell && ls -lh target/release/llmspell`
+
+**Validation Criteria**:
+- ✅ Zero compiler errors
+- ⏳ Zero compiler warnings
+- ⏳ Zero clippy warnings
+- ⏳ All tests passing (149+ tests)
+- ⏳ Binary size ~12MB (down from ~60MB, -76% reduction)
+
+**Key Learnings**:
+1. **Workspace vs Runtime Dependencies**: Don't confuse Rust crate dependencies (compile-time) with loadable extensions (runtime). sqlite-vec crate was unnecessary - we only load vec0.so at runtime.
+
+2. **Feature Flag Interactions**: `--all-features` exposes hidden conflicts. Both `sqlite` features (with sqlite-vec) and other features pulled in conflicting SQLite implementations.
+
+3. **Temporary Code Becomes Permanent**: Task 13c.2.2 sqlite-vec was marked "temporary baseline", but sat in Cargo.toml for weeks after vectorlite-rs completion. Should have been removed in Task 13c.2.2a.
+
+4. **Pure Rust Philosophy**: The conflict validates project mandate: "Pure Rust > C binary". vectorlite-rs (pure Rust) eliminated the C dependency that caused conflicts.
+
+**Commits**:
+- "Task 13c.2.8.15: Remove sqlite-vec to fix libsqlite3-sys symbol conflicts" (3 files)
 
 ---
 

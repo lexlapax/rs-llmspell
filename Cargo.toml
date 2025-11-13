@@ -147,8 +147,8 @@ refinery = { version = "0.8", features = ["tokio-postgres"] }
 # Note: encryption feature disabled temporarily until SHA1 symbol conflict resolved
 libsql = { version = "0.9", features = ["core", "replication"] }
 r2d2 = "0.8"
-# Phase 13c.2.2: Vector search extensions
-sqlite-vec = "0.1.6" # Brute-force vector search baseline (Task 13c.2.2)
+# Phase 13c.2.2a: Vector search - vectorlite-rs only (sqlite-vec removed due to libsqlite3-sys conflict)
+# NOTE: Runtime fallback to vec0.so extension file still supported (loaded via load_extension)
 zerocopy = { version = "0.8", features = [
     "derive",
 ] } # Zero-copy Vec<f32> marshaling via AsBytes trait
