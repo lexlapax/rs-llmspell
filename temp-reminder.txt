@@ -15,4 +15,5 @@
   - ripgrep
   - rust-script
 
-  
+  - replace libsql and sqlite with vector search and index with
+  https://github.com/tursodatabase/turso after the vector indexing is ready.

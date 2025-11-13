@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tracing::info;
 
 /// Setup test environment with memory and context bridges
-fn setup_test_env() -> (
+async fn setup_test_env() -> (
     Arc<DefaultMemoryManager>,
     Arc<MemoryBridge>,
     Arc<ContextBridge>,
@@ -34,7 +34,7 @@ fn setup_test_env() -> (
 async fn test_e2e_template_with_memory() {
     info!("E2E Test 1/5: Template execution with memory enabled");
 
-    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env();
+    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env().await;
 
     // Add prior context to memory
     let session_id = "e2e-template-session";
@@ -63,7 +63,7 @@ async fn test_e2e_template_with_memory() {
 async fn test_e2e_multi_session_isolation() {
     info!("E2E Test 2/5: Multi-session memory isolation");
 
-    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env();
+    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env().await;
 
     // Add entries to Session A
     for i in 0..3 {
@@ -116,7 +116,7 @@ async fn test_e2e_multi_session_isolation() {
 async fn test_e2e_consolidation_workflow() {
     info!("E2E Test 3/5: Consolidation + semantic query workflow");
 
-    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env();
+    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env().await;
 
     // Add episodic data
     let session_id = "consolidation-session";
@@ -170,7 +170,7 @@ async fn test_e2e_consolidation_workflow() {
 async fn test_e2e_context_assembly_strategies() {
     info!("E2E Test 4/5: Context assembly with multiple strategies");
 
-    let (memory_manager, _memory_bridge, context_bridge) = setup_test_env();
+    let (memory_manager, _memory_bridge, context_bridge) = setup_test_env().await;
 
     let session_id = "context-session";
 
@@ -223,7 +223,7 @@ async fn test_e2e_context_assembly_strategies() {
 async fn test_e2e_memory_search_functionality() {
     info!("E2E Test 5/5: Memory search with vector similarity");
 
-    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env();
+    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env().await;
 
     let session_id = "search-session";
 
@@ -272,7 +272,7 @@ async fn test_e2e_memory_search_functionality() {
 async fn test_e2e_performance_overhead() {
     info!("E2E Performance Test: Validate <2ms template overhead");
 
-    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env();
+    let (memory_manager, _memory_bridge, _context_bridge) = setup_test_env().await;
 
     // Add some memory entries
     let session_id = "performance-session";

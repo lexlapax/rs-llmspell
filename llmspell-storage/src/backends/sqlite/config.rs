@@ -148,8 +148,15 @@ impl SqliteConfig {
     /// let config = SqliteConfig::in_memory();
     /// ```
     pub fn in_memory() -> Self {
+        // libsql's :memory: creates isolated databases per connection
+        // Use a temp file to ensure all connections see the same data
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let temp_path = std::env::temp_dir().join(format!("llmspell_test_{}.db", id));
+
         Self {
-            database_path: PathBuf::from(":memory:"),
+            database_path: temp_path,
             ..Default::default()
         }
     }
