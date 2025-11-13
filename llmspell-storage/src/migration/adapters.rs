@@ -94,8 +94,10 @@ impl MigrationTarget for Arc<PostgresBackend> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "postgres")]
     use super::*;
 
+    #[cfg(feature = "postgres")]
     #[test]
     fn test_component_prefix_mapping() {
         assert_eq!(component_to_prefix("agent_state"), "agent:");

@@ -4,7 +4,7 @@
 use anyhow::Result;
 use llmspell_agents::{agents::basic::BasicAgent, builder::AgentBuilder, state::StatePersistence};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_kernel::state::config::SledConfig;
+use llmspell_kernel::state::config::SqliteConfig;
 use llmspell_kernel::state::{PersistenceConfig, StateManager, StateScope, StorageBackendType};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -27,10 +27,8 @@ mod tests {
 
         let state_manager = Arc::new(
             StateManager::with_backend(
-                StorageBackendType::Sled(SledConfig {
-                    path: storage_path.join("state_db"),
-                    cache_capacity: 1024 * 1024,
-                    use_compression: true,
+                StorageBackendType::Sqlite(SqliteConfig {
+                    path: storage_path.join("state_db.db"),
                 }),
                 PersistenceConfig::default(),
                 None, // No memory manager for this test
@@ -136,10 +134,8 @@ mod tests {
 
         let state_manager = Arc::new(
             StateManager::with_backend(
-                StorageBackendType::Sled(SledConfig {
-                    path: storage_path.join("state_db"),
-                    cache_capacity: 1024 * 1024,
-                    use_compression: true,
+                StorageBackendType::Sqlite(SqliteConfig {
+                    path: storage_path.join("state_db.db"),
                 }),
                 PersistenceConfig::default(),
                 None, // No memory manager for this test
@@ -216,10 +212,8 @@ mod tests {
         {
             let state_manager = Arc::new(
                 StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: storage_path.join("state_db"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
+                    StorageBackendType::Sqlite(SqliteConfig {
+                        path: storage_path.join("state_db.db"),
                     }),
                     enabled_persistence_config(),
                     None, // No memory manager for this test
@@ -264,10 +258,8 @@ mod tests {
         {
             let state_manager = Arc::new(
                 StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: storage_path.join("state_db"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
+                    StorageBackendType::Sqlite(SqliteConfig {
+                        path: storage_path.join("state_db.db"),
                     }),
                     enabled_persistence_config(),
                     None, // No memory manager for this test
@@ -313,10 +305,8 @@ mod tests {
 
         let state_manager = Arc::new(
             StateManager::with_backend(
-                StorageBackendType::Sled(SledConfig {
-                    path: storage_path.join("state_db"),
-                    cache_capacity: 1024 * 1024,
-                    use_compression: true,
+                StorageBackendType::Sqlite(SqliteConfig {
+                    path: storage_path.join("state_db.db"),
                 }),
                 PersistenceConfig::default(),
                 None, // No memory manager for this test
@@ -421,10 +411,8 @@ mod tests {
         {
             let state_manager = Arc::new(
                 StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: storage_path.join("state_db"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
+                    StorageBackendType::Sqlite(SqliteConfig {
+                        path: storage_path.join("state_db.db"),
                     }),
                     enabled_persistence_config(),
                     None, // No memory manager for this test
@@ -452,10 +440,8 @@ mod tests {
         {
             let state_manager = Arc::new(
                 StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: storage_path.join("state_db"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
+                    StorageBackendType::Sqlite(SqliteConfig {
+                        path: storage_path.join("state_db.db"),
                     }),
                     enabled_persistence_config(),
                     None, // No memory manager for this test

@@ -15,7 +15,7 @@
 use anyhow::Result;
 use llmspell_agents::{agents::llm::LLMAgent, builder::AgentBuilder, StatePersistence};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_kernel::state::config::{PerformanceConfig, SledConfig};
+use llmspell_kernel::state::config::{PerformanceConfig, SqliteConfig};
 use llmspell_kernel::state::{PersistenceConfig, StateManager, StorageBackendType};
 use llmspell_providers::ProviderManager;
 use std::env;
@@ -55,10 +55,8 @@ async fn main() -> Result<()> {
     // Create state manager with persistent storage
     let state_manager = Arc::new(
         StateManager::with_backend(
-            StorageBackendType::Sled(SledConfig {
-                path: storage_path.join("example_states"),
-                cache_capacity: 1024 * 1024, // 1MB
-                use_compression: true,
+            StorageBackendType::Sqlite(SqliteConfig {
+                path: storage_path.join("example_states.db"),
             }),
             PersistenceConfig {
                 enabled: true,

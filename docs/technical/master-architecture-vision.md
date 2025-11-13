@@ -309,7 +309,7 @@ Built-in production capabilities that scale from development to enterprise deplo
 #### 4. **Bridge-First Technology Strategy**
 - **LLM Providers**: `rig` crate for unified access to OpenAI, Anthropic, local models
 - **Script Engines**: `mlua` for Lua, `boa`/`v8` for JavaScript, `pyo3` for Python
-- **Storage**: `sled` for development, `rocksdb` for production, behind trait abstractions
+- **Storage**: `sqlite` for embedded, `postgres` for production, behind trait abstractions
 - **Async Runtime**: `tokio` with cooperative scheduling adapters for single-threaded engines
 
 #### 5. **Comprehensive Built-in Ecosystem**

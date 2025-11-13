@@ -16,7 +16,7 @@ use llmspell_core::{
     types::AgentInput,
     ExecutionContext,
 };
-use llmspell_kernel::state::config::{PerformanceConfig, SledConfig};
+use llmspell_kernel::state::config::{PerformanceConfig, SqliteConfig};
 use llmspell_kernel::state::{PersistenceConfig, StateManager, StorageBackendType};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -40,10 +40,8 @@ async fn main() -> Result<()> {
     // Create state manager with persistent storage
     let state_manager = Arc::new(
         StateManager::with_backend(
-            StorageBackendType::Sled(SledConfig {
-                path: storage_path.join("agent_states"),
-                cache_capacity: 1024 * 1024, // 1MB
-                use_compression: true,
+            StorageBackendType::Sqlite(SqliteConfig {
+                path: storage_path.join("agent_states.db"),
             }),
             PersistenceConfig {
                 enabled: true,

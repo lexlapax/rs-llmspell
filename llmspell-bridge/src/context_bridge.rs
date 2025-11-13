@@ -160,6 +160,7 @@ impl ContextBridge {
         let strategy_enum = Self::parse_strategy(strategy)?;
 
         self.assemble_context_async(query, strategy_enum, max_tokens, session_id)
+            .await
     }
 
     /// Validate token budget constraints
@@ -210,7 +211,8 @@ impl ContextBridge {
         debug!("Entering async context assembly");
 
         let chunks = self
-            .retrieve_chunks(query, strategy, max_tokens, session_id)?;
+            .retrieve_chunks(query, strategy, max_tokens, session_id)
+            .await?;
 
         debug!("Retrieved {} chunks", chunks.len());
 

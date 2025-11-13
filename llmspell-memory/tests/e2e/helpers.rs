@@ -54,8 +54,9 @@ pub struct TestEngine {
 ///
 /// Test engine bundle with LLM engine, metrics, knowledge graph, and temp directory
 pub async fn create_test_engine() -> TestEngine {
-    // Create knowledge graph with temp SQLite backend
-    let sqlite_backend = Arc::new(SqliteBackend::new_temp().await.unwrap());
+    // Create knowledge graph with in-memory SQLite backend
+    let sqlite_config = llmspell_storage::backends::sqlite::SqliteConfig::in_memory();
+    let sqlite_backend = Arc::new(SqliteBackend::new(sqlite_config).await.unwrap());
     let knowledge_graph = Arc::new(SqliteGraphStorage::new(sqlite_backend)) as Arc<dyn KnowledgeGraph>;
 
     // Create temp dir for test cleanup

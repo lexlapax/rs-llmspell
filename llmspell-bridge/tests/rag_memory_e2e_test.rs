@@ -135,6 +135,7 @@ async fn create_memory_with_test_data(session_id: &str) -> Arc<DefaultMemoryMana
         memory
             .episodic()
             .add(entry)
+            .await
             .expect("Failed to add episodic entry");
     }
 
