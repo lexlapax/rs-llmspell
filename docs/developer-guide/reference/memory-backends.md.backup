@@ -17,8 +17,8 @@ llmspell's adaptive memory system (Phase 13) provides a 3-tier memory architectu
 
 **Backend Options**:
 - **InMemory**: Development and testing (fast, ephemeral)
-- **vectorlite-rs HNSW**: Production episodic memory (8.47x speedup, persistent)
-- **SQLite/PostgreSQL Graph**: Semantic memory graph (bi-temporal)
+- **HNSW**: Production episodic memory (8.47x speedup, persistent)
+- **SurrealDB**: Semantic memory graph (bi-temporal, embedded)
 - **ChromaDB/Qdrant**: External vector databases (optional)
 
 ---
@@ -32,11 +32,11 @@ Memory Facade (MemorySystem)
     ↓
     ├─→ Episodic Memory
     │   ├─→ InMemoryBackend (dev)
-    │   ├─→ vectorlite-rs HNSW Backend (production)
+    │   ├─→ HNSWBackend (production)
     │   └─→ ChromaDB/Qdrant (external)
     │
     ├─→ Semantic Memory
-    │   ├─→ Knowledge Graph (SQLite/PostgreSQL)
+    │   ├─→ Knowledge Graph (SurrealDB)
     │   └─→ InMemory Graph (testing)
     │
     └─→ Procedural Memory
@@ -59,11 +59,11 @@ let memory = MemorySystem::new(
         .with_semantic_backend(MemoryBackend::InMemory)
 )?;
 
-// Production setup (vectorlite-rs HNSW + SQLite graph)
+// Production setup (HNSW + SurrealDB)
 let memory = MemorySystem::new(
     MemoryConfig::default()
-        .with_episodic_backend(MemoryBackend::VectorliteHNSW)
-        .with_semantic_backend(MemoryBackend::SqliteGraph)
+        .with_episodic_backend(MemoryBackend::HNSW)
+        .with_semantic_backend(MemoryBackend::SurrealDB)
         .with_persistence_path("/var/lib/llmspell/memory")
 )?;
 ```
@@ -174,14 +174,14 @@ let config = HNSWConfig {
     ..Default::default()
 };
 
-let backend = MemoryBackend::VectorliteHNSW(config);
+let backend = MemoryBackend::HNSW(config);
 ```
 
 **Usage**:
 ```rust
 let memory = MemorySystem::new(
     MemoryConfig::default()
-        .with_episodic_backend(MemoryBackend::VectorliteHNSW)
+        .with_episodic_backend(MemoryBackend::HNSW)
 )?;
 
 // Add memories (automatically embedded and indexed)
@@ -267,7 +267,7 @@ let backend = MemoryBackend::Qdrant(config);
 
 **Purpose**: Store facts, entities, and relationships in a knowledge graph
 
-### SQLite/PostgreSQL Graph Backend (Recommended)
+### SurrealDB Backend (Recommended)
 
 **Features**:
 - Bi-temporal tracking (event time + ingestion time)
@@ -277,22 +277,22 @@ let backend = MemoryBackend::Qdrant(config);
 
 **Configuration**:
 ```rust
-use llmspell_memory::backends::SqliteGraphConfig;
+use llmspell_memory::backends::SurrealDBConfig;
 
-let config = SqliteGraphConfig {
+let config = SurrealDBConfig {
     path: "/var/lib/llmspell/semantic".into(),
     namespace: "llmspell",
     database: "semantic_memory",
 };
 
-let backend = MemoryBackend::SqliteGraph(config);
+let backend = MemoryBackend::SurrealDB(config);
 ```
 
 **Usage**:
 ```rust
 let memory = MemorySystem::new(
     MemoryConfig::default()
-        .with_semantic_backend(MemoryBackend::SqliteGraph)
+        .with_semantic_backend(MemoryBackend::SurrealDB)
 )?;
 
 // Add fact
