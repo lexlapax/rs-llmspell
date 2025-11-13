@@ -55,9 +55,9 @@ rand = "0.8"
 criterion = { workspace = true }
 # Phase 13c.1.6: blake3 removed (use sha2 for content hashing in tests)
 sha2 = "0.10"
-# Phase 13c.2.2: rusqlite for sqlite-vec extension registration in tests
-# Note: NOT using bundled feature to avoid conflict with libsql's sqlite3
-rusqlite = "0.32"
+# Phase 13c.2.2: libsql-rusqlite for test consistency (no symbol conflicts)
+# Note: Using libsql-rusqlite instead of rusqlite to avoid libsqlite3-sys conflicts
+rusqlite = { package = "libsql-rusqlite", version = "0.9", default-features = false }
 
 [[bench]]
 name = "graph_bench"

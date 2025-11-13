@@ -122,7 +122,9 @@ winapi = { version = "0.3", features = ["fileapi"] }
 [features]
 default = []  # Truly minimal - no heavy external dependencies
 common = ["templates", "pdf"]  # Convenient preset for typical usage
-full = ["csv-parquet", "templates", "pdf", "excel", "json-query", "archives", "email", "email-aws", "database"]
+# Phase 13c.2: Removed "database" from full feature to avoid sqlx-sqlite/libsql symbol conflicts
+# Users can opt-in to database-postgres if needed for DatabaseConnectorTool
+full = ["csv-parquet", "templates", "pdf", "excel", "json-query", "archives", "email", "email-aws"]
 
 # Individual feature flags
 csv-parquet = ["dep:arrow", "dep:parquet"]
@@ -139,7 +141,8 @@ email-aws = ["dep:aws-sdk-ses", "dep:aws-config"]
 # Database support
 database = ["dep:sqlx"]
 database-postgres = ["database", "sqlx/postgres"]
-database-sqlite = ["database", "sqlx/sqlite"]
+# Phase 13c.2: database-sqlite feature removed due to symbol conflicts with libsql
+# SQLite database access should use libsql-based storage (llmspell-storage) instead
 # database-mysql removed in 13c.1.1 - mock implementation never completed, PostgreSQL is production backend
 
 [dev-dependencies]

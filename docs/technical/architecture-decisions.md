@@ -221,15 +221,17 @@ pub fn execute_sync(input: LuaValue) -> LuaResult<LuaValue> {
 ### ADR-014: Multi-Backend State Persistence
 
 **Date**: July 2025 (Phase 5)  
-**Status**: Accepted  
-**Context**: Different deployment scenarios need different storage  
-**Decision**: Support Memory, Sled, RocksDB backends  
-**Implementation**: StorageBackend trait abstraction  
+**Status**: Superseded (Phase 13c)
+**Context**: Different deployment scenarios need different storage
+**Decision**: Support Memory, SQLite, PostgreSQL backends
+**Implementation**: StorageBackend trait abstraction
 **Consequences**:
 - ✅ Flexible deployment options
-- ✅ Zero external dependencies with Sled
-- ✅ High performance with RocksDB
+- ✅ Unified SQLite for embedded (libsql) with HNSW vector search (vectorlite-rs)
+- ✅ PostgreSQL for production multi-tenant deployments
+- ✅ Reduced dependency tree (consolidated around libsql ecosystem)
 - ❌ More complexity in abstraction
+**Update**: Phase 13c migrated from Sled/RocksDB to SQLite/PostgreSQL
 
 ### ADR-015: State Scoping Hierarchy
 
@@ -784,7 +786,7 @@ let entities = graph.query_temporal(query).await?;
 ```
 
 **Performance Validation**:
-- SurrealDB embedded: 5/7 methods working (71% functional, acceptable for Phase 13)
+- SQLite/PostgreSQL graph backend: Full implementation via llmspell-graph
 - Temporal queries: <10ms on 10K entities (measured)
 - Storage overhead: +18% measured (within +20% target)
 - Write latency: +1.2ms measured (within +2ms target)
@@ -800,13 +802,14 @@ let entities = graph.query_temporal(query).await?;
 - ❌ Additional complexity in query API (well-contained)
 
 **Related ADRs**:
-- ADR-026: SurrealDB for RAG Backend (chosen for graph storage in Phase 8)
+- ADR-026: Namespace Multi-Tenancy Pattern (used for graph isolation)
+- ADR-027: Separate Storage Crate (llmspell-graph for semantic storage)
 - ADR-045: Consolidation Engine Strategy (uses bi-temporal data for episodic→semantic flow)
 
 **Validation**:
 - 34 tests passing (15 graph + 19 extraction tests)
 - Zero clippy warnings
-- SurrealDB embedded backend: 71% functional (5/7 methods)
+- SQLite/PostgreSQL graph backend: Full implementation via llmspell-graph
 - Comprehensive documentation in llmspell-graph crate
 
 ---
@@ -957,7 +960,7 @@ impl MemoryManager for DefaultMemoryManager {
 ```rust
 // Example 1: Manual consolidation (testing)
 let extractor = Arc::new(RegexExtractor::new());
-let graph = Arc::new(SurrealDBBackend::new(path).await?);
+let graph = Arc::new(SqliteGraphBackend::new(path).await?);
 let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
 
 let manager = DefaultMemoryManager::with_consolidation(
@@ -1002,7 +1005,8 @@ let result = manager.consolidate("session-a", ConsolidationMode::Manual).await?;
 **Related ADRs**:
 - ADR-044: Bi-Temporal Knowledge Graph (provides storage for consolidated knowledge)
 - ADR-001: BaseAgent as Universal Foundation (trait-based design philosophy)
-- ADR-026: SurrealDB for RAG Backend (storage backend for knowledge graph)
+- ADR-026: Namespace Multi-Tenancy Pattern (isolation for graph storage)
+- ADR-027: Separate Storage Crate (llmspell-graph implementation)
 
 **Validation**:
 - 91 tests passing in llmspell-memory
@@ -1325,7 +1329,8 @@ pub enum PromptVersion {
 - **ADR-045**: Consolidation Engine Strategy (defines LLMConsolidationEngine as chosen approach)
 - **ADR-044**: Bi-Temporal Knowledge Graph (storage backend for consolidated knowledge)
 - **ADR-001**: BaseAgent as Universal Foundation (trait-based modularity philosophy)
-- **ADR-026**: SurrealDB for RAG Backend (knowledge graph storage)
+- **ADR-026**: Namespace Multi-Tenancy Pattern (isolation for knowledge graph)
+- **ADR-027**: Separate Storage Crate (llmspell-graph with SQLite/PostgreSQL backends)
 
 **Future Enhancements** (Phase 13.7+):
 - [ ] **Parallel LLM Calls**: Increase throughput >200 records/min (requires concurrency limits)
