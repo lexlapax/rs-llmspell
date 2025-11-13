@@ -200,7 +200,7 @@ fn create_backend_type(config: &StatePersistenceConfig) -> StorageBackendType {
         }
         backend => {
             warn!(
-                "Backend type '{}' not supported via Lua bridge (Sled removed, use 'memory'), falling back to memory",
+                "Backend type '{}' not supported via Lua bridge, falling back to memory",
                 backend
             );
             StorageBackendType::Memory

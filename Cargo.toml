@@ -84,7 +84,6 @@ nursery = "warn"
 # - Test results: 2,982 tests passing, zero warnings
 # - Clippy: Clean across all features
 #
-# Future Phases (14+): Monitor transitive dependencies, consider RocksDB backend
 # ================================================================================
 
 [workspace.dependencies]
@@ -135,7 +134,11 @@ tracing-test = "0.2"
 # Phase 13c.2.8: sled removed (legacy backend deprecated)
 
 # PostgreSQL storage (Phase 13b.2 - optional)
-tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }
+tokio-postgres = { version = "0.7", features = [
+    "with-uuid-1",
+    "with-chrono-0_4",
+    "with-serde_json-1",
+] }
 deadpool-postgres = "0.14"
 pgvector = { version = "0.4", features = ["postgres"] }
 refinery = { version = "0.8", features = ["tokio-postgres"] }
@@ -146,8 +149,10 @@ libsql = { version = "0.9", features = ["core", "replication"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.25"
 # Phase 13c.2.2: Vector search extensions
-sqlite-vec = "0.1.6"  # Brute-force vector search baseline (Task 13c.2.2)
-zerocopy = { version = "0.8", features = ["derive"] }  # Zero-copy Vec<f32> marshaling via AsBytes trait
+sqlite-vec = "0.1.6" # Brute-force vector search baseline (Task 13c.2.2)
+zerocopy = { version = "0.8", features = [
+    "derive",
+] } # Zero-copy Vec<f32> marshaling via AsBytes trait
 
 # Scripting engines
 mlua = { version = "0.9", features = [

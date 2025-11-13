@@ -299,7 +299,6 @@ fn bench_compression_effectiveness(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("compression_effectiveness");
 
-    // Note: Compression benchmarks removed after Sled backend deletion
     // Use SQLite backend for compression testing if needed
 
     group.finish();

@@ -95,7 +95,6 @@ Phase 13 (Temporal Knowledge Graph):
 - ✅ Task 13c.2.4: SQLite graph storage (via llmspell-storage)
 - ✅ Task 13c.2.4: PostgreSQL graph storage (via llmspell-storage)
 - ✅ Task 13c.2.8: Graph traversal with recursive CTEs
-- ✅ Task 13c.2.8: Legacy backend removal (SurrealDB deleted)
 
 **Note**: Graph storage implementations moved to `llmspell-storage` crate for unified storage architecture.
 

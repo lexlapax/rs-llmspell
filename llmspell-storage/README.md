@@ -33,19 +33,15 @@ backend.set("user:123", serde_json::to_vec(&value)?).await?;
 
 ### Vector Storage (Production RAG)
 ```rust
-use llmspell_storage::{
-    VectorEntry, VectorQuery, HNSWVectorStorage, HNSWConfig, DistanceMetric
-};
-use llmspell_state_traits::StateScope;
-use std::collections::HashMap;
+use llmspell_storage::backends::sqlite::{SqliteVectorStorage, SqliteConfig};
+use std::sync::Arc;
 
-// Create production-optimized HNSW storage
-let config = HNSWConfig::production()  // Preset for production workloads
-    .with_distance_metric(DistanceMetric::Cosine)
-    .with_max_connections(16)
-    .with_ef_construction(200);
+// Create SQLite vector storage with vectorlite-rs HNSW extension
+let config = SqliteConfig::new("./data/vectors.db")
+    .with_max_connections(20);
 
-let storage = HNSWVectorStorage::new(1536, config);  // OpenAI ada-002 dimensions
+let backend = Arc::new(SqliteBackend::new(config).await?);
+let storage = SqliteVectorStorage::new(backend, "main".to_string())?;  // tenant_id "main"
 
 // Multi-tenant document ingestion
 let mut metadata = HashMap::new();

@@ -125,12 +125,9 @@ impl Default for PersistenceConfigBuilder {
 pub enum StorageBackendType {
     Memory,
     Sqlite(SqliteConfig),
-    RocksDB(RocksDBConfig),
     #[cfg(feature = "postgres")]
     Postgres(PostgresConfig),
 }
-
-// SledConfig removed - Sled backend deprecated in Phase 13c
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SqliteConfig {
@@ -143,13 +140,6 @@ impl Default for SqliteConfig {
             path: std::path::PathBuf::from("./data/llmspell.db"),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RocksDBConfig {
-    pub path: std::path::PathBuf,
-    pub create_if_missing: bool,
-    pub optimize_for_point_lookup: bool,
 }
 
 /// `PostgreSQL` configuration for kernel state storage (Phase 13b.2)

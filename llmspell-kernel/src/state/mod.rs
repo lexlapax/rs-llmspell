@@ -79,7 +79,7 @@ pub use agent_state::{
 };
 pub use backend_adapter::StateStorageAdapter;
 pub use config::{
-    BackupConfig, EncryptionConfig, PerformanceConfig, PersistenceConfig, RocksDBConfig,
+    BackupConfig, EncryptionConfig, PerformanceConfig, PersistenceConfig, SqliteConfig,
     StorageBackendType,
 };
 pub use manager::{HookReplayManager, SerializedHookExecution, StateManager};

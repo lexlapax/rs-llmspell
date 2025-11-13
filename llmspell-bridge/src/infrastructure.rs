@@ -204,7 +204,6 @@ fn create_session_manager(
 ) -> Result<Arc<llmspell_kernel::sessions::SessionManager>, LLMSpellError> {
     debug!("Creating session manager");
 
-    // Create session storage backend based on config (Phase 13c.2.8.12 - Sled removed)
     // Only memory backend supported via Lua bridge (production: use Rust API with SQLite/PostgreSQL)
     let session_storage_backend: Arc<dyn llmspell_storage::StorageBackend> = {
         debug!("Using memory backend for session storage");

@@ -51,7 +51,6 @@ impl StateManagerAdapter {
         config: &llmspell_config::StatePersistenceConfig,
     ) -> anyhow::Result<Self> {
         // Convert string backend type to enum
-        // Phase 13c.2.8: Sled backend removed, only Memory supported via bridge currently
         let backend_type = match config.backend_type.as_str() {
             "memory" => StorageBackendType::Memory,
             "sqlite" => {

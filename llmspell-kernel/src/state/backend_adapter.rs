@@ -14,7 +14,7 @@ use std::sync::Arc;
 ///
 /// Returns `StateError::StorageError` if:
 /// - SQLite backend cannot be created at the specified path
-/// - `RocksDB` backend is requested (not yet implemented)
+/// - PostgreSQL backend is not yet fully implemented
 pub async fn create_storage_backend(
     backend_type: &StorageBackendType,
 ) -> StateResult<Arc<dyn StorageBackend>> {
@@ -34,12 +34,6 @@ pub async fn create_storage_backend(
                 "system".to_string()
             );
             Ok(Arc::new(kv_storage) as Arc<dyn StorageBackend>)
-        }
-        StorageBackendType::RocksDB(_config) => {
-            // RocksDB backend to be implemented in future phase
-            Err(StateError::storage(
-                "RocksDB backend not yet implemented".to_string(),
-            ))
         }
         #[cfg(feature = "postgres")]
         StorageBackendType::Postgres(_config) => {

@@ -267,7 +267,7 @@ impl StateManager {
     ///
     /// # Arguments
     ///
-    /// * `backend_type` - Storage backend type (Memory, Sled, `RocksDB`)
+    /// * `backend_type` - Storage backend type (Memory, Sqlite, Postgres)
     /// * `config` - Persistence configuration
     /// * `memory_manager` - Optional memory manager for state-memory synchronization (Phase 13.7.4)
     ///

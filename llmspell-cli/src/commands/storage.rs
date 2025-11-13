@@ -21,7 +21,6 @@ pub async fn handle_storage_command(
     Err(anyhow!(
         "Storage migration commands removed in Phase 13c.\n\
          \n\
-         Sled backend has been removed. Use SQLite or PostgreSQL backends directly:\n\
          \n\
          For SQLite:\n\
          - Set backend_type = \"Sqlite\" in config\n\

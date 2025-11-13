@@ -1,5 +1,4 @@
 //! ABOUTME: Migration adapters for existing storage backends (deprecated - Phase 13c)
-//! ABOUTME: Sled-to-PostgreSQL migration removed; use SQLite or PostgreSQL directly
 
 #[cfg(feature = "postgres")]
 use super::traits::MigrationTarget;
