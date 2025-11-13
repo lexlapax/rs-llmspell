@@ -53,6 +53,8 @@ async fn test_lua_builder_to_rust_workflow_conversion() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -124,6 +126,8 @@ async fn test_agent_classification_condition_parsing() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -184,6 +188,8 @@ async fn test_nested_workflow_step_conversion() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -250,6 +256,8 @@ async fn test_multi_branch_condition_conversion() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();

@@ -40,6 +40,8 @@ async fn test_api_availability_for_workflows() {
         &agent_registry,
         &workflow_factory,
         None,
+        None,
+        None,
     );
 
     let lua_code = r"
@@ -127,6 +129,8 @@ async fn test_state_management_integration() {
         &tool_registry,
         &agent_registry,
         &workflow_factory,
+        None,
+        None,
         None,
     );
 
@@ -219,6 +223,8 @@ async fn test_memory_leak_prevention() {
         &agent_registry,
         &workflow_factory,
         None,
+        None,
+        None,
     );
 
     // Test creating multiple script executions without memory leaks
@@ -307,6 +313,8 @@ async fn test_performance_requirements() {
         &tool_registry,
         &agent_registry,
         &workflow_factory,
+        None,
+        None,
         None,
     );
 
@@ -401,6 +409,8 @@ async fn test_error_conditions_and_recovery() {
         &agent_registry,
         &workflow_factory,
         None,
+        None,
+        None,
     );
 
     let lua_code = r#"
@@ -490,6 +500,8 @@ async fn test_concurrent_operations() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         );
 
         let lua_code = format!(
@@ -572,6 +584,8 @@ async fn test_comprehensive_api_methods() {
         &tool_registry,
         &agent_registry,
         &workflow_factory,
+        None,
+        None,
         None,
     );
 

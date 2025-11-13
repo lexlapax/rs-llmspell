@@ -164,10 +164,28 @@ async fn register_rag_global(
     context: &Arc<GlobalContext>,
     session_manager_opt: Option<Arc<llmspell_kernel::sessions::manager::SessionManager>>,
 ) {
+    use tracing::debug;
+
     // Try to get vector storage from infrastructure
-    let vector_storage = context
-        .get_bridge::<crate::globals::rag_infrastructure::RAGInfrastructure>("rag_infrastructure")
-        .and_then(|infra| infra.vector_storage.clone());
+    let rag_infra = context
+        .get_bridge::<crate::globals::rag_infrastructure::RAGInfrastructure>("rag_infrastructure");
+    debug!(
+        "register_rag_global: rag_infrastructure found: {}",
+        rag_infra.is_some()
+    );
+
+    let vector_storage = rag_infra.and_then(|infra| {
+        debug!(
+            "register_rag_global: vector_storage in infra: {}",
+            infra.vector_storage.is_some()
+        );
+        infra.vector_storage.clone()
+    });
+
+    debug!(
+        "register_rag_global: final vector_storage: {}",
+        vector_storage.is_some()
+    );
 
     if let (Some(state_manager), Some(session_manager), Some(multi_tenant_rag)) = (
         context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager"),

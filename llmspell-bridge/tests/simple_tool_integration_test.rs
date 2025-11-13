@@ -42,6 +42,8 @@ async fn test_simple_tool_integration() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -999,6 +1001,8 @@ async fn test_tool_performance() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();

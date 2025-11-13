@@ -35,6 +35,8 @@ mod tests {
                 &agent_registry,
                 &workflow_factory,
                 None,
+                None,
+                None,
             )
             .unwrap();
 
@@ -110,6 +112,8 @@ mod tests {
                 &agent_registry,
                 &workflow_factory,
                 None,
+                None,
+                None,
             )
             .unwrap();
 
@@ -169,6 +173,8 @@ mod tests {
                 &tool_registry,
                 &agent_registry,
                 &workflow_factory,
+                None,
+                None,
                 None,
             )
             .unwrap();
@@ -240,6 +246,8 @@ mod tests {
                 &tool_registry,
                 &agent_registry,
                 &workflow_factory,
+                None,
+                None,
                 None,
             )
             .unwrap();

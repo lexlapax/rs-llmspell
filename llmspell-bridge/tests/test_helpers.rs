@@ -1,5 +1,8 @@
 //! Test helper utilities for llmspell-bridge tests
 
+use llmspell_bridge::engine::bridge::ApiDependencies;
+use llmspell_bridge::{ComponentRegistry, ProviderManager};
+use llmspell_config::providers::ProviderManagerConfig;
 use std::sync::Arc;
 
 /// Create infrastructure registries for testing
@@ -18,6 +21,32 @@ pub fn create_test_infrastructure() -> (
     let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
         Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
     (tool_registry, agent_registry, workflow_factory)
+}
+
+/// Create API dependencies for testing
+///
+/// Returns fully configured `ApiDependencies` struct that can be passed to `inject_apis()`.
+/// This is a convenience wrapper around `create_test_infrastructure()` that creates all
+/// required dependencies and bundles them into the struct.
+#[must_use]
+#[allow(dead_code)] // Used in test files
+pub async fn create_test_api_deps() -> ApiDependencies {
+    let registry = Arc::new(ComponentRegistry::new());
+    let provider_config = ProviderManagerConfig::default();
+    let providers = Arc::new(
+        ProviderManager::new(provider_config)
+            .await
+            .expect("Failed to create provider manager"),
+    );
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    ApiDependencies::new(
+        registry,
+        providers,
+        tool_registry,
+        agent_registry,
+        workflow_factory,
+    )
 }
 
 /// Execute test function with tokio runtime context

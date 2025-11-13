@@ -1,4 +1,5 @@
 //! ABOUTME: Integration tests for `LuaEngine` implementation
+use llmspell_bridge::engine::bridge::ApiDependencies;
 //! ABOUTME: Validates basic script execution and API injection
 
 mod test_helpers;
@@ -38,15 +39,15 @@ mod tests {
         // Create test infrastructure
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-        // Inject APIs
-        let result = engine.inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
+        // Inject APIs using ApiDependencies struct
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
         );
+        let result = engine.inject_apis(&api_deps);
         assert!(result.is_ok(), "Failed to inject APIs");
 
         // Execute simple script
@@ -74,17 +75,15 @@ mod tests {
         // Create test infrastructure
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-        // Inject APIs
-        engine
-            .inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-            )
-            .unwrap();
+        // Inject APIs using ApiDependencies struct
+        let api_deps = ApiDependencies::new(
+            registry.clone(),
+            providers.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        );
+        engine.inject_apis(&api_deps).unwrap();
 
         // Test that Agent global exists
         let script = "return Agent ~= nil";

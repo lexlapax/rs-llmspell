@@ -1,4 +1,5 @@
 //! ABOUTME: External API integration tests requiring real LLM providers
+use llmspell_bridge::engine::bridge::ApiDependencies;
 //! ABOUTME: Tests LLM-based workflows using actual OpenAI/Anthropic APIs
 //! ABOUTME: All tests marked with #[ignore = "external"] to skip in CI without API keys
 

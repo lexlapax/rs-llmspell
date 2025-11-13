@@ -72,6 +72,9 @@ pub struct Infrastructure {
     /// RAG system (optional, created if config.rag.enabled)
     pub rag: Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>,
 
+    /// Vector storage for RAG (optional, created with rag)
+    pub vector_storage: Option<Arc<SqliteVectorStorage>>,
+
     /// Memory manager (optional, created if config.memory.enabled)
     pub memory_manager: Option<Arc<llmspell_memory::DefaultMemoryManager>>,
 
@@ -118,11 +121,12 @@ impl Infrastructure {
         let session_manager = create_session_manager(state_manager.clone(), config)?;
 
         // 4. Create RAG if enabled
-        let rag = if config.rag.enabled {
-            Some(create_rag(config).await?)
+        let (rag, vector_storage) = if config.rag.enabled {
+            let (rag, vs) = create_rag(config).await?;
+            (Some(rag), Some(vs))
         } else {
             debug!("RAG disabled in config, skipping creation");
-            None
+            (None, None)
         };
 
         // 5. Create memory manager if enabled
@@ -153,6 +157,7 @@ impl Infrastructure {
             state_manager,
             session_manager,
             rag,
+            vector_storage,
             memory_manager,
             tool_registry,
             agent_registry,
@@ -241,33 +246,60 @@ fn create_session_manager(
 ///
 /// Only called when `config.rag.enabled` is true.
 ///
+/// # Returns
+///
+/// Returns a tuple of (MultiTenantRAG, SqliteVectorStorage)
+///
 /// # Errors
 ///
 /// Returns an error if `SQLite` backend or vector storage initialization fails
 async fn create_rag(
     config: &LLMSpellConfig,
-) -> Result<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>, LLMSpellError> {
+) -> Result<
+    (
+        Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>,
+        Arc<SqliteVectorStorage>,
+    ),
+    LLMSpellError,
+> {
     debug!("Creating RAG infrastructure (enabled via config)");
 
     // Read configuration from config.rag
     let dimensions = config.rag.vector_storage.dimensions;
 
     // Create SQLite backend (in-memory if no persistence_path specified)
-    let sqlite_config = if let Some(db_path) = &config.rag.vector_storage.persistence_path {
+    let sqlite_config = if let Some(path) = &config.rag.vector_storage.persistence_path {
+        // If path is a directory or doesn't have an extension, append default db filename
+        let db_path = if path.is_dir() || path.extension().is_none() {
+            // Create directory if it doesn't exist
+            if !path.exists() {
+                std::fs::create_dir_all(path).map_err(|e| LLMSpellError::Storage {
+                    message: format!("Failed to create persistence directory: {e}"),
+                    operation: Some("create_directory".to_string()),
+                    source: None,
+                })?;
+            }
+            path.join("vectors.db")
+        } else {
+            path.clone()
+        };
         debug!("Creating SQLite vector storage at: {:?}", db_path);
-        SqliteConfig::new(db_path.clone())
+        SqliteConfig::new(db_path)
     } else {
         debug!("Creating in-memory SQLite vector storage (no persistence_path configured)");
         SqliteConfig::in_memory()
     };
 
-    let backend = Arc::new(SqliteBackend::new(sqlite_config)
-        .await
-        .map_err(|e| LLMSpellError::Storage {
-            message: format!("Failed to create SQLite backend for RAG: {e}"),
-            operation: Some("create_backend".to_string()),
-            source: None,
-        })?);
+    let backend =
+        Arc::new(
+            SqliteBackend::new(sqlite_config)
+                .await
+                .map_err(|e| LLMSpellError::Storage {
+                    message: format!("Failed to create SQLite backend for RAG: {e}"),
+                    operation: Some("create_backend".to_string()),
+                    source: None,
+                })?,
+        );
 
     // Run migrations to create required tables
     backend
@@ -292,7 +324,7 @@ async fn create_rag(
 
     // Create tenant manager
     let tenant_manager = Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(
-        vector_storage,
+        vector_storage.clone(),
     ));
 
     // Create multi-tenant RAG
@@ -302,7 +334,7 @@ async fn create_rag(
 
     debug!("RAG infrastructure created (dimensions={})", dimensions);
 
-    Ok(rag)
+    Ok((rag, vector_storage))
 }
 
 /// Create memory manager from config

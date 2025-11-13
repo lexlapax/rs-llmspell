@@ -41,6 +41,8 @@ async fn test_all_tools_integration() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -145,6 +147,8 @@ async fn test_tool_performance_benchmarks() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();

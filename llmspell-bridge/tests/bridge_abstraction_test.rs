@@ -121,6 +121,8 @@ async fn test_api_injection() {
         &agent_registry,
         &workflow_factory,
         None,
+        None,
+        None,
     );
     assert!(result.is_ok(), "API injection should succeed");
 
@@ -153,6 +155,8 @@ async fn test_bridge_error_handling() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -201,6 +205,8 @@ async fn test_output_format_consistency() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -242,6 +248,8 @@ async fn test_console_output_capture() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -278,6 +286,8 @@ async fn test_output_metadata() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();

@@ -1,4 +1,5 @@
 //! ABOUTME: Performance and memory validation tests for the bridge
+use llmspell_bridge::engine::bridge::ApiDependencies;
 //! ABOUTME: Ensures memory usage and performance targets are met
 
 mod test_helpers;
@@ -36,6 +37,8 @@ async fn test_memory_usage_simple_scripts() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -78,6 +81,8 @@ async fn test_no_memory_leaks() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -158,6 +163,8 @@ async fn test_script_startup_time() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
     let _ = engine.execute_script("return 'hello'").await.unwrap();
@@ -189,6 +196,8 @@ async fn test_streaming_latency() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -234,6 +243,8 @@ async fn test_operation_benchmarks() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -298,6 +309,8 @@ async fn test_concurrent_execution_correctness() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -385,6 +398,8 @@ async fn test_large_script_memory() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -493,6 +508,8 @@ async fn test_context_switching_overhead() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();

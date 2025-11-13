@@ -1,4 +1,5 @@
 //! ABOUTME: Tests for provider access through the script engine bridge
+use llmspell_bridge::engine::bridge::ApiDependencies;
 //! ABOUTME: Validates that scripts can access and use providers correctly
 
 mod test_helpers;

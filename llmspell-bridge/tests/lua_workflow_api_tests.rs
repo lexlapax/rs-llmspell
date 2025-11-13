@@ -53,6 +53,8 @@ async fn test_lua_workflow_sequential_creation() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -95,6 +97,8 @@ async fn test_lua_workflow_parallel() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -133,6 +137,8 @@ async fn test_lua_workflow_conditional() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -194,6 +200,8 @@ async fn test_lua_workflow_loop() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -238,6 +246,8 @@ async fn test_lua_workflow_list() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -280,6 +290,8 @@ async fn test_lua_workflow_discover_types() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -336,6 +348,8 @@ async fn test_lua_workflow_error_handling() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();

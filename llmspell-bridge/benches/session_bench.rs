@@ -79,6 +79,8 @@ async fn create_setup_engine() -> LuaEngine {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
     engine

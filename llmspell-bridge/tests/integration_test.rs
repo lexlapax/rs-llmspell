@@ -39,6 +39,8 @@ async fn test_script_execution_through_bridge() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -124,6 +126,8 @@ async fn test_streaming_through_bridge() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -197,6 +201,8 @@ async fn test_provider_integration() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -229,6 +235,8 @@ async fn test_error_propagation() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -275,6 +283,8 @@ async fn test_multimodal_types_access() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -318,6 +328,8 @@ async fn test_execution_context_integration() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -364,6 +376,8 @@ async fn test_bridge_performance_overhead() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
@@ -471,6 +485,8 @@ async fn test_component_registration_integration() {
             &agent_registry,
             &workflow_factory,
             None,
+            None,
+            None,
         )
         .unwrap();
 
@@ -498,6 +514,8 @@ async fn test_concurrent_script_execution() {
             &tool_registry,
             &agent_registry,
             &workflow_factory,
+            None,
+            None,
             None,
         )
         .unwrap();
