@@ -74,10 +74,10 @@ async fn create_setup_engine() -> LuaEngine {
 
     let api_deps = ApiDependencies::new(
         registry.clone(),
-        providers.clone(),
-        tool_registry.clone(),
-        agent_registry.clone(),
-        workflow_factory.clone(),
+        providers,
+        tool_registry,
+        agent_registry,
+        workflow_factory,
     );
 
     engine.inject_apis(&api_deps).unwrap();
