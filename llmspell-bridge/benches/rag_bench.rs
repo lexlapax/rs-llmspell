@@ -43,7 +43,7 @@ async fn setup_bridge() -> Arc<RAGBridge> {
     );
 
     // Setup SQLite vector storage (in-memory for benchmarking)
-    let config = SqliteConfig::new(":memory:");
+    let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
     let vector_storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
 

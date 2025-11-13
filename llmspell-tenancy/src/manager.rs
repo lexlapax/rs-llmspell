@@ -517,7 +517,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tenant_creation() {
-        let config = SqliteConfig::new(":memory:");
+        let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
         let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);
@@ -542,7 +542,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tenant_isolation() {
-        let config = SqliteConfig::new(":memory:");
+        let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
         let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);
@@ -588,7 +588,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tenant_limits() {
-        let config = SqliteConfig::new(":memory:");
+        let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
         let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);

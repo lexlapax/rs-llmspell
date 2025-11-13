@@ -510,7 +510,7 @@ mod tests {
     use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 
     async fn create_test_retrieval_flow() -> RetrievalFlow {
-        let config = SqliteConfig::new(":memory:");
+        let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
         let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let embedding_config = EmbeddingProviderConfig {

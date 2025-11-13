@@ -96,18 +96,14 @@ fn extract_memory_manager(
 }
 
 /// Create in-memory fallback memory manager
-fn create_fallback_memory_manager() -> Option<Arc<dyn llmspell_memory::MemoryManager>> {
+async fn create_fallback_memory_manager() -> Option<Arc<dyn llmspell_memory::MemoryManager>> {
     use llmspell_memory::DefaultMemoryManager;
     use tracing::{debug, info, warn};
 
     info!("No memory_manager in context, creating in-memory fallback");
 
-    // Use sync_utils to block on async creation
-    match crate::lua::sync_utils::block_on_async(
-        "create_fallback_memory_manager",
-        DefaultMemoryManager::new_in_memory(),
-        None,
-    ) {
+    // Directly await async creation (no need for block_on_async)
+    match DefaultMemoryManager::new_in_memory().await {
         Ok(manager) => {
             debug!("Created in-memory MemoryManager successfully");
             Some(Arc::new(manager) as Arc<dyn llmspell_memory::MemoryManager>)
@@ -140,7 +136,7 @@ fn register_bridges(
 }
 
 /// Register Memory and Context globals (always available with in-memory fallback)
-fn register_memory_context_globals(
+async fn register_memory_context_globals(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
 ) {
@@ -152,7 +148,7 @@ fn register_memory_context_globals(
     let memory_manager_opt = if memory_manager_from_context.is_some() {
         memory_manager_from_context
     } else {
-        create_fallback_memory_manager()
+        create_fallback_memory_manager().await
     };
 
     if let Some(memory_manager) = memory_manager_opt {
@@ -426,7 +422,7 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     let session_manager_opt = register_session_artifacts(&mut builder, &context);
 
     // Register Memory and Context globals (always available with in-memory fallback)
-    register_memory_context_globals(&mut builder, &context);
+    register_memory_context_globals(&mut builder, &context).await;
 
     // Register RAG global if dependencies available
     register_rag_global(&mut builder, &context, session_manager_opt).await;

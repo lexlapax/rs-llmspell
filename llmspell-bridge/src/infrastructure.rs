@@ -252,28 +252,35 @@ async fn create_rag(
     // Read configuration from config.rag
     let dimensions = config.rag.vector_storage.dimensions;
 
-    // Get database path from config or use default
-    let db_path = config
-        .rag
-        .vector_storage
-        .persistence_path
-        .clone()
-        .unwrap_or_else(|| std::path::PathBuf::from("./data/rag_vectors.db"));
+    // Create SQLite backend (in-memory if no persistence_path specified)
+    let sqlite_config = if let Some(db_path) = &config.rag.vector_storage.persistence_path {
+        debug!("Creating SQLite vector storage at: {:?}", db_path);
+        SqliteConfig::new(db_path.clone())
+    } else {
+        debug!("Creating in-memory SQLite vector storage (no persistence_path configured)");
+        SqliteConfig::in_memory()
+    };
 
-    debug!("Creating SQLite vector storage at: {:?}", db_path);
-
-    // Create SQLite backend
-    let config = SqliteConfig::new(db_path);
-    let backend = SqliteBackend::new(config)
+    let backend = Arc::new(SqliteBackend::new(sqlite_config)
         .await
         .map_err(|e| LLMSpellError::Storage {
             message: format!("Failed to create SQLite backend for RAG: {e}"),
             operation: Some("create_backend".to_string()),
             source: None,
+        })?);
+
+    // Run migrations to create required tables
+    backend
+        .run_migrations()
+        .await
+        .map_err(|e| LLMSpellError::Storage {
+            message: format!("Failed to run migrations for RAG storage: {e}"),
+            operation: Some("run_migrations".to_string()),
+            source: None,
         })?;
 
     // Create vector storage with SQLite backend
-    let vector_storage = SqliteVectorStorage::new(Arc::new(backend), dimensions)
+    let vector_storage = SqliteVectorStorage::new(backend.clone(), dimensions)
         .await
         .map_err(|e| LLMSpellError::Storage {
             message: format!("Failed to create SQLite vector storage for RAG: {e}"),

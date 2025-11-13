@@ -136,6 +136,17 @@ impl SqliteVectorStorage {
             );
         }
 
+        // Create vec_embeddings table if it doesn't exist (Task 13c.2.8.16 - runtime creation)
+        // Use regular tables instead of vec0 virtual tables (vec0 extension optional)
+        let conn = backend.get_connection().await?;
+        let create_table_sql = format!(
+            "CREATE TABLE IF NOT EXISTS vec_embeddings_{} (rowid INTEGER PRIMARY KEY, embedding BLOB)",
+            dimension
+        );
+        conn.execute(&create_table_sql, ())
+            .await
+            .with_context(|| format!("Failed to create vec_embeddings_{} table", dimension))?;
+
         let persistence_path = PathBuf::from("./data/hnsw_indices");
         std::fs::create_dir_all(&persistence_path)?;
 

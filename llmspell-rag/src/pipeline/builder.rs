@@ -430,7 +430,7 @@ mod tests {
         Arc<EmbeddingFactory>,
         Arc<EmbeddingCache>,
     ) {
-        let config = SqliteConfig::new(":memory:");
+        let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
         let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
 

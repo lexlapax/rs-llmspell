@@ -241,7 +241,7 @@ mod tests {
         let extractor = Arc::new(RegexExtractor::new());
 
         // Create in-memory SQLite backend for testing
-        let config = SqliteConfig::new(":memory:");
+        let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
         let graph: Arc<dyn KnowledgeGraph> = Arc::new(SqliteGraphStorage::new(backend));
 

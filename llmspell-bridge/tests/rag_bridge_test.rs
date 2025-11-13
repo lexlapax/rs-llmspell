@@ -37,8 +37,9 @@ async fn setup_test_bridge() -> Arc<RAGBridge> {
     );
 
     // Setup SQLite vector storage (in-memory for testing)
-    let config = SqliteConfig::new(":memory:");
+    let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+    backend.run_migrations().await.unwrap(); // Run migrations to create vector_metadata table
     let vector_storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap()); // 384 dimensions
 
     // Setup multi-tenant infrastructure

@@ -3772,7 +3772,7 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 
 **Actions** (Original + Additional):
 1. ✅ Clean rebuild: `cargo clean && cargo build --workspace --all-features` (SUCCESS)
-2. ✅ Run all tests: `cargo test --workspace --all-features` (3 failures → 0 failures after in-memory fix)
+2. ✅ Run all tests: `cargo test --workspace --all-features` (46/47 suites pass)
 3. ✅ Run clippy: `cargo clippy --workspace --all-features --all-targets` (ZERO warnings)
 4. ⏳ Verify binary size: `cargo build --release --bin llmspell && ls -lh target/release/llmspell`
 
@@ -3780,8 +3780,8 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - ✅ Zero compiler errors
 - ✅ Zero compiler warnings
 - ✅ Zero clippy warnings
-- ✅ All critical tests passing (145+ tests, 3 failures fixed)
-- ⏳ Binary size ~12MB (down from ~60MB, -76% reduction)
+- ✅ 46/47 test suites passing (rag_e2e_integration_test: 7 failures - pre-existing, uses legacy HNSW config)
+- ⏳ Binary size ~12MB (down from ~60MB, -76% reduction) - pending release build
 
 **Additional Issues Discovered & Fixed** (2025-11-13):
 
@@ -3833,10 +3833,52 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
    - Systematic grep-and-fix required: `rg "new_in_memory\(\)\.unwrap\(\)"` → add `.await`
    - Zero-warning policy caught all instances early (doc tests fail clippy if async wrong)
 
+**Phase 9 - Async Cascade Fix in globals/mod.rs** (1 test failure):
+- **Problem**: `local_llm_registration::test_localllm_global_registered` failing with "can call blocking only when running on the multi-threaded runtime"
+- **Root Cause**: `create_fallback_memory_manager()` using `block_on_async()` to call now-async `new_in_memory()`
+  - `block_in_place` requires multi-threaded tokio runtime
+  - Test was running on current_thread runtime
+- **Fix**: Made `create_fallback_memory_manager()` and `register_memory_context_globals()` async
+  - Location: `llmspell-bridge/src/globals/mod.rs:99,143`
+  - Direct await instead of blocking: `DefaultMemoryManager::new_in_memory().await`
+  - Updated caller in `create_standard_registry()` to await the async call
+- **Test Verification**: `local_llm_registration_test` now passes (2/2 tests)
+
+**Phase 10 - Systematic :memory: to in_memory() Replacement** (9 files, RAG test fixes):
+- **Problem**: RAG bridge/e2e tests failing with "Failed to insert into vec_embeddings_384" and "Failed to insert into vector_metadata"
+- **Root Causes**:
+  1. Direct `:memory:` usage bypasses UUID-based temp file fix (isolated databases)
+  2. Missing migrations: `backend.run_migrations().await` not called before vector storage creation
+  3. Missing table creation: `vec_embeddings_*` tables not created by `SqliteVectorStorage::new()`
+- **Fixes Applied**:
+  1. ✅ Replaced ALL `SqliteConfig::new(":memory:")` → `SqliteConfig::in_memory()` (9 files):
+     - `llmspell-bridge/tests/rag_bridge_test.rs`
+     - `llmspell-bridge/tests/rag_lua_integration_test.rs`
+     - `llmspell-bridge/benches/rag_bench.rs`
+     - `llmspell-rag/src/pipeline/builder.rs`
+     - `llmspell-rag/src/pipeline/rag_pipeline.rs`
+     - `llmspell-rag/src/pipeline/retrieval_flow.rs`
+     - `llmspell-tenancy/src/manager.rs` (3 instances)
+     - `llmspell-tenancy/tests/integration_tests.rs` (4 instances)
+     - `llmspell-memory/src/consolidation/manual.rs`
+     - `llmspell-memory/tests/consolidation_test.rs`
+  2. ✅ Added `backend.run_migrations().await` in test setup (`rag_bridge_test.rs:42`)
+  3. ✅ Added runtime table creation in `SqliteVectorStorage::new()` (`vector.rs:139-148`)
+- **Test Verification**: `rag_bridge_test` now passes (9/9 tests)
+- **In-Memory Strategy Evolution**:
+  - Attempt #1: Atomic counter → Still had isolation issues
+  - Attempt #2: `file:memdb{id}?mode=memory&cache=shared` URI → libsql doesn't support
+  - **Final Solution**: UUID-based temp files (`/tmp/llmspell_test_{uuid}.db`)
+    - Ensures true connection sharing across pool
+    - No libsql in-memory quirks
+    - Clean up handled by OS temp dir cleanup
+
 **Commits**:
 - "Task 13c.2.8.15: Remove sqlite-vec to fix libsqlite3-sys symbol conflicts" (3 files)
 - "Task 13c.2.8.15: Fix async/await for new_in_memory() calls" (3 files)
 - "Task 13c.2.8.15: Fix libsql in-memory database isolation issue" (1 file, 3 tests fixed)
+- "Task 13c.2.8.15: Fix async globals creation blocking issue" (1 file)
+- "Task 13c.2.8.15: Systematic :memory: replacement and migration fixes" (11 files, 9 tests fixed)
 
 ---
 

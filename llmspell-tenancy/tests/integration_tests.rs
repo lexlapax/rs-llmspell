@@ -158,7 +158,7 @@ async fn test_tenant_registry_with_event_bus() -> Result<()> {
 
 #[tokio::test]
 async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
-    let config = SqliteConfig::new(":memory:");
+    let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await?);
     let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await?);
     let event_bus = Arc::new(EventBus::new());
@@ -259,7 +259,7 @@ async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
 
 #[tokio::test]
 async fn test_tenant_limits_enforcement() -> Result<()> {
-    let config = SqliteConfig::new(":memory:");
+    let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await?);
     let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await?);
     let manager = MultiTenantVectorManager::new(storage);
@@ -317,7 +317,7 @@ async fn test_tenant_limits_enforcement() -> Result<()> {
 
 #[tokio::test]
 async fn test_tenant_isolation() -> Result<()> {
-    let config = SqliteConfig::new(":memory:");
+    let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await?);
     let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await?);
     let manager = MultiTenantVectorManager::new(storage);
@@ -391,7 +391,7 @@ async fn test_tenant_isolation() -> Result<()> {
 
 #[tokio::test]
 async fn test_inactive_tenant_access() -> Result<()> {
-    let config = SqliteConfig::new(":memory:");
+    let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await?);
     let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await?);
     let manager = MultiTenantVectorManager::new(storage);
