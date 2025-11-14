@@ -519,7 +519,7 @@ mod tests {
     async fn test_tenant_creation() {
         let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
-        let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);
 
         let config = TenantConfig {
@@ -544,7 +544,7 @@ mod tests {
     async fn test_tenant_isolation() {
         let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
-        let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);
 
         // Create two tenants
@@ -562,10 +562,19 @@ mod tests {
             manager.create_tenant(config).await.unwrap();
         }
 
-        // Insert vectors for tenant-1
+        // Insert vectors for tenant-1 (384 dimensions)
+        let mut vec1 = vec![0.0; 384];
+        vec1[0] = 0.1;
+        vec1[1] = 0.2;
+        vec1[2] = 0.3;
+        let mut vec2 = vec![0.0; 384];
+        vec2[0] = 0.4;
+        vec2[1] = 0.5;
+        vec2[2] = 0.6;
+
         let vectors = vec![
-            VectorEntry::new("vec1".to_string(), vec![0.1, 0.2, 0.3]),
-            VectorEntry::new("vec2".to_string(), vec![0.4, 0.5, 0.6]),
+            VectorEntry::new("vec1".to_string(), vec1.clone()),
+            VectorEntry::new("vec2".to_string(), vec2),
         ];
 
         manager
@@ -574,7 +583,7 @@ mod tests {
             .unwrap();
 
         // Search from tenant-1 should find results
-        let query = VectorQuery::new(vec![0.1, 0.2, 0.3], 10);
+        let query = VectorQuery::new(vec1, 10);
         let results = manager
             .search_for_tenant("tenant-1", query.clone())
             .await
@@ -590,7 +599,7 @@ mod tests {
     async fn test_tenant_limits() {
         let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
-        let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);
 
         let config = TenantConfig {
@@ -600,7 +609,7 @@ mod tests {
                 max_vectors: Some(1),
                 max_storage_bytes: Some(1024),
                 max_queries_per_second: Some(10),
-                max_dimensions: Some(3),
+                max_dimensions: Some(384),
                 allow_overflow: false,
                 custom_limits: HashMap::new(),
             },
@@ -613,15 +622,23 @@ mod tests {
 
         manager.create_tenant(config).await.unwrap();
 
-        // First insert should succeed
-        let vector = vec![VectorEntry::new("vec1".to_string(), vec![0.1, 0.2, 0.3])];
+        // First insert should succeed (384 dimensions)
+        let mut test_vec1 = vec![0.0; 384];
+        test_vec1[0] = 0.1;
+        test_vec1[1] = 0.2;
+        test_vec1[2] = 0.3;
+        let vector = vec![VectorEntry::new("vec1".to_string(), test_vec1)];
         manager
             .insert_for_tenant("limited-tenant", vector)
             .await
             .unwrap();
 
         // Second insert should fail due to vector limit
-        let vector = vec![VectorEntry::new("vec2".to_string(), vec![0.4, 0.5, 0.6])];
+        let mut test_vec2 = vec![0.0; 384];
+        test_vec2[0] = 0.4;
+        test_vec2[1] = 0.5;
+        test_vec2[2] = 0.6;
+        let vector = vec![VectorEntry::new("vec2".to_string(), test_vec2)];
         let result = manager.insert_for_tenant("limited-tenant", vector).await;
         assert!(result.is_err());
     }
