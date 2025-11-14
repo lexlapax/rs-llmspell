@@ -87,7 +87,7 @@ where
 // Backend Abstraction Tests
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_backend_add() {
     run_on_both_backends(|backend| async move {
         let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Test message".into());
@@ -98,7 +98,7 @@ async fn test_backend_add() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_backend_get() {
     run_on_both_backends(|backend| async move {
         let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Test message".into());
@@ -113,7 +113,7 @@ async fn test_backend_get() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_backend_get_session() {
     run_on_both_backends(|backend| async move {
         // Add entries to two different sessions
@@ -157,7 +157,7 @@ async fn test_backend_get_session() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_backend_search() {
     run_on_both_backends(|backend| async move {
         // Add entries with different content
@@ -187,7 +187,7 @@ async fn test_backend_search() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_backend_list_unprocessed() {
     run_on_both_backends(|backend| async move {
         // Add entries
@@ -222,7 +222,7 @@ async fn test_backend_list_unprocessed() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_backend_delete_before() {
     use chrono::{Duration, Utc};
 
@@ -260,7 +260,7 @@ async fn test_backend_delete_before() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_backend_name() {
     // Test InMemory backend name
     let config = MemoryConfig::for_testing();
@@ -291,14 +291,14 @@ async fn test_backend_name() {
 // Configuration Tests
 // ============================================================================
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_config_for_testing() {
     let config = MemoryConfig::for_testing();
     let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
     assert_eq!(backend.backend_name(), "InMemory");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_config_for_production() {
     let provider: Arc<dyn EmbeddingProvider> = Arc::new(TestEmbeddingProvider);
     let embedding_service = Arc::new(EmbeddingService::new(provider));

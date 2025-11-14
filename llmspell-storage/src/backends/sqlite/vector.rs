@@ -147,6 +147,38 @@ impl SqliteVectorStorage {
             .await
             .with_context(|| format!("Failed to create vec_embeddings_{} table", dimension))?;
 
+        // Create vector_metadata table if it doesn't exist
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS vector_metadata (
+                rowid INTEGER PRIMARY KEY,
+                id TEXT NOT NULL UNIQUE,
+                tenant_id TEXT,
+                scope TEXT NOT NULL,
+                dimension INTEGER NOT NULL CHECK (dimension IN (384, 768, 1536, 3072)),
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await
+        .with_context(|| "Failed to create vector_metadata table")?;
+
+        // Create indices for vector_metadata
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_tenant_scope ON vector_metadata(tenant_id, scope)",
+            (),
+        )
+        .await
+        .with_context(|| "Failed to create idx_vector_metadata_tenant_scope index")?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_id ON vector_metadata(id)",
+            (),
+        )
+        .await
+        .with_context(|| "Failed to create idx_vector_metadata_id index")?;
+
         let persistence_path = PathBuf::from("./data/hnsw_indices");
         std::fs::create_dir_all(&persistence_path)?;
 
