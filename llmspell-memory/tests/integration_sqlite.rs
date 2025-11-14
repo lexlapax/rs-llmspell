@@ -1,8 +1,9 @@
-//! Integration tests for MemoryManager with libsql backend
+//! Integration tests for `MemoryManager` with libsql backend
 //!
 //! Tests the full memory system integration: episodic + semantic + procedural via libsql
 
 use llmspell_graph::extraction::RegexExtractor;
+use llmspell_graph::types::{Entity, Relationship};
 use llmspell_memory::consolidation::ManualConsolidationEngine;
 use llmspell_memory::episodic::InMemoryEpisodicMemory;
 use llmspell_memory::manager::DefaultMemoryManager;
@@ -11,6 +12,7 @@ use llmspell_memory::semantic::GraphSemanticMemory;
 use llmspell_memory::traits::MemoryManager;
 use llmspell_memory::types::{ConsolidationMode, EpisodicEntry};
 use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteGraphStorage};
+use serde_json::json;
 use std::sync::Arc;
 
 /// Create integrated memory manager with all subsystems via libsql
@@ -75,9 +77,6 @@ async fn test_memory_manager_semantic_operations() {
     let manager = create_integrated_manager().await;
 
     // Test semantic memory (knowledge graph)
-    use llmspell_graph::types::{Entity, Relationship};
-    use serde_json::json;
-
     // Add entities
     let rust_entity = Entity::new(
         "Rust".to_string(),
@@ -271,9 +270,6 @@ async fn test_memory_manager_full_integration() {
     // We can't easily query by name without search, but we verified entities_added > 0
 
     // 5. Manually add a direct semantic entity
-    use llmspell_graph::types::Entity;
-    use serde_json::json;
-
     let go_entity = Entity::new(
         "Go".to_string(),
         "programming_language".to_string(),
@@ -296,7 +292,6 @@ async fn test_memory_manager_full_integration() {
         .unwrap();
 
     // 7. Add relationship
-    use llmspell_graph::types::Relationship;
     let concurrency_rel = Relationship::new(
         go_id.clone(),
         concurrency_id.clone(),

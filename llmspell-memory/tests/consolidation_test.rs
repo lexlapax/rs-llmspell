@@ -259,7 +259,7 @@ async fn test_regex_extractor_standalone() {
     let text = "Rust is a systems programming language. Rust has memory safety.";
     let entities = extractor.extract_entities(text);
 
-    println!("Text: {}", text);
+    println!("Text: {text}");
     println!("Entities extracted: {}", entities.len());
     for ent in &entities {
         println!("  - {}", ent.name);
