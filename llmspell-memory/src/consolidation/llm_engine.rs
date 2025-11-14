@@ -803,6 +803,13 @@ mod tests {
             Ok(vec![])
         }
 
+        async fn get_relationships(
+            &self,
+            _entity_id: &str,
+        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::types::Relationship>> {
+            Ok(vec![])
+        }
+
         async fn query_temporal(
             &self,
             _query: TemporalQuery,
