@@ -4116,21 +4116,29 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 **Progress Summary**:
 - ✅ 13c.2.9.1: Fixed tokio runtime configuration (commit: 13c.2.9.1)
 - ✅ 13c.2.9.2: Consolidated table creation in SqliteBackend::new() (commit: 13c.2.9.2)
-- 🔄 13c.2.9.3: Fixing consolidation test failures (3/146 tests failing)
-- ⏹ 13c.2.9.4: Test llmspell-graph package
-- ⏹ 13c.2.9.5: Test llmspell-context package
-- ⏹ 13c.2.9.6: Create and run benchmarks
-- ⏹ 13c.2.9.7: Profile memory usage
+- ✅ 13c.2.9.3: Fixed vec_embeddings table creation + removed debug module (commit: 13c.2.9.3)
+- ✅ 13c.2.9.4: Test llmspell-memory package (222 passed, 10 ignored)
+- ✅ 13c.2.9.5: Test llmspell-graph package (11 passed)
+- ✅ 13c.2.9.6: Test llmspell-context package (19 passed)
+- ⏹ 13c.2.9.7: Create and run benchmarks
+- ⏹ 13c.2.9.8: Profile memory usage
 
-**Test Results (as of 13c.2.9.2)**:
-- llmspell-memory: 143 passed, 3 failed, 9 ignored (97.9% pass rate)
+**Test Results (as of 13c.2.9.3)**:
+- llmspell-memory: 222 passed, 10 ignored (100% pass rate)
   - ✅ lib tests: 110/110 passed
   - ✅ backend_integration_test: 10/10 passed
   - ✅ baseline_measurement_test: 9 passed, 2 ignored
   - ✅ consolidation_llm_test: 9 passed, 7 ignored
-  - ✗ consolidation_test: 5 passed, 3 failed
-- llmspell-graph: Not yet tested
-- llmspell-context: Not yet tested
+  - ✅ consolidation_test: 10/10 passed
+  - ✅ episodic_comprehensive_test: 46/46 passed
+  - ✅ episodic_sqlite_backend: 7 passed, 1 ignored
+  - ✅ error_test: 6/6 passed
+  - ✅ provider_integration_test: 10/10 passed
+  - ✅ trace_verification: 5/5 passed
+  - ✅ traits_test: 10/10 passed
+- llmspell-graph: 11 passed (100% pass rate)
+- llmspell-context: 19 passed (100% pass rate)
+- **Phase 13 Total: 252 passed, 10 ignored (100% pass rate)**
 
 **Accomplishments**:
 1. **Tokio Runtime Fix (13c.2.9.1)**:
@@ -4143,8 +4151,23 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
    - Removed ad-hoc table creation from SqliteVectorStorage::new()
    - Added backend.run_migrations() call to SqliteBackend::new()
    - Now matches Postgres pattern: Backend handles schema via migrations, Storage wraps backend
-   - Centralized all table creation in V1-V13 migrations
+   - Centralized standard table creation in V1-V13 migrations
    - Result: 110/110 lib tests passing, cleaner architecture
+
+3. **Vec Embeddings Table Fix (13c.2.9.3)**:
+   - Restored dimension-specific vec_embeddings_* table creation in SqliteVectorStorage::new()
+   - These tables are created at runtime because they're dimension-specific (384, 768, 1536, 3072)
+   - Removed debug test module inclusion from llmspell-graph/src/lib.rs
+   - Clarified table creation split:
+     * vec_embeddings_* tables: Runtime creation (dimension-specific, on-demand)
+     * vector_metadata table + indices: Migration creation (standard schema)
+   - Result: All llmspell-memory tests passing (222 passed, 10 ignored)
+
+4. **Phase 13 Test Suite Validation (13c.2.9.4-6)**:
+   - llmspell-memory: 222 passed, 10 ignored
+   - llmspell-graph: 11 passed
+   - llmspell-context: 19 passed
+   - Total: 252 passed, 10 ignored (100% pass rate)
 
 **Key Insights**:
 1. **Postgres Consistency Pattern**: SQLite backend should match Postgres architecture
@@ -4162,18 +4185,21 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
    - Tests using SqliteBackend must use `#[tokio::test(flavor = "multi_thread")]`
    - Single-threaded runtime causes panic in block_in_place calls
 
-**Remaining Issues**:
-1. **Consolidation Test Failures (3 tests)**:
-   - test_episodic_to_semantic_flow: entities_added == 0 (expected > 0)
-   - test_multiple_relationship_extraction: entities_added == 0 (expected >= 2)
-   - test_consolidation_immediate_mode: entities_added == 0 (expected > 0)
-   - Root cause: ManualConsolidationEngine extracting entities but not adding to graph
-   - RegexExtractor confirmed working (standalone test passes)
-   - Issue in SqliteGraphStorage::add_entity() or consolidation engine flow
+**Remaining Work**:
+1. **Benchmarks (13c.2.9.7)**: Create and run performance benchmarks
+   - Vector storage: insert/search performance
+   - Graph storage: traversal performance
+   - State storage: CRUD performance
+   - Validate against targets: <1ms insert, <10ms search 10K, <50ms graph 4-hop
+
+2. **Memory Profiling (13c.2.9.8)**: Profile memory usage
+   - Ensure no memory leaks
+   - Verify connection pool behavior
+   - Document memory consumption patterns
 
 **Acceptance Criteria**:
-- [ ] 149 Phase 13 tests ported to libsql backend (143/146 llmspell-memory passing, graph/context pending)
-- [ ] All tests passing (100% pass rate) - currently 97.9% for llmspell-memory
+- [x] 149 Phase 13 tests ported to libsql backend (252 passing, 10 ignored)
+- [x] All tests passing (100% pass rate)
 - [ ] Benchmarks run: vector insert/search, graph traversal, state CRUD, session/artifact
 - [ ] Performance targets met: <1ms vector insert, <10ms search 10K, <50ms graph 4-hop, <10ms state write
 - [ ] Regression tests: no performance degradation vs HNSW/SurrealDB/Sled within acceptable bounds
