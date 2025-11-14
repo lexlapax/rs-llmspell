@@ -160,7 +160,7 @@ async fn test_tenant_registry_with_event_bus() -> Result<()> {
 async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
     let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await?);
-    let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await?);
+    let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await?);
     let event_bus = Arc::new(EventBus::new());
 
     // Set up event subscription
@@ -187,7 +187,7 @@ async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
             max_vectors: Some(100),
             max_storage_bytes: Some(1024 * 1024),
             max_queries_per_second: Some(10),
-            max_dimensions: Some(10),
+            max_dimensions: Some(384),
             allow_overflow: false,
             custom_limits: HashMap::new(),
         },
@@ -212,9 +212,13 @@ async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
         .contains("tenant.vector-tenant.created"));
 
     // Insert vectors - should emit insertion event
+    let mut vec1 = vec![0.0; 384];
+    vec1[0] = 1.0;
+    vec1[1] = 2.0;
+    vec1[2] = 3.0;
     let vectors = vec![VectorEntry::new(
         "test-vector-1".to_string(),
-        vec![1.0, 2.0, 3.0],
+        vec1.clone(),
     )];
 
     manager.insert_for_tenant("vector-tenant", vectors).await?;
@@ -231,7 +235,7 @@ async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
 
     // Search vectors - should emit search event
     let query = VectorQuery {
-        vector: vec![1.0, 2.0, 3.0],
+        vector: vec1,
         k: 5,
         filter: None,
         threshold: None,
@@ -261,7 +265,7 @@ async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
 async fn test_tenant_limits_enforcement() -> Result<()> {
     let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await?);
-    let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await?);
+    let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await?);
     let manager = MultiTenantVectorManager::new(storage);
 
     let config = TenantConfig {
@@ -269,7 +273,7 @@ async fn test_tenant_limits_enforcement() -> Result<()> {
         name: "Limited Tenant".to_string(),
         limits: TenantLimits {
             max_vectors: Some(10), // Higher limit so we can test dimensions
-            max_dimensions: Some(3),
+            max_dimensions: Some(384),
             allow_overflow: false,
             ..Default::default()
         },
@@ -285,7 +289,7 @@ async fn test_tenant_limits_enforcement() -> Result<()> {
     // Try to insert vector with too many dimensions - should fail
     let oversized_vector = vec![VectorEntry::new(
         "oversized-vector".to_string(),
-        vec![1.0, 2.0, 3.0, 4.0], // 4 dimensions > 3 limit
+        vec![1.0; 385], // 385 dimensions > 384 limit
     )];
     let result = manager
         .insert_for_tenant("limited-tenant", oversized_vector)
@@ -295,18 +299,26 @@ async fn test_tenant_limits_enforcement() -> Result<()> {
     assert!(error_msg.contains("dimension") || error_msg.contains("exceeds"));
 
     // Insert first vector - should succeed
+    let mut vec1 = vec![0.0; 384];
+    vec1[0] = 1.0;
+    vec1[1] = 2.0;
+    vec1[2] = 3.0;
     let vectors1 = vec![VectorEntry::new(
         "vector-1".to_string(),
-        vec![1.0, 2.0, 3.0],
+        vec1,
     )];
     manager
         .insert_for_tenant("limited-tenant", vectors1)
         .await?;
 
     // Insert second vector - should succeed
+    let mut vec2 = vec![0.0; 384];
+    vec2[0] = 4.0;
+    vec2[1] = 5.0;
+    vec2[2] = 6.0;
     let vectors2 = vec![VectorEntry::new(
         "vector-2".to_string(),
-        vec![4.0, 5.0, 6.0],
+        vec2,
     )];
     manager
         .insert_for_tenant("limited-tenant", vectors2)
@@ -319,7 +331,7 @@ async fn test_tenant_limits_enforcement() -> Result<()> {
 async fn test_tenant_isolation() -> Result<()> {
     let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await?);
-    let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await?);
+    let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await?);
     let manager = MultiTenantVectorManager::new(storage);
 
     // Create two tenants
@@ -349,13 +361,18 @@ async fn test_tenant_isolation() -> Result<()> {
     manager.create_tenant(config2).await?;
 
     // Insert different vectors for each tenant
+    let mut vec1 = vec![0.0; 384];
+    vec1[0] = 1.0;
+    let mut vec2 = vec![0.0; 384];
+    vec2[1] = 1.0;
+
     let vectors1 = vec![VectorEntry::new(
         "tenant1-vector".to_string(),
-        vec![1.0, 0.0, 0.0],
+        vec1.clone(),
     )];
     let vectors2 = vec![VectorEntry::new(
         "tenant2-vector".to_string(),
-        vec![0.0, 1.0, 0.0],
+        vec2,
     )];
 
     manager.insert_for_tenant("tenant-1", vectors1).await?;
@@ -363,7 +380,7 @@ async fn test_tenant_isolation() -> Result<()> {
 
     // Search from each tenant - should only see their own vectors
     let query = VectorQuery {
-        vector: vec![1.0, 0.0, 0.0],
+        vector: vec1,
         k: 10,
         filter: None,
         threshold: None,
@@ -393,7 +410,7 @@ async fn test_tenant_isolation() -> Result<()> {
 async fn test_inactive_tenant_access() -> Result<()> {
     let config = SqliteConfig::in_memory();
     let backend = Arc::new(SqliteBackend::new(config).await?);
-    let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await?);
+    let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await?);
     let manager = MultiTenantVectorManager::new(storage);
 
     let config = TenantConfig {
@@ -410,9 +427,13 @@ async fn test_inactive_tenant_access() -> Result<()> {
     manager.create_tenant(config).await?;
 
     // Try to insert vectors - should fail
+    let mut vec1 = vec![0.0; 384];
+    vec1[0] = 1.0;
+    vec1[1] = 2.0;
+    vec1[2] = 3.0;
     let vectors = vec![VectorEntry::new(
         "inactive-vector".to_string(),
-        vec![1.0, 2.0, 3.0],
+        vec1.clone(),
     )];
     let result = manager.insert_for_tenant("inactive-tenant", vectors).await;
     assert!(result.is_err());
@@ -420,7 +441,7 @@ async fn test_inactive_tenant_access() -> Result<()> {
 
     // Try to search - should also fail
     let query = VectorQuery {
-        vector: vec![1.0, 2.0, 3.0],
+        vector: vec1,
         k: 5,
         filter: None,
         threshold: None,
