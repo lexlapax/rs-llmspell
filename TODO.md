@@ -4489,18 +4489,25 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
    ```
 
 **Progress Summary**:
-- ✅ **13c.2.10.1**: MemoryManager integration test created and passing (6/6 tests)
+- ✅ **13c.2.10.1**: MemoryManager integration test created and passing (6/6 tests) - COMPLETE
   - Created `llmspell-memory/tests/integration_sqlite.rs` with 6 comprehensive tests
   - Tests episodic, semantic, procedural memory subsystems via SqliteBackend
   - Tests consolidation flow (episodic → semantic)
   - All tests pass in 0.08s
+  - **get_relationships() implemented**: Full relationship query support added (see below)
+
+- ✅ **get_relationships() Implementation** (blocking issue resolved):
+  - Added `get_relationships()` to GraphBackend and KnowledgeGraph traits
+  - Implemented for SQLite: 94 lines, bi-temporal query with tenant isolation
+  - Implemented for Postgres: 70 lines, same bi-temporal pattern
+  - Updated GraphSemanticMemory to delegate properly (removed stub)
+  - Added comprehensive Postgres test (test_get_relationships): 120 lines
+  - Total: +312 lines across 6 files, zero clippy warnings
+  - SQLite tests: 6/6 pass (0.08s)
+  - Postgres tests: 1/1 pass (0.04s)
+  - Backend parity maintained
 
 **Key Insights**:
-- **SemanticMemory limitation discovered**: `get_relationships()` not fully implemented (returns empty Vec)
-  - See `llmspell-memory/src/semantic.rs:172` - TODO to expand KnowledgeGraph trait
-  - Workaround: Tests verify entity storage/retrieval instead of relationship queries
-  - Future work: Implement full relationship query support in KnowledgeGraph trait
-
 - **Foreign key constraints**: Relationships require both source and target entities to exist
   - Must create target entities before adding relationships
   - SQLite enforces referential integrity properly
@@ -4508,6 +4515,12 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - **Multi-threaded runtime required**: All tests use `#[tokio::test(flavor = "multi_thread")]`
   - Consistent with backend_integration_test.rs from Task 13c.2.9.1
   - SqliteBackend::new() requires multi-threaded runtime
+
+- **Bi-temporal consistency**: Both SQLite and Postgres implementations maintain:
+  - Event time tracking (when real-world event occurred)
+  - Ingestion time tracking (when we learned about it)
+  - Tenant isolation via tenant_id filtering
+  - Query returns both outgoing and incoming relationships
 
 **Test Coverage** (llmspell-memory/tests/integration_sqlite.rs):
 1. `test_memory_manager_episodic_operations`: Add/search episodic entries ✅
@@ -4533,7 +4546,7 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - `llmspell-storage/tests/backup_restore.rs` (NEW)
 
 ---
-## Phase 13c.3: Clean up, trait refactoring and alignment of Postgresql and Sqlite
+## Phase 13c.3: Clean up, centralized trait refactoring and alignment of Postgresql and Sqlite implementations
 
 ---
 
