@@ -216,10 +216,7 @@ async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
     vec1[0] = 1.0;
     vec1[1] = 2.0;
     vec1[2] = 3.0;
-    let vectors = vec![VectorEntry::new(
-        "test-vector-1".to_string(),
-        vec1.clone(),
-    )];
+    let vectors = vec![VectorEntry::new("test-vector-1".to_string(), vec1.clone())];
 
     manager.insert_for_tenant("vector-tenant", vectors).await?;
 
@@ -303,10 +300,7 @@ async fn test_tenant_limits_enforcement() -> Result<()> {
     vec1[0] = 1.0;
     vec1[1] = 2.0;
     vec1[2] = 3.0;
-    let vectors1 = vec![VectorEntry::new(
-        "vector-1".to_string(),
-        vec1,
-    )];
+    let vectors1 = vec![VectorEntry::new("vector-1".to_string(), vec1)];
     manager
         .insert_for_tenant("limited-tenant", vectors1)
         .await?;
@@ -316,10 +310,7 @@ async fn test_tenant_limits_enforcement() -> Result<()> {
     vec2[0] = 4.0;
     vec2[1] = 5.0;
     vec2[2] = 6.0;
-    let vectors2 = vec![VectorEntry::new(
-        "vector-2".to_string(),
-        vec2,
-    )];
+    let vectors2 = vec![VectorEntry::new("vector-2".to_string(), vec2)];
     manager
         .insert_for_tenant("limited-tenant", vectors2)
         .await?;
@@ -366,14 +357,8 @@ async fn test_tenant_isolation() -> Result<()> {
     let mut vec2 = vec![0.0; 384];
     vec2[1] = 1.0;
 
-    let vectors1 = vec![VectorEntry::new(
-        "tenant1-vector".to_string(),
-        vec1.clone(),
-    )];
-    let vectors2 = vec![VectorEntry::new(
-        "tenant2-vector".to_string(),
-        vec2,
-    )];
+    let vectors1 = vec![VectorEntry::new("tenant1-vector".to_string(), vec1.clone())];
+    let vectors2 = vec![VectorEntry::new("tenant2-vector".to_string(), vec2)];
 
     manager.insert_for_tenant("tenant-1", vectors1).await?;
     manager.insert_for_tenant("tenant-2", vectors2).await?;

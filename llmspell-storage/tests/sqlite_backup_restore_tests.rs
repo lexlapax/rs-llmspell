@@ -25,10 +25,7 @@ async fn create_test_backend(db_path: PathBuf) -> Arc<SqliteBackend> {
     let config = SqliteConfig::new(db_path.to_str().unwrap()).with_max_connections(10);
     let backend = Arc::new(SqliteBackend::new(config).await.expect("create backend"));
 
-    backend
-        .run_migrations()
-        .await
-        .expect("run migrations");
+    backend.run_migrations().await.expect("run migrations");
 
     backend
 }
@@ -51,7 +48,8 @@ async fn test_backup_and_restore_single_file() {
         .expect("set agent state");
 
     // Insert data into workflow state storage
-    let workflow_storage = SqliteWorkflowStateStorage::new(Arc::clone(&backend), tenant_id.to_string());
+    let workflow_storage =
+        SqliteWorkflowStateStorage::new(Arc::clone(&backend), tenant_id.to_string());
     let workflow_state = WorkflowState {
         workflow_id: "wf-original".to_string(),
         workflow_name: "Original Workflow".to_string(),
@@ -74,10 +72,18 @@ async fn test_backup_and_restore_single_file() {
         .expect("set kv");
 
     // Verify data exists
-    let agent_data_before = agent_storage.get("agent:original").await.expect("get").unwrap();
+    let agent_data_before = agent_storage
+        .get("agent:original")
+        .await
+        .expect("get")
+        .unwrap();
     assert_eq!(agent_data_before, b"{\"state\":\"original\"}");
 
-    let workflow_data_before = workflow_storage.load_state("wf-original").await.expect("load").unwrap();
+    let workflow_data_before = workflow_storage
+        .load_state("wf-original")
+        .await
+        .expect("load")
+        .unwrap();
     assert_eq!(workflow_data_before.workflow_name, "Original Workflow");
 
     let kv_data_before = kv_storage.get("config").await.expect("get").unwrap();
@@ -95,7 +101,8 @@ async fn test_backup_and_restore_single_file() {
     // Phase 3: Modify data
     let backend2 = create_test_backend(db_path.clone()).await;
     let agent_storage2 = SqliteAgentStateStorage::new(Arc::clone(&backend2), tenant_id.to_string());
-    let workflow_storage2 = SqliteWorkflowStateStorage::new(Arc::clone(&backend2), tenant_id.to_string());
+    let workflow_storage2 =
+        SqliteWorkflowStateStorage::new(Arc::clone(&backend2), tenant_id.to_string());
     let kv_storage2 = SqliteKVStorage::new(Arc::clone(&backend2), tenant_id.to_string());
 
     // Overwrite with modified data
@@ -124,10 +131,18 @@ async fn test_backup_and_restore_single_file() {
         .expect("set kv");
 
     // Verify data is modified
-    let agent_data_modified = agent_storage2.get("agent:original").await.expect("get").unwrap();
+    let agent_data_modified = agent_storage2
+        .get("agent:original")
+        .await
+        .expect("get")
+        .unwrap();
     assert_eq!(agent_data_modified, b"{\"state\":\"modified\"}");
 
-    let workflow_data_modified = workflow_storage2.load_state("wf-original").await.expect("load").unwrap();
+    let workflow_data_modified = workflow_storage2
+        .load_state("wf-original")
+        .await
+        .expect("load")
+        .unwrap();
     assert_eq!(workflow_data_modified.workflow_name, "Modified Workflow");
 
     let kv_data_modified = kv_storage2.get("config").await.expect("get").unwrap();
@@ -145,16 +160,25 @@ async fn test_backup_and_restore_single_file() {
     // Phase 5: Verify original data is restored
     let backend3 = create_test_backend(db_path.clone()).await;
     let agent_storage3 = SqliteAgentStateStorage::new(Arc::clone(&backend3), tenant_id.to_string());
-    let workflow_storage3 = SqliteWorkflowStateStorage::new(Arc::clone(&backend3), tenant_id.to_string());
+    let workflow_storage3 =
+        SqliteWorkflowStateStorage::new(Arc::clone(&backend3), tenant_id.to_string());
     let kv_storage3 = SqliteKVStorage::new(Arc::clone(&backend3), tenant_id.to_string());
 
-    let agent_data_restored = agent_storage3.get("agent:original").await.expect("get").unwrap();
+    let agent_data_restored = agent_storage3
+        .get("agent:original")
+        .await
+        .expect("get")
+        .unwrap();
     assert_eq!(
         agent_data_restored, b"{\"state\":\"original\"}",
         "Agent state should be restored to original"
     );
 
-    let workflow_data_restored = workflow_storage3.load_state("wf-original").await.expect("load").unwrap();
+    let workflow_data_restored = workflow_storage3
+        .load_state("wf-original")
+        .await
+        .expect("load")
+        .unwrap();
     assert_eq!(
         workflow_data_restored.workflow_name, "Original Workflow",
         "Workflow state should be restored to original"
@@ -194,10 +218,14 @@ async fn test_backup_simplicity_vs_old_multi_backend() {
 
     // Create data in ALL storage layers
     let agent_storage = SqliteAgentStateStorage::new(Arc::clone(&backend), tenant_id.to_string());
-    let workflow_storage = SqliteWorkflowStateStorage::new(Arc::clone(&backend), tenant_id.to_string());
+    let workflow_storage =
+        SqliteWorkflowStateStorage::new(Arc::clone(&backend), tenant_id.to_string());
     let kv_storage = SqliteKVStorage::new(Arc::clone(&backend), tenant_id.to_string());
 
-    agent_storage.set("agent:1", b"{\"test\":1}".to_vec()).await.expect("set");
+    agent_storage
+        .set("agent:1", b"{\"test\":1}".to_vec())
+        .await
+        .expect("set");
     workflow_storage
         .save_state(
             "wf-1",

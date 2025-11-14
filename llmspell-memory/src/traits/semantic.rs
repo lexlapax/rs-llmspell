@@ -46,7 +46,7 @@ pub use llmspell_graph::types::{Entity, Relationship};
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
-///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await?);
+///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.map_err(|e| llmspell_memory::MemoryError::Storage(e.to_string()))?);
 ///     let semantic = GraphSemanticMemory::new_with_sqlite(sqlite_backend);
 ///
 ///     // Add an entity

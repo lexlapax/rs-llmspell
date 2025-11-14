@@ -15,17 +15,19 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 /// Create test storage with temporary database
-async fn create_test_storage() -> (TempDir, Arc<SqliteBackend>, SqliteWorkflowStateStorage, String) {
+async fn create_test_storage() -> (
+    TempDir,
+    Arc<SqliteBackend>,
+    SqliteWorkflowStateStorage,
+    String,
+) {
     let temp_dir = TempDir::new().expect("create temp dir");
     let db_path = temp_dir.path().join("test_workflows.db");
 
     let config = SqliteConfig::new(db_path.to_str().unwrap()).with_max_connections(5);
     let backend = Arc::new(SqliteBackend::new(config).await.expect("create backend"));
 
-    backend
-        .run_migrations()
-        .await
-        .expect("run migrations");
+    backend.run_migrations().await.expect("run migrations");
 
     let tenant_id = "test-tenant".to_string();
     let storage = SqliteWorkflowStateStorage::new(Arc::clone(&backend), tenant_id.clone());
@@ -142,10 +144,7 @@ async fn test_workflow_state_tenant_isolation() {
 
     let config = SqliteConfig::new(db_path.to_str().unwrap()).with_max_connections(5);
     let backend = Arc::new(SqliteBackend::new(config).await.expect("create backend"));
-    backend
-        .run_migrations()
-        .await
-        .expect("run migrations");
+    backend.run_migrations().await.expect("run migrations");
 
     // Create storage for tenant A
     let storage_a = SqliteWorkflowStateStorage::new(Arc::clone(&backend), "tenant-a".to_string());
@@ -228,7 +227,11 @@ async fn test_workflow_state_delete() {
         .expect("save state");
 
     // Verify exists
-    assert!(storage.load_state(workflow_id).await.expect("load").is_some());
+    assert!(storage
+        .load_state(workflow_id)
+        .await
+        .expect("load")
+        .is_some());
 
     // Delete state
     storage
@@ -237,7 +240,11 @@ async fn test_workflow_state_delete() {
         .expect("delete state");
 
     // Verify deleted
-    assert!(storage.load_state(workflow_id).await.expect("load").is_none());
+    assert!(storage
+        .load_state(workflow_id)
+        .await
+        .expect("load")
+        .is_none());
 }
 
 #[tokio::test]

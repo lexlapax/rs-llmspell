@@ -206,9 +206,10 @@ impl SqliteBackend {
 
         // Run migrations to create all necessary tables (consistent with Postgres pattern)
         // For SQLite, we run migrations at initialization since there's no separate deployment step
-        backend.run_migrations().await.map_err(|e| {
-            SqliteError::Migration(format!("Failed to run migrations: {}", e))
-        })?;
+        backend
+            .run_migrations()
+            .await
+            .map_err(|e| SqliteError::Migration(format!("Failed to run migrations: {}", e)))?;
 
         info!("SQLite backend initialized with all necessary tables via migrations");
 

@@ -57,17 +57,17 @@ async fn test_memory_manager_episodic_operations() {
         .search("Rust programming", 5)
         .await
         .unwrap();
-    assert!(
-        !results.is_empty(),
-        "Should find entries related to Rust"
-    );
+    assert!(!results.is_empty(), "Should find entries related to Rust");
 
     // Verify entry retrieval
     let retrieved1 = manager.episodic().get(&entry1.id).await.unwrap();
     assert_eq!(retrieved1.content, "What is Rust?");
 
     let retrieved2 = manager.episodic().get(&entry2.id).await.unwrap();
-    assert_eq!(retrieved2.content, "Rust is a systems programming language.");
+    assert_eq!(
+        retrieved2.content,
+        "Rust is a systems programming language."
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -172,11 +172,7 @@ async fn test_memory_manager_procedural_operations() {
     );
 
     // Get learned patterns (returns empty for no-op)
-    let patterns = manager
-        .procedural()
-        .get_learned_patterns(3)
-        .await
-        .unwrap();
+    let patterns = manager.procedural().get_learned_patterns(3).await.unwrap();
     assert!(
         patterns.is_empty(),
         "NoopProceduralMemory should return empty patterns"
@@ -197,8 +193,7 @@ async fn test_memory_manager_consolidation_flow() {
     let entry2 = EpisodicEntry::new(
         "session-python".to_string(),
         "assistant".to_string(),
-        "Python is a high-level programming language. Python has dynamic typing."
-            .to_string(),
+        "Python is a high-level programming language. Python has dynamic typing.".to_string(),
     );
 
     manager.episodic().add(entry1).await.unwrap();
@@ -238,8 +233,7 @@ async fn test_memory_manager_full_integration() {
         EpisodicEntry::new(
             "session-go".to_string(),
             "assistant".to_string(),
-            "Go is a compiled programming language. Go was designed at Google."
-                .to_string(),
+            "Go is a compiled programming language. Go was designed at Google.".to_string(),
         ),
         EpisodicEntry::new(
             "session-go".to_string(),
@@ -263,10 +257,7 @@ async fn test_memory_manager_full_integration() {
         .search("Go language features", 5)
         .await
         .unwrap();
-    assert!(
-        !search_results.is_empty(),
-        "Should find entries about Go"
-    );
+    assert!(!search_results.is_empty(), "Should find entries about Go");
 
     // 3. Consolidate to semantic memory
     let consolidation = manager

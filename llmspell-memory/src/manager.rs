@@ -40,7 +40,7 @@ use crate::episodic::InMemoryEpisodicMemory;
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
 ///     // Create manager with in-memory backends (testing)
-///     let manager = DefaultMemoryManager::new_in_memory()?;
+///     let manager = DefaultMemoryManager::new_in_memory().await?;
 ///
 ///     // Access subsystems
 ///     let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Hello".into());
@@ -82,7 +82,7 @@ impl DefaultMemoryManager {
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
     ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await?);
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.map_err(|e| llmspell_memory::MemoryError::Storage(e.to_string()))?);
     ///     let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(sqlite_backend));
     ///     let procedural = Arc::new(NoopProceduralMemory);
     ///
@@ -128,7 +128,7 @@ impl DefaultMemoryManager {
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
     ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await?);
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.map_err(|e| llmspell_memory::MemoryError::Storage(e.to_string()))?);
     ///     let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(Arc::clone(&sqlite_backend)));
     ///     let procedural = Arc::new(NoopProceduralMemory);
     ///
@@ -184,7 +184,7 @@ impl DefaultMemoryManager {
     /// # async fn example() -> llmspell_memory::Result<()> {
     /// // Testing configuration (InMemory backend, no embeddings)
     /// let test_config = MemoryConfig::for_testing();
-    /// let test_manager = DefaultMemoryManager::with_config(test_config)?;
+    /// let test_manager = DefaultMemoryManager::with_config(&test_config)?;
     ///
     /// // Production configuration (HNSW backend with embeddings)
     /// # use llmspell_memory::embeddings::EmbeddingService;
@@ -202,7 +202,7 @@ impl DefaultMemoryManager {
     /// # let provider: Arc<dyn EmbeddingProvider> = Arc::new(MockProvider);
     /// let service = Arc::new(EmbeddingService::new(provider));
     /// let prod_config = MemoryConfig::for_production(service);
-    /// let prod_manager = DefaultMemoryManager::with_config(prod_config)?;
+    /// let prod_manager = DefaultMemoryManager::with_config(&prod_config)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -325,7 +325,7 @@ impl DefaultMemoryManager {
     ///     let service = Arc::new(EmbeddingService::new(provider));
     ///
     ///     // Create manager with HNSW backend and real embeddings
-    ///     let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service)?;
+    ///     let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).await?;
     ///     Ok(())
     /// }
     /// ```
@@ -823,7 +823,9 @@ mod tests {
         let service = Arc::new(EmbeddingService::new(provider));
 
         // Create manager with embeddings
-        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).await.unwrap();
+        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service)
+            .await
+            .unwrap();
 
         // Verify all subsystems are accessible
         let _ = manager.episodic();

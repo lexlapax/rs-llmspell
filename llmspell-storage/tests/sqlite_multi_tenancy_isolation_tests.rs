@@ -29,10 +29,7 @@ async fn create_test_backend() -> (TempDir, Arc<SqliteBackend>) {
     let config = SqliteConfig::new(db_path.to_str().unwrap()).with_max_connections(10);
     let backend = Arc::new(SqliteBackend::new(config).await.expect("create backend"));
 
-    backend
-        .run_migrations()
-        .await
-        .expect("run migrations");
+    backend.run_migrations().await.expect("run migrations");
 
     (temp_dir, backend)
 }
@@ -102,8 +99,16 @@ async fn test_comprehensive_multi_tenancy_isolation() {
         .expect("save B");
 
     // Verify isolation
-    let loaded_a = workflow_a.load_state("wf-1").await.expect("load A").unwrap();
-    let loaded_b = workflow_b.load_state("wf-1").await.expect("load B").unwrap();
+    let loaded_a = workflow_a
+        .load_state("wf-1")
+        .await
+        .expect("load A")
+        .unwrap();
+    let loaded_b = workflow_b
+        .load_state("wf-1")
+        .await
+        .expect("load B")
+        .unwrap();
 
     assert_eq!(loaded_a.workflow_name, "Workflow A");
     assert_eq!(loaded_a.current_step, 1);
@@ -128,9 +133,7 @@ async fn test_comprehensive_multi_tenancy_isolation() {
 
     assert_eq!(val_a, b"Config A");
     assert_eq!(val_b, b"Config B");
-
 }
-
 
 #[tokio::test]
 async fn test_cross_tenant_data_leak_prevention() {

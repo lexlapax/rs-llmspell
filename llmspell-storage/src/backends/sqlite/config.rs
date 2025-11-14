@@ -251,7 +251,11 @@ mod tests {
         let config = SqliteConfig::in_memory();
         // in_memory() now uses unique temp files instead of :memory:
         // to ensure connections share the same database (libsql isolation fix)
-        assert!(config.database_path.to_str().unwrap().contains("llmspell_test_"));
+        assert!(config
+            .database_path
+            .to_str()
+            .unwrap()
+            .contains("llmspell_test_"));
         assert!(config.database_path.to_str().unwrap().ends_with(".db"));
     }
 

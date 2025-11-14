@@ -258,50 +258,69 @@ async fn test_regex_extractor_standalone() {
     let extractor = llmspell_graph::extraction::RegexExtractor::new();
     let text = "Rust is a systems programming language. Rust has memory safety.";
     let entities = extractor.extract_entities(text);
-    
+
     println!("Text: {}", text);
     println!("Entities extracted: {}", entities.len());
     for ent in &entities {
         println!("  - {}", ent.name);
     }
-    
-    assert!(!entities.is_empty(), "RegexExtractor should extract entities");
-    assert!(entities.iter().any(|e| e.name == "Rust"), "Should extract Rust");
+
+    assert!(
+        !entities.is_empty(),
+        "RegexExtractor should extract entities"
+    );
+    assert!(
+        entities.iter().any(|e| e.name == "Rust"),
+        "Should extract Rust"
+    );
 }
 
 #[tokio::test]
 async fn test_consolidation_debug() {
     let manager = create_test_manager().await;
-    
+
     // Add episodic entries
     let entry1 = EpisodicEntry::new(
         "session-debug".to_string(),
         "user".to_string(),
         "Tell me about Rust programming language.".to_string(),
     );
-    
+
     let entry2 = EpisodicEntry::new(
         "session-debug".to_string(),
         "assistant".to_string(),
         "Rust is a systems programming language. Rust has memory safety.".to_string(),
     );
-    
+
     manager.episodic().add(entry1.clone()).await.unwrap();
     manager.episodic().add(entry2.clone()).await.unwrap();
-    
-    println!("Entry 1: {} (processed: {})", entry1.content, entry1.processed);
-    println!("Entry 2: {} (processed: {})", entry2.content, entry2.processed);
-    
+
+    println!(
+        "Entry 1: {} (processed: {})",
+        entry1.content, entry1.processed
+    );
+    println!(
+        "Entry 2: {} (processed: {})",
+        entry2.content, entry2.processed
+    );
+
     // Trigger consolidation
     let result = manager
-        .consolidate("session-debug", llmspell_memory::types::ConsolidationMode::Manual, None)
+        .consolidate(
+            "session-debug",
+            llmspell_memory::types::ConsolidationMode::Manual,
+            None,
+        )
         .await
         .unwrap();
-    
+
     println!("Consolidation result:");
     println!("  entries_processed: {}", result.entries_processed);
     println!("  entities_added: {}", result.entities_added);
-    
+
     assert_eq!(result.entries_processed, 2, "Should process both entries");
-    assert!(result.entities_added > 0, "Should extract at least one entity");
+    assert!(
+        result.entities_added > 0,
+        "Should extract at least one entity"
+    );
 }

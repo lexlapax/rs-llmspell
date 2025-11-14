@@ -581,30 +581,30 @@ impl GraphBackend for SqliteGraphStorage {
             .await
             .map_err(|e| GraphError::Storage(format!("Failed to iterate query results: {}", e)))?
         {
-            let relationship_id: String = row
-                .get(0)
-                .map_err(|e| GraphError::Storage(format!("Failed to get relationship_id: {}", e)))?;
+            let relationship_id: String = row.get(0).map_err(|e| {
+                GraphError::Storage(format!("Failed to get relationship_id: {}", e))
+            })?;
             let from_entity: String = row
                 .get(1)
                 .map_err(|e| GraphError::Storage(format!("Failed to get from_entity: {}", e)))?;
             let to_entity: String = row
                 .get(2)
                 .map_err(|e| GraphError::Storage(format!("Failed to get to_entity: {}", e)))?;
-            let relationship_type: String = row
-                .get(3)
-                .map_err(|e| GraphError::Storage(format!("Failed to get relationship_type: {}", e)))?;
+            let relationship_type: String = row.get(3).map_err(|e| {
+                GraphError::Storage(format!("Failed to get relationship_type: {}", e))
+            })?;
             let properties_str: String = row
                 .get(4)
                 .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
-            let valid_time_start: i64 = row
-                .get(5)
-                .map_err(|e| GraphError::Storage(format!("Failed to get valid_time_start: {}", e)))?;
-            let transaction_time_start: i64 = row
-                .get(6)
-                .map_err(|e| GraphError::Storage(format!("Failed to get transaction_time_start: {}", e)))?;
+            let valid_time_start: i64 = row.get(5).map_err(|e| {
+                GraphError::Storage(format!("Failed to get valid_time_start: {}", e))
+            })?;
+            let transaction_time_start: i64 = row.get(6).map_err(|e| {
+                GraphError::Storage(format!("Failed to get transaction_time_start: {}", e))
+            })?;
 
-            let properties: serde_json::Value = serde_json::from_str(&properties_str)
-                .unwrap_or(serde_json::Value::Null);
+            let properties: serde_json::Value =
+                serde_json::from_str(&properties_str).unwrap_or(serde_json::Value::Null);
 
             relationships.push(Relationship {
                 id: relationship_id,
@@ -618,10 +618,7 @@ impl GraphBackend for SqliteGraphStorage {
         }
 
         let count = relationships.len();
-        debug!(
-            "Found {} relationships for entity {}",
-            count, entity_id
-        );
+        debug!("Found {} relationships for entity {}", count, entity_id);
 
         Ok(relationships)
     }

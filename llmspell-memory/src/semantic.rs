@@ -55,7 +55,7 @@ impl GraphSemanticMemory {
     /// # use llmspell_storage::backends::sqlite::SqliteBackend;
     /// # use llmspell_memory::semantic::GraphSemanticMemory;
     /// # async fn example() -> llmspell_memory::Result<()> {
-    /// let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await?);
+    /// let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.map_err(|e| llmspell_memory::MemoryError::Storage(e.to_string()))?);
     /// let semantic = GraphSemanticMemory::new_with_sqlite(sqlite_backend);
     /// # Ok(())
     /// # }

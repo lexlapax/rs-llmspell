@@ -19,10 +19,7 @@ async fn create_test_storage() -> (TempDir, Arc<SqliteBackend>, SqliteAgentState
     let config = SqliteConfig::new(db_path.to_str().unwrap()).with_max_connections(5);
     let backend = Arc::new(SqliteBackend::new(config).await.expect("create backend"));
 
-    backend
-        .run_migrations()
-        .await
-        .expect("run migrations");
+    backend.run_migrations().await.expect("run migrations");
 
     let tenant_id = "test-tenant".to_string();
     let storage = SqliteAgentStateStorage::new(Arc::clone(&backend), tenant_id.clone());
@@ -63,10 +60,7 @@ async fn test_agent_state_update_versioning() {
 
     // Save initial state
     let state_v1 = b"{\"version\":1}".to_vec();
-    storage
-        .set(&agent_key, state_v1)
-        .await
-        .expect("save v1");
+    storage.set(&agent_key, state_v1).await.expect("save v1");
 
     // Update state (should increment version)
     let state_v2 = b"{\"version\":2}".to_vec();
@@ -116,10 +110,7 @@ async fn test_agent_state_tenant_isolation() {
 
     let config = SqliteConfig::new(db_path.to_str().unwrap()).with_max_connections(5);
     let backend = Arc::new(SqliteBackend::new(config).await.expect("create backend"));
-    backend
-        .run_migrations()
-        .await
-        .expect("run migrations");
+    backend.run_migrations().await.expect("run migrations");
 
     // Create storage for tenant A
     let storage_a = SqliteAgentStateStorage::new(Arc::clone(&backend), "tenant-a".to_string());
@@ -179,10 +170,7 @@ async fn test_agent_state_delete() {
     assert!(storage.get(&agent_key).await.expect("get").is_some());
 
     // Delete state
-    storage
-        .delete(&agent_key)
-        .await
-        .expect("delete state");
+    storage.delete(&agent_key).await.expect("delete state");
 
     // Verify deleted
     assert!(storage.get(&agent_key).await.expect("get").is_none());
@@ -250,10 +238,7 @@ async fn test_agent_state_list_keys() {
         .expect("save charlie");
 
     // List all keys with prefix
-    let keys = storage
-        .list_keys("agent:")
-        .await
-        .expect("list keys");
+    let keys = storage.list_keys("agent:").await.expect("list keys");
 
     assert_eq!(keys.len(), 3);
     assert!(keys.contains(&"agent:alice".to_string()));
