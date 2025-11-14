@@ -4351,7 +4351,7 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - [x] RAG pipeline integration test (document ingestion + vectorlite search) - covered by existing llmspell-bridge tests
 - [x] Agent workflow integration test (state persistence via libsql) - 16 tests passing (8 agent state + 8 workflow state)
 - [x] Multi-tenancy isolation test (ensure tenant_id filtering works) - 3 tests passing (agent state, workflow state, KV store)
-- [ ] Backup/restore integration test (1 file copy vs 4 procedures)
+- [x] Backup/restore integration test (1 file copy vs 4 procedures) - 2 tests passing (single-file backup/restore, simplicity comparison)
 - [ ] All 635+ workspace tests passing with libsql backend enabled
 
 **Implementation Steps**:
