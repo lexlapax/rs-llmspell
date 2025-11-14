@@ -40,6 +40,17 @@ pub trait GraphBackend: Send + Sync {
     /// Get related entities
     async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>>;
 
+    /// Get all relationships for an entity
+    ///
+    /// Returns both outgoing (from this entity) and incoming (to this entity) relationships.
+    ///
+    /// # Arguments
+    /// * `entity_id` - The entity ID to query
+    ///
+    /// # Returns
+    /// All relationships involving this entity
+    async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>>;
+
     /// Execute temporal query
     async fn query_temporal(&self, query: TemporalQuery) -> Result<Vec<Entity>>;
 

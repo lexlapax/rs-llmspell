@@ -70,6 +70,17 @@ pub trait KnowledgeGraph: Send + Sync {
     /// List of target entities connected via the specified relationship
     async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>>;
 
+    /// Get all relationships for an entity
+    ///
+    /// Returns both outgoing (from this entity) and incoming (to this entity) relationships.
+    ///
+    /// # Arguments
+    /// * `entity_id` - The entity ID to query
+    ///
+    /// # Returns
+    /// All relationships involving this entity
+    async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>>;
+
     /// Execute a temporal query on the graph
     ///
     /// Supports filtering by:

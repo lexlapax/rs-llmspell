@@ -299,3 +299,123 @@ async fn test_tenant_isolation() {
     let result = graph_b.get_entity(&id_a).await;
     assert!(result.is_err(), "Tenant B should not see Tenant A's entity");
 }
+
+#[tokio::test]
+async fn test_get_relationships() {
+    ensure_migrations_run_once().await;
+
+    let tenant_id = unique_tenant_id("kg-get-relationships");
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
+    let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
+    backend
+        .set_tenant_context(&tenant_id)
+        .await
+        .expect("set tenant");
+
+    let graph = PostgresGraphStorage::new(Arc::clone(&backend));
+    let now = Utc::now();
+
+    // Create entities
+    let person = Entity {
+        id: "".to_string(),
+        name: "Bob".to_string(),
+        entity_type: "Person".to_string(),
+        properties: json!({}),
+        event_time: Some(now),
+        ingestion_time: now,
+    };
+
+    let company1 = Entity {
+        id: "".to_string(),
+        name: "TechCorp".to_string(),
+        entity_type: "Company".to_string(),
+        properties: json!({}),
+        event_time: Some(now),
+        ingestion_time: now,
+    };
+
+    let company2 = Entity {
+        id: "".to_string(),
+        name: "StartupInc".to_string(),
+        entity_type: "Company".to_string(),
+        properties: json!({}),
+        event_time: Some(now),
+        ingestion_time: now,
+    };
+
+    let person_id = graph.add_entity(person).await.expect("add person");
+    let company1_id = graph.add_entity(company1).await.expect("add company1");
+    let company2_id = graph.add_entity(company2).await.expect("add company2");
+
+    // Create outgoing relationship (person -> company1)
+    let relationship1 = Relationship {
+        id: "".to_string(),
+        from_entity: person_id.clone(),
+        to_entity: company1_id.clone(),
+        relationship_type: "works_at".to_string(),
+        properties: json!({"since": "2020"}),
+        event_time: Some(now),
+        ingestion_time: now,
+    };
+
+    // Create incoming relationship (company2 -> person)
+    let relationship2 = Relationship {
+        id: "".to_string(),
+        from_entity: company2_id.clone(),
+        to_entity: person_id.clone(),
+        relationship_type: "contacted".to_string(),
+        properties: json!({"date": "2024-01-15"}),
+        event_time: Some(now),
+        ingestion_time: now,
+    };
+
+    let rel1_id = graph
+        .add_relationship(relationship1)
+        .await
+        .expect("add relationship1");
+
+    let rel2_id = graph
+        .add_relationship(relationship2)
+        .await
+        .expect("add relationship2");
+
+    // Get all relationships for person (should return both outgoing and incoming)
+    let relationships = graph
+        .get_relationships(&person_id)
+        .await
+        .expect("get_relationships");
+
+    assert_eq!(
+        relationships.len(),
+        2,
+        "Should find 2 relationships (1 outgoing, 1 incoming)"
+    );
+
+    // Verify relationship 1 (outgoing)
+    let rel1 = relationships
+        .iter()
+        .find(|r| r.id == rel1_id)
+        .expect("find relationship 1");
+    assert_eq!(rel1.from_entity, person_id);
+    assert_eq!(rel1.to_entity, company1_id);
+    assert_eq!(rel1.relationship_type, "works_at");
+    assert_eq!(rel1.properties["since"], "2020");
+
+    // Verify relationship 2 (incoming)
+    let rel2 = relationships
+        .iter()
+        .find(|r| r.id == rel2_id)
+        .expect("find relationship 2");
+    assert_eq!(rel2.from_entity, company2_id);
+    assert_eq!(rel2.to_entity, person_id);
+    assert_eq!(rel2.relationship_type, "contacted");
+    assert_eq!(rel2.properties["date"], "2024-01-15");
+
+    // Verify company1 has only 1 relationship (incoming from person)
+    let company1_rels = graph
+        .get_relationships(&company1_id)
+        .await
+        .expect("get company1 relationships");
+    assert_eq!(company1_rels.len(), 1);
+    assert_eq!(company1_rels[0].relationship_type, "works_at");
+}

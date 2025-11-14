@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace};
 
 use crate::error::{MemoryError, Result};
 use crate::traits::SemanticMemory;
@@ -171,14 +171,11 @@ impl SemanticMemory for GraphSemanticMemory {
 
     async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>> {
         debug!("Getting relationships for entity: id={}", entity_id);
-        warn!("get_relationships not fully implemented - KnowledgeGraph trait needs expansion");
 
-        // Get outgoing relationships
-        // Note: Current KnowledgeGraph trait only has get_related which returns entities
-        // For now, we'll return empty vec as full relationship API needs expansion
-        // TODO: Expand KnowledgeGraph trait with get_relationships method
-        let _ = entity_id;
-        Ok(Vec::new())
+        self.graph
+            .get_relationships(entity_id)
+            .await
+            .map_err(|e| MemoryError::Storage(e.to_string()))
     }
 
     async fn query_by_type(&self, entity_type: &str) -> Result<Vec<Entity>> {

@@ -541,6 +541,91 @@ impl GraphBackend for SqliteGraphStorage {
         Ok(entities)
     }
 
+    /// Get all relationships for an entity
+    ///
+    /// Returns both outgoing (from this entity) and incoming (to this entity) relationships.
+    ///
+    /// # Arguments
+    ///
+    /// * `entity_id` - The entity ID to query
+    ///
+    /// # Returns
+    ///
+    /// All relationships involving this entity
+    async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>> {
+        let conn = self.backend.get_connection().await.map_err(|e| {
+            GraphError::Storage(format!("Failed to get database connection: {}", e))
+        })?;
+
+        let tenant_id = self.get_tenant_id();
+        let now = Utc::now().timestamp();
+
+        let mut rows = conn
+            .query(
+                "SELECT relationship_id, from_entity, to_entity, relationship_type, properties,
+                        valid_time_start, transaction_time_start
+                 FROM relationships
+                 WHERE (from_entity = ?1 OR to_entity = ?1)
+                   AND tenant_id = ?2
+                   AND valid_time_start <= ?3 AND valid_time_end > ?3
+                   AND transaction_time_end = 9999999999",
+                libsql::params![entity_id, tenant_id, now],
+            )
+            .await
+            .map_err(|e| GraphError::Storage(format!("Failed to query relationships: {}", e)))?;
+
+        let mut relationships = Vec::new();
+
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| GraphError::Storage(format!("Failed to iterate query results: {}", e)))?
+        {
+            let relationship_id: String = row
+                .get(0)
+                .map_err(|e| GraphError::Storage(format!("Failed to get relationship_id: {}", e)))?;
+            let from_entity: String = row
+                .get(1)
+                .map_err(|e| GraphError::Storage(format!("Failed to get from_entity: {}", e)))?;
+            let to_entity: String = row
+                .get(2)
+                .map_err(|e| GraphError::Storage(format!("Failed to get to_entity: {}", e)))?;
+            let relationship_type: String = row
+                .get(3)
+                .map_err(|e| GraphError::Storage(format!("Failed to get relationship_type: {}", e)))?;
+            let properties_str: String = row
+                .get(4)
+                .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
+            let valid_time_start: i64 = row
+                .get(5)
+                .map_err(|e| GraphError::Storage(format!("Failed to get valid_time_start: {}", e)))?;
+            let transaction_time_start: i64 = row
+                .get(6)
+                .map_err(|e| GraphError::Storage(format!("Failed to get transaction_time_start: {}", e)))?;
+
+            let properties: serde_json::Value = serde_json::from_str(&properties_str)
+                .unwrap_or(serde_json::Value::Null);
+
+            relationships.push(Relationship {
+                id: relationship_id,
+                from_entity,
+                to_entity,
+                relationship_type,
+                properties,
+                event_time: Some(Self::unix_to_datetime(valid_time_start)),
+                ingestion_time: Self::unix_to_datetime(transaction_time_start),
+            });
+        }
+
+        let count = relationships.len();
+        debug!(
+            "Found {} relationships for entity {}",
+            count, entity_id
+        );
+
+        Ok(relationships)
+    }
+
     /// Execute temporal query
     ///
     /// Queries entities with optional filters on entity_type, event_time, and
@@ -936,6 +1021,15 @@ impl llmspell_graph::traits::KnowledgeGraph for SqliteGraphStorage {
         relationship_type: &str,
     ) -> llmspell_graph::error::Result<Vec<Entity>> {
         <Self as GraphBackend>::get_related(self, entity_id, relationship_type)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    }
+
+    async fn get_relationships(
+        &self,
+        entity_id: &str,
+    ) -> llmspell_graph::error::Result<Vec<Relationship>> {
+        <Self as GraphBackend>::get_relationships(self, entity_id)
             .await
             .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
     }

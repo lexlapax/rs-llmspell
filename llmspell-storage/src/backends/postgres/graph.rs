@@ -782,6 +782,76 @@ impl KnowledgeGraph for PostgresGraphStorage {
             .collect())
     }
 
+    /// Get all relationships for an entity
+    ///
+    /// Returns both outgoing (from this entity) and incoming (to this entity) relationships.
+    async fn get_relationships(
+        &self,
+        entity_id: &str,
+    ) -> llmspell_graph::error::Result<Vec<Relationship>> {
+        // Parse entity_id as UUID
+        let uuid = Uuid::parse_str(entity_id).map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Invalid entity ID (not a UUID): {}",
+                e
+            ))
+        })?;
+
+        let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
+            llmspell_graph::error::GraphError::Storage(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
+        })?;
+
+        let client = self.backend.get_client().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
+        })?;
+
+        let now = Utc::now();
+
+        let rows = client
+            .query(
+                "SELECT relationship_id, from_entity, to_entity, relationship_type, properties,
+                        valid_time_start, transaction_time_start
+                 FROM llmspell.relationships
+                 WHERE (from_entity = $1 OR to_entity = $1)
+                   AND tenant_id = $2
+                   AND valid_time_start <= $3 AND valid_time_end > $3
+                   AND transaction_time_end = 'infinity'::timestamptz",
+                &[&uuid, &tenant_id, &now],
+            )
+            .await
+            .map_err(|e| {
+                llmspell_graph::error::GraphError::Storage(format!(
+                    "Failed to query relationships: {}",
+                    e
+                ))
+            })?;
+
+        let mut relationships = Vec::new();
+        for row in rows {
+            let relationship_id: Uuid = row.get("relationship_id");
+            let from_entity: Uuid = row.get("from_entity");
+            let to_entity: Uuid = row.get("to_entity");
+            let relationship_type: String = row.get("relationship_type");
+            let properties: Value = row.get("properties");
+            let valid_time_start: DateTime<Utc> = row.get("valid_time_start");
+            let transaction_time_start: DateTime<Utc> = row.get("transaction_time_start");
+
+            relationships.push(Relationship {
+                id: relationship_id.to_string(),
+                from_entity: from_entity.to_string(),
+                to_entity: to_entity.to_string(),
+                relationship_type,
+                properties,
+                event_time: Some(valid_time_start),
+                ingestion_time: transaction_time_start,
+            });
+        }
+
+        Ok(relationships)
+    }
+
     /// Execute a temporal query on the graph
     ///
     /// Delegates to the existing query_temporal method (Phase 13b.5.2)
