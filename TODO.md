@@ -4347,9 +4347,9 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 **Description**: End-to-end integration testing with MemoryManager, RAG, agents, and workflows using libsql backend.
 
 **Acceptance Criteria**:
-- [ ] MemoryManager integration test (episodic + semantic + procedural via libsql)
-- [ ] RAG pipeline integration test (document ingestion + vectorlite search)
-- [ ] Agent workflow integration test (state persistence via libsql)
+- [x] MemoryManager integration test (episodic + semantic + procedural via libsql) - 6 tests passing
+- [x] RAG pipeline integration test (document ingestion + vectorlite search) - covered by existing llmspell-bridge tests
+- [x] Agent workflow integration test (state persistence via libsql) - 16 tests passing (8 agent state + 8 workflow state)
 - [ ] Multi-tenancy isolation test (ensure tenant_id filtering works)
 - [ ] Backup/restore integration test (1 file copy vs 4 procedures)
 - [ ] All 635+ workspace tests passing with libsql backend enabled
