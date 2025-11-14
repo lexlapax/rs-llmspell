@@ -4488,8 +4488,37 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
    echo "Expected: 635+ tests passing, Actual: $(cargo test --workspace --all-features 2>&1 | grep -E 'test result.*passed' | grep -oP '\d+(?= passed)')"
    ```
 
+**Progress Summary**:
+- ✅ **13c.2.10.1**: MemoryManager integration test created and passing (6/6 tests)
+  - Created `llmspell-memory/tests/integration_sqlite.rs` with 6 comprehensive tests
+  - Tests episodic, semantic, procedural memory subsystems via SqliteBackend
+  - Tests consolidation flow (episodic → semantic)
+  - All tests pass in 0.08s
+
+**Key Insights**:
+- **SemanticMemory limitation discovered**: `get_relationships()` not fully implemented (returns empty Vec)
+  - See `llmspell-memory/src/semantic.rs:172` - TODO to expand KnowledgeGraph trait
+  - Workaround: Tests verify entity storage/retrieval instead of relationship queries
+  - Future work: Implement full relationship query support in KnowledgeGraph trait
+
+- **Foreign key constraints**: Relationships require both source and target entities to exist
+  - Must create target entities before adding relationships
+  - SQLite enforces referential integrity properly
+
+- **Multi-threaded runtime required**: All tests use `#[tokio::test(flavor = "multi_thread")]`
+  - Consistent with backend_integration_test.rs from Task 13c.2.9.1
+  - SqliteBackend::new() requires multi-threaded runtime
+
+**Test Coverage** (llmspell-memory/tests/integration_sqlite.rs):
+1. `test_memory_manager_episodic_operations`: Add/search episodic entries ✅
+2. `test_memory_manager_semantic_operations`: Upsert entities, add relationships, retrieve entities ✅
+3. `test_memory_manager_procedural_operations`: Store patterns, record transitions, query frequencies ✅
+4. `test_memory_manager_consolidation_flow`: Episodic → Semantic consolidation ✅
+5. `test_memory_manager_full_integration`: Full workflow (9 steps: episodic + semantic + consolidation + procedural) ✅
+6. `test_memory_manager_shutdown`: Graceful shutdown ✅
+
 **Definition of Done**:
-- [ ] MemoryManager integration test passing
+- [x] MemoryManager integration test passing (6/6 tests, 0.08s)
 - [ ] RAG pipeline integration test passing
 - [ ] Agent workflow integration test passing
 - [ ] Multi-tenancy isolation test passing
@@ -4504,8 +4533,19 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - `llmspell-storage/tests/backup_restore.rs` (NEW)
 
 ---
+## Phase 13c.3: Clean up, trait refactoring and alignment of Postgresql and Sqlite
 
-### Task 13c.2.11: PostgreSQL/SQLite Schema Compatibility & Data Portability ⏹ PENDING
+---
+
+### Task 13c.3.0:
+
+---
+
+### Task 13c.3.1:
+
+---
+
+### Task 13c.3.2: PostgreSQL/SQLite Schema Compatibility & Data Portability ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 8 hours (Days 17-18)
 **Assignee**: Storage Architecture Team
@@ -4821,12 +4861,12 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 
 ---
 
-### Task 13c.2.12: Documentation & Validation ⏹ PENDING
+### Task 13c.3.3: Documentation & Validation for 13c.2 and 13c.3 ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 8 hours (Days 19-20)
 **Assignee**: Documentation Team
 **Status**: ⏹ PENDING
-**Dependencies**: Tasks 13c.2.1-13c.2.11 ✅
+**Dependencies**: Tasks 13c.2.1-13c.2.11, 13c.3.1-13c.3.2 ✅
 
 **Description**: Comprehensive documentation for libsql unified storage integrated into existing documentation structure (user guide, developer guide, technical docs). Focus on usage, architecture, and configuration.
 
