@@ -136,49 +136,7 @@ impl SqliteVectorStorage {
             );
         }
 
-        // Create vec_embeddings table if it doesn't exist (Task 13c.2.8.16 - runtime creation)
-        // Use regular tables instead of vec0 virtual tables (vec0 extension optional)
-        let conn = backend.get_connection().await?;
-        let create_table_sql = format!(
-            "CREATE TABLE IF NOT EXISTS vec_embeddings_{} (rowid INTEGER PRIMARY KEY, embedding BLOB)",
-            dimension
-        );
-        conn.execute(&create_table_sql, ())
-            .await
-            .with_context(|| format!("Failed to create vec_embeddings_{} table", dimension))?;
-
-        // Create vector_metadata table if it doesn't exist
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS vector_metadata (
-                rowid INTEGER PRIMARY KEY,
-                id TEXT NOT NULL UNIQUE,
-                tenant_id TEXT,
-                scope TEXT NOT NULL,
-                dimension INTEGER NOT NULL CHECK (dimension IN (384, 768, 1536, 3072)),
-                metadata TEXT NOT NULL DEFAULT '{}',
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            )",
-            (),
-        )
-        .await
-        .with_context(|| "Failed to create vector_metadata table")?;
-
-        // Create indices for vector_metadata
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_tenant_scope ON vector_metadata(tenant_id, scope)",
-            (),
-        )
-        .await
-        .with_context(|| "Failed to create idx_vector_metadata_tenant_scope index")?;
-
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_id ON vector_metadata(id)",
-            (),
-        )
-        .await
-        .with_context(|| "Failed to create idx_vector_metadata_id index")?;
-
+        // Tables are created by SqliteBackend::new() for consistency with postgres pattern
         let persistence_path = PathBuf::from("./data/hnsw_indices");
         std::fs::create_dir_all(&persistence_path)?;
 

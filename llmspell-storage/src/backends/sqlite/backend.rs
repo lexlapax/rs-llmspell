@@ -198,6 +198,125 @@ impl SqliteBackend {
             SqliteError::Extension(format!("Failed to disable extension loading: {e}"))
         })?;
 
+        // Create all necessary tables (consistent with Postgres migrations pattern)
+        // For SQLite, we create tables at runtime since there's no separate deployment step
+
+        // Vector storage tables (for all supported dimensions)
+        for dim in &[384, 768, 1536, 3072] {
+            let create_vec_table = format!(
+                "CREATE TABLE IF NOT EXISTS vec_embeddings_{} (rowid INTEGER PRIMARY KEY, embedding BLOB)",
+                dim
+            );
+            conn.execute(&create_vec_table, ()).await.map_err(|e| {
+                SqliteError::Migration(format!("Failed to create vec_embeddings_{} table: {}", dim, e))
+            })?;
+        }
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS vector_metadata (
+                rowid INTEGER PRIMARY KEY,
+                id TEXT NOT NULL UNIQUE,
+                tenant_id TEXT,
+                scope TEXT NOT NULL,
+                dimension INTEGER NOT NULL CHECK (dimension IN (384, 768, 1536, 3072)),
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create vector_metadata table: {}", e)))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_tenant_scope ON vector_metadata(tenant_id, scope)",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create idx_vector_metadata_tenant_scope: {}", e)))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_id ON vector_metadata(id)",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create idx_vector_metadata_id: {}", e)))?;
+
+        // Graph storage tables
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS entities (
+                entity_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                name TEXT NOT NULL,
+                properties TEXT NOT NULL DEFAULT '{}',
+                valid_time_start INTEGER NOT NULL,
+                valid_time_end INTEGER NOT NULL DEFAULT 9999999999,
+                transaction_time_start INTEGER NOT NULL,
+                transaction_time_end INTEGER NOT NULL DEFAULT 9999999999,
+                created_at INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create entities table: {}", e)))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_entities_tenant ON entities(tenant_id)",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create idx_entities_tenant: {}", e)))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create idx_entities_name: {}", e)))?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS relationships (
+                relationship_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                from_entity_id TEXT NOT NULL,
+                to_entity_id TEXT NOT NULL,
+                relationship_type TEXT NOT NULL,
+                properties TEXT NOT NULL DEFAULT '{}',
+                valid_time_start INTEGER NOT NULL,
+                valid_time_end INTEGER NOT NULL DEFAULT 9999999999,
+                transaction_time_start INTEGER NOT NULL,
+                transaction_time_end INTEGER NOT NULL DEFAULT 9999999999,
+                created_at INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create relationships table: {}", e)))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_relationships_tenant ON relationships(tenant_id)",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create idx_relationships_tenant: {}", e)))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_entity_id)",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create idx_relationships_from: {}", e)))?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_entity_id)",
+            (),
+        )
+        .await
+        .map_err(|e| SqliteError::Migration(format!("Failed to create idx_relationships_to: {}", e)))?;
+
+        info!("SQLite backend initialized with all necessary tables");
+
         Ok(Self {
             pool: Arc::new(pool),
             tenant_contexts: Arc::new(DashMap::new()),
