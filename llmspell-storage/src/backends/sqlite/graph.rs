@@ -1519,7 +1519,6 @@ mod tests {
         let storage = SqliteGraphStorage::new(backend);
 
         let past = Utc::now() - chrono::Duration::days(10);
-        let present = Utc::now();
         let future = Utc::now() + chrono::Duration::days(10);
 
         // Create entity A (exists now)
@@ -1536,26 +1535,27 @@ mod tests {
         c.event_time = Some(future);
         let c_id = storage.add_entity(c).await.unwrap();
 
-        // Add relationships
-        storage
-            .add_relationship(Relationship::new(
-                a_id.clone(),
-                b_id.clone(),
-                "links".into(),
-                serde_json::json!({}),
-            ))
-            .await
-            .unwrap();
+        // Add relationships with explicit event times to match entity temporal semantics
+        let mut rel_b = Relationship::new(
+            a_id.clone(),
+            b_id.clone(),
+            "links".into(),
+            serde_json::json!({}),
+        );
+        rel_b.event_time = Some(past); // Relationship to past entity has past event time
+        storage.add_relationship(rel_b).await.unwrap();
 
-        storage
-            .add_relationship(Relationship::new(
-                a_id.clone(),
-                c_id.clone(),
-                "links".into(),
-                serde_json::json!({}),
-            ))
-            .await
-            .unwrap();
+        let mut rel_c = Relationship::new(
+            a_id.clone(),
+            c_id.clone(),
+            "links".into(),
+            serde_json::json!({}),
+        );
+        rel_c.event_time = Some(future); // Relationship to future entity has future event time
+        storage.add_relationship(rel_c).await.unwrap();
+
+        // Capture present time after creating all entities and relationships
+        let present = Utc::now();
 
         // Query at present time (should see A and B, not C)
         let results = storage
