@@ -4577,7 +4577,7 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 
 **Current Status**: 5076/5083 tests passing (99.86% pass rate)
 - **✅ All functional tests passing**: Unit tests, integration tests, all pass
-- **⚠️ 7 doc-test compile failures**: Documentation examples in llmspell-memory need SqliteConfig::in_memory() API updates
+- **✅ ALL doc-tests passing**: Fixed 7 doc-test compile failures in llmspell-memory
 
 **Test Breakdown**:
 - **Unit tests**: 100% passing across all crates
@@ -4587,7 +4587,7 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
   - llmspell-tenancy: 9 tenant isolation tests (3 unit + 6 integration)
   - llmspell-state-persistence: 16 agent/workflow state tests
   - llmspell-sessions: 2 backup/restore tests
-- **Doc-tests**: 28/35 passing (7 compile failures)
+- **Doc-tests**: 35/35 passing (7 failures fixed this session)
 
 **Dimension Fixes Applied** (fixing VectorLite constraint: dimensions must be 384, 768, 1536, or 3072):
 1. **llmspell-storage/migrations.rs**: Fixed table name check (agent_state → agent_states)
@@ -4610,11 +4610,21 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 1. "Fix migration test and graph traversal - add missing INSERT statements"
 2. "Fix tenancy tests - update vector dimensions from 3 to 384"
 3. "Fix tenancy integration tests - update vector dimensions from 3 to 384"
+4. "13c.2.10 - Fix all 7 doc-test compile failures" (manager.rs, semantic.rs, traits/semantic.rs)
+
+**Doc-test Fixes Applied** (8 fixes for 7 failures):
+1. manager.rs:43 - Added .await to new_in_memory()
+2. manager.rs:85 - Added error conversion for SqliteBackend::new()
+3. manager.rs:132 - Added error conversion for SqliteBackend::new()
+4. manager.rs:187 - Changed with_config(test_config) to with_config(&test_config)
+5. manager.rs:205 - Changed with_config(prod_config) to with_config(&prod_config)
+6. manager.rs:328 - Added .await to new_in_memory_with_embeddings()
+7. semantic.rs:58 - Added error conversion for SqliteBackend::new()
+8. traits/semantic.rs:49 - Added error conversion and fixed path (crate:: to llmspell_memory::)
 
 **Remaining Work**:
-- Fix 7 doc-test compile failures in llmspell-memory (documentation examples)
-- Update examples to use SqliteConfig::in_memory() instead of SqliteConfig::new(":memory:")
-- Estimated time: 30 minutes
+- ✅ All doc-test compile failures fixed!
+- Verify full workspace test suite passes (awaiting test completion)
 
 
 #### Task 13c.2.10 **Definition of Done**:
@@ -4623,7 +4633,8 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - [x] Agent workflow integration test passing (16/16 tests)
 - [x] Multi-tenancy isolation test passing (9/9 tests)
 - [x] Backup/restore integration test passing (2/2 tests)
-- [~] All workspace tests passing: **5076/5083 passing** (7 doc-test compile failures remaining)
+- [x] All doc-tests passing: **35/35 passing** (7 doc-test failures fixed)
+- [~] All workspace tests passing: **Awaiting final verification** (functional tests + doc-tests passing)
 
 
 ---
