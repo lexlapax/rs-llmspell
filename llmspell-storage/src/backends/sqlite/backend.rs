@@ -11,6 +11,7 @@ use super::{
 use dashmap::DashMap;
 use libsql::Connection;
 use std::sync::Arc;
+use tracing::{debug, info, warn};
 
 /// Tenant context for RLS-style isolation
 ///
@@ -156,13 +157,13 @@ impl SqliteBackend {
         // Try to load vectorlite-rs (HNSW, preferred)
         let loaded = match conn.load_extension(vectorlite_path, None) {
             Ok(()) => {
-                tracing::info!(
+                info!(
                     "Successfully loaded vectorlite-rs extension from {vectorlite_path} (HNSW-indexed, 3-100x faster)"
                 );
                 true
             }
             Err(e) => {
-                tracing::debug!(
+                debug!(
                     "vectorlite-rs not available at {vectorlite_path}: {e}. \
                     Falling back to sqlite-vec (brute-force). \
                     Build vectorlite: cargo build -p vectorlite-rs --release && \
@@ -176,12 +177,12 @@ impl SqliteBackend {
         if !loaded {
             match conn.load_extension(vec0_path, None) {
                 Ok(()) => {
-                    tracing::info!(
+                    info!(
                         "Successfully loaded sqlite-vec extension from {vec0_path} (brute-force, slower than vectorlite-rs)"
                     );
                 }
                 Err(e) => {
-                    tracing::warn!(
+                    warn!(
                         "Failed to load vector search extensions from {vectorlite_path} or {vec0_path}: {e}. \
                         Vector search will not be available. \
                         Build sqlite-vec: cd /tmp && git clone https://github.com/asg017/sqlite-vec && \
@@ -488,7 +489,7 @@ mod tests {
         let available = match SqliteVecExtension::is_available(&conn).await {
             Ok(available) => available,
             Err(_) => {
-                tracing::warn!(
+                warn!(
                     "Skipping vector operations test: sqlite-vec extension not loaded. \
                     Build extension: cd /tmp && git clone https://github.com/asg017/sqlite-vec && \
                     cd sqlite-vec && ./scripts/vendor.sh && make loadable && \
@@ -498,7 +499,7 @@ mod tests {
             }
         };
         if !available {
-            tracing::warn!("Skipping vector operations test: vec_version() returned empty");
+            warn!("Skipping vector operations test: vec_version() returned empty");
             return Ok(());
         }
 
@@ -582,12 +583,12 @@ mod tests {
         let available = match SqliteVecExtension::is_available(&conn).await {
             Ok(available) => available,
             Err(_) => {
-                tracing::warn!("Skipping multi-dimension test: sqlite-vec extension not loaded");
+                warn!("Skipping multi-dimension test: sqlite-vec extension not loaded");
                 return Ok(());
             }
         };
         if !available {
-            tracing::warn!("Skipping multi-dimension test: vec_version() returned empty");
+            warn!("Skipping multi-dimension test: vec_version() returned empty");
             return Ok(());
         }
 
