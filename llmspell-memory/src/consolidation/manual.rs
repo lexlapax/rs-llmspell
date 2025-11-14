@@ -243,6 +243,10 @@ mod tests {
         // Create in-memory SQLite backend for testing
         let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+
+        // Run migrations to create required tables
+        backend.run_migrations().await.unwrap();
+
         let graph: Arc<dyn KnowledgeGraph> = Arc::new(SqliteGraphStorage::new(backend));
 
         ManualConsolidationEngine::new(extractor, graph)

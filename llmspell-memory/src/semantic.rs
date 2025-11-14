@@ -227,6 +227,7 @@ mod tests {
             .await
             .unwrap(),
         );
+        backend.run_migrations().await.unwrap();
         let memory = GraphSemanticMemory::new_with_sqlite(backend);
         // Just verify it was created without panicking
         assert!(Arc::strong_count(&memory.graph) > 0);
@@ -241,6 +242,7 @@ mod tests {
             .await
             .unwrap(),
         );
+        backend.run_migrations().await.unwrap();
         let memory = GraphSemanticMemory::new_with_sqlite(backend);
 
         let entity = Entity::new(
@@ -268,6 +270,7 @@ mod tests {
             .await
             .unwrap(),
         );
+        backend.run_migrations().await.unwrap();
         let memory = GraphSemanticMemory::new_with_sqlite(backend);
 
         let result = memory.get_entity("nonexistent").await.unwrap();
@@ -283,6 +286,7 @@ mod tests {
             .await
             .unwrap(),
         );
+        backend.run_migrations().await.unwrap();
         let memory = GraphSemanticMemory::new_with_sqlite(backend);
 
         memory

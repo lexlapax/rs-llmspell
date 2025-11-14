@@ -205,6 +205,19 @@ impl MemoryConfig {
         self
     }
 
+    /// Configure embedding service
+    ///
+    /// Sets the embedding service for the memory system.
+    ///
+    /// # Arguments
+    ///
+    /// * `service` - Embedding service instance
+    #[must_use]
+    pub fn with_embedding_service(mut self, service: Arc<EmbeddingService>) -> Self {
+        self.embedding_service = Some(service);
+        self
+    }
+
     /// Configure episodic memory with `SQLite` backend
     ///
     /// Sets episodic backend to `Sqlite` and configures the backend instance.
@@ -219,6 +232,23 @@ impl MemoryConfig {
     ) -> Self {
         self.episodic_backend = EpisodicBackendType::Sqlite;
         self.sqlite_backend = Some(sqlite_backend);
+        self
+    }
+
+    /// Configure semantic memory with `SQLite` backend
+    ///
+    /// Sets semantic backend to `Sqlite` and configures the backend instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `sqlite_backend` - `SQLite` backend instance
+    #[must_use]
+    pub fn with_semantic_sqlite(
+        mut self,
+        sqlite_backend: Arc<llmspell_storage::backends::sqlite::SqliteBackend>,
+    ) -> Self {
+        self.semantic_backend = SemanticBackendType::Sqlite;
+        self.semantic_sqlite_backend = Some(sqlite_backend);
         self
     }
 

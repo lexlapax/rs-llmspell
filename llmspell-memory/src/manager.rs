@@ -329,16 +329,28 @@ impl DefaultMemoryManager {
     ///     Ok(())
     /// }
     /// ```
-    pub fn new_in_memory_with_embeddings(
+    pub async fn new_in_memory_with_embeddings(
         embedding_service: Arc<crate::embeddings::EmbeddingService>,
     ) -> Result<Self> {
         info!(
-            "Initializing DefaultMemoryManager with HNSW backend and embedding service: {}",
+            "Initializing DefaultMemoryManager with InMemory backend and embedding service: {}",
             embedding_service.provider_name()
         );
 
-        // Use HNSW backend for production
-        let config = crate::config::MemoryConfig::for_production(embedding_service);
+        // Create in-memory SQLite backend for semantic memory
+        let sqlite_backend = Arc::new(
+            llmspell_storage::backends::sqlite::SqliteBackend::new(
+                llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+            )
+            .await
+            .map_err(|e| crate::error::MemoryError::Storage(e.to_string()))?,
+        );
+
+        // Use InMemory backend for episodic, SQLite for semantic (both in-memory)
+        let config = crate::config::MemoryConfig::default()
+            .with_backend(crate::config::EpisodicBackendType::InMemory)
+            .with_embedding_service(embedding_service)
+            .with_semantic_sqlite(Arc::clone(&sqlite_backend));
         Self::with_config(&config)
     }
 
@@ -811,7 +823,7 @@ mod tests {
         let service = Arc::new(EmbeddingService::new(provider));
 
         // Create manager with embeddings
-        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).unwrap();
+        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).await.unwrap();
 
         // Verify all subsystems are accessible
         let _ = manager.episodic();

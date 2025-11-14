@@ -53,12 +53,12 @@ impl ArtifactId {
 
 impl std::fmt::Display for ArtifactId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}/{}",
-            self.session_id,
-            &self.content_hash[..8] // First 8 chars of hash
-        )
+        let hash_preview = if self.content_hash.len() > 8 {
+            &self.content_hash[..8]
+        } else {
+            &self.content_hash
+        };
+        write!(f, "{}/{hash_preview}", self.session_id)
     }
 }
 

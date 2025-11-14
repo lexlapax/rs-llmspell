@@ -579,6 +579,12 @@ mod tests {
             .await
             .map_err(|e| MemoryError::Storage(format!("Failed to create backend: {e}")))?;
 
+        // Run migrations to create required tables
+        backend
+            .run_migrations()
+            .await
+            .map_err(|e| MemoryError::Storage(format!("Failed to run migrations: {e}")))?;
+
         let provider = Arc::new(MockEmbeddingProvider);
         let service = Arc::new(EmbeddingService::new(provider));
 

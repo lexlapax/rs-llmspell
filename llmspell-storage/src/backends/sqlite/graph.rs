@@ -275,7 +275,7 @@ impl GraphBackend for SqliteGraphStorage {
             .next()
             .await
             .map_err(|e| GraphError::Storage(format!("Failed to get query result: {}", e)))?
-            .ok_or_else(|| GraphError::Storage("Entity not found".to_string()))?;
+            .ok_or_else(|| GraphError::EntityNotFound(id.to_string()))?;
 
         let entity_id: String = row
             .get(0)
@@ -350,9 +350,7 @@ impl GraphBackend for SqliteGraphStorage {
             .next()
             .await
             .map_err(|e| GraphError::Storage(format!("Failed to get query result: {}", e)))?
-            .ok_or_else(|| {
-                GraphError::Storage("Entity not found at specified event time".to_string())
-            })?;
+            .ok_or_else(|| GraphError::EntityNotFound(id.to_string()))?;
 
         let entity_id: String = row
             .get(0)
@@ -912,9 +910,7 @@ impl llmspell_graph::traits::KnowledgeGraph for SqliteGraphStorage {
     }
 
     async fn get_entity(&self, id: &str) -> llmspell_graph::error::Result<Entity> {
-        <Self as GraphBackend>::get_entity(self, id)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+        <Self as GraphBackend>::get_entity(self, id).await
     }
 
     async fn get_entity_at(
@@ -922,9 +918,7 @@ impl llmspell_graph::traits::KnowledgeGraph for SqliteGraphStorage {
         id: &str,
         event_time: DateTime<Utc>,
     ) -> llmspell_graph::error::Result<Entity> {
-        <Self as GraphBackend>::get_entity_at(self, id, event_time)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+        <Self as GraphBackend>::get_entity_at(self, id, event_time).await
     }
 
     async fn add_relationship(

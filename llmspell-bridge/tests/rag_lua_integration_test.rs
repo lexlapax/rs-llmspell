@@ -47,6 +47,10 @@ mod rag_lua_tests {
         // Create multi-tenant RAG with SQLite vector storage (in-memory for testing)
         let config = SqliteConfig::in_memory();
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+
+        // Run migrations to create required tables
+        backend.run_migrations().await.unwrap();
+
         let vector_storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage.clone()));
         let multi_tenant_rag = Arc::new(MultiTenantRAG::new(tenant_manager));
