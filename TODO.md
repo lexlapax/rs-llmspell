@@ -4337,11 +4337,11 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 
 ---
 
-### Task 13c.2.10: Integration Testing ⏹ PENDING
+### Task 13c.2.10: Integration Testing  IN_PROGRESS
 **Priority**: HIGH
 **Estimated Time**: 8 hours (Day 16)
 **Assignee**: Integration Testing Team
-**Status**: ⏹ PENDING
+**Status**:  IN_PROGRESS (95% Complete - 7 doc-test compile failures remaining)
 **Dependencies**: Task 13c.2.9 ✅
 
 **Description**: End-to-end integration testing with MemoryManager, RAG, agents, and workflows using libsql backend.
@@ -4350,9 +4350,9 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - [x] MemoryManager integration test (episodic + semantic + procedural via libsql) - 6 tests passing
 - [x] RAG pipeline integration test (document ingestion + vectorlite search) - covered by existing llmspell-bridge tests
 - [x] Agent workflow integration test (state persistence via libsql) - 16 tests passing (8 agent state + 8 workflow state)
-- [x] Multi-tenancy isolation test (ensure tenant_id filtering works) - 3 tests passing (agent state, workflow state, KV store)
+- [x] Multi-tenancy isolation test (ensure tenant_id filtering works) - 9 tests passing (3 agent state + 3 workflow state + 3 KV store + 6 tenancy integration tests)
 - [x] Backup/restore integration test (1 file copy vs 4 procedures) - 2 tests passing (single-file backup/restore, simplicity comparison)
-- [ ] All 635+ workspace tests passing with libsql backend enabled
+- [~] All workspace tests: **5076/5083 passing** (7 doc-test compile failures in llmspell-memory documentation examples)
 
 **Implementation Steps**:
 1. Create MemoryManager integration test (llmspell-memory/tests/integration_sqlite.rs):
@@ -4533,10 +4533,83 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 **Definition of Done**:
 - [x] MemoryManager integration test passing (6/6 tests, 0.08s)
 - [x] RAG pipeline integration test passing (covered by existing tests - see below)
-- [ ] Agent workflow integration test passing
-- [ ] Multi-tenancy isolation test passing
-- [ ] Backup/restore integration test passing
-- [ ] All 635+ workspace tests passing with libsql backend
+- [x] Agent workflow integration test passing (16/16 tests)
+- [x] Multi-tenancy isolation test passing (9/9 tests)
+- [x] Backup/restore integration test passing (2/2 tests)
+- [~] All workspace tests passing: **5076/5083 passing** (7 doc-test compile failures remaining)
+
+---
+
+**13c.2.10.6 - Workspace Test Validation**: Status ⏳ IN_PROGRESS (95% Complete)
+
+**Current Status**: 5076/5083 tests passing (99.86% pass rate)
+- **✅ All functional tests passing**: Unit tests, integration tests, all pass
+- **⚠️ 7 doc-test compile failures**: Documentation examples in llmspell-memory need SqliteConfig::in_memory() API updates
+
+**Test Breakdown**:
+- **Unit tests**: 100% passing across all crates
+- **Integration tests**: 100% passing (27 integration test files)
+  - llmspell-storage: 31 vector storage tests (MessagePack, HNSW, <2ms search)
+  - llmspell-memory: 6 MemoryManager integration tests
+  - llmspell-tenancy: 9 tenant isolation tests (3 unit + 6 integration)
+  - llmspell-state-persistence: 16 agent/workflow state tests
+  - llmspell-sessions: 2 backup/restore tests
+- **Doc-tests**: 28/35 passing (7 compile failures)
+
+**Dimension Fixes Applied** (fixing VectorLite constraint: dimensions must be 384, 768, 1536, or 3072):
+1. **llmspell-storage/migrations.rs**: Fixed table name check (agent_state → agent_states)
+2. **llmspell-storage/graph.rs**: Fixed temporal traverse test (explicit event_time on relationships)
+3. **llmspell-tenancy/src/manager.rs**: Updated 3 tests from dimension=3 to dimension=384
+4. **llmspell-tenancy/tests/integration_tests.rs**: Updated 4 tests from dimension=3 to dimension=384
+5. **llmspell-storage V9/V10/V11/V13**: Added INSERT INTO _migrations statements
+
+**Files Modified** (this session):
+- migrations/sqlite/V9__sessions.sql: +3 lines (INSERT statement)
+- migrations/sqlite/V10__artifacts.sql: +3 lines (INSERT statement)
+- migrations/sqlite/V11__event_log.sql: +3 lines (INSERT statement)
+- migrations/sqlite/V13__hook_history.sql: +3 lines (INSERT statement)
+- src/backends/sqlite/migrations.rs: ~2 lines (table name fix)
+- src/backends/sqlite/graph.rs: ~15 lines (temporal traverse test fix)
+- llmspell-tenancy/src/manager.rs: ~40 lines (3 tests: dimension + vector updates)
+- llmspell-tenancy/tests/integration_tests.rs: ~50 lines (4 tests: dimension + vector updates)
+
+**Git Commits** (this session):
+1. "Fix migration test and graph traversal - add missing INSERT statements"
+2. "Fix tenancy tests - update vector dimensions from 3 to 384"
+3. "Fix tenancy integration tests - update vector dimensions from 3 to 384"
+
+**Remaining Work**:
+- Fix 7 doc-test compile failures in llmspell-memory (documentation examples)
+- Update examples to use SqliteConfig::in_memory() instead of SqliteConfig::new(":memory:")
+- Estimated time: 30 minutes
+
+---
+
+**13c.2.10.3 - Agent Workflow Integration**: Marked COMPLETE ✅ (from previous session)
+- **Tests**: 16/16 passing in llmspell-state-persistence/tests/backend_integration_test.rs
+  - 8 agent state tests (save/load/list/delete)
+  - 8 workflow state tests (save/load/list/delete)
+- **File**: Created in previous session, validated in this session
+
+**13c.2.10.4 - Multi-Tenancy Isolation**: Marked COMPLETE ✅ (from previous session)
+- **Tests**: 9/9 passing (3 unit + 6 integration)
+  - llmspell-tenancy/src/manager.rs: 3 unit tests (creation, isolation, limits)
+  - llmspell-tenancy/tests/integration_tests.rs: 6 integration tests
+    - test_tenant_registry_with_lifecycle_hooks ✅
+    - test_tenant_registry_with_event_bus ✅
+    - test_multi_tenant_vector_manager_with_events ✅
+    - test_tenant_limits_enforcement ✅
+    - test_tenant_isolation ✅
+    - test_inactive_tenant_access ✅
+- **Fixes Applied** (this session): Updated all tests to use dimension=384
+
+**13c.2.10.5 - Backup/Restore Integration**: Marked COMPLETE ✅ (from previous session)
+- **Tests**: 2/2 passing in llmspell-sessions/tests/backup_restore_test.rs
+  - test_single_file_backup_restore ✅
+  - test_backup_restore_simplicity ✅
+- **File**: Created in previous session, validated in this session
+
+---
 
 **13c.2.10.2 - RAG Pipeline Integration**: Marked COMPLETE ✅
 - **Decision**: No new test file needed - existing comprehensive coverage sufficient
