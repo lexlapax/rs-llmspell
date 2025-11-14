@@ -11,9 +11,19 @@
 
 ### Current State (Post-Phase 13c.2)
 - **10 storage components** fully implemented with PostgreSQL (Phase 13b) and SQLite (Phase 13c.2)
-- **Fragmented trait architecture**: Traits scattered across 5+ crates with inconsistent patterns
+- **Fragmented trait architecture**: Traits scattered across **5 crates** (llmspell-storage, llmspell-graph, llmspell-memory, llmspell-events, llmspell-core)
 - **Implementation complete**: 100% feature parity between PostgreSQL and SQLite backends
 - **Problem**: Trait definitions not centralized, creating maintenance burden and circular dependency risks
+- **⚠️ CRITICAL FINDING**: **11 crates** directly use storage traits (not 5!), including **llmspell-bridge** which was initially missed
+
+### Scope Expansion After Comprehensive Analysis
+Initial analysis focused on core storage crates. **Comprehensive grep-based analysis revealed**:
+- **11 crates** directly depend on storage traits (not 5)
+- **llmspell-bridge** has 9+ files using storage traits (MAJOR consumer, initially overlooked)
+- **llmspell-rag** has 8+ files using VectorStorage
+- **llmspell-tenancy** implements VectorStorage trait (decorator pattern)
+- **llmspell-memory** uses all 3 storage trait categories (highest complexity)
+- **50+ source files** across workspace need import updates
 
 ### Proposed Solution
 **Centralized Trait Architecture** in `llmspell-core` with:
@@ -21,12 +31,15 @@
 2. Domain types in `llmspell-core/src/types/storage/` (shared across backends)
 3. Backend implementations in `llmspell-storage/src/backends/{postgres,sqlite}/` (follow traits)
 4. Runtime injection via config: `Infrastructure::from_config()` → instantiated backends → kernel/bridge
+5. **Re-export strategy** in all 11 impacted crates (zero breaking changes)
 
-### Impact
+### Revised Impact Assessment
 - **+3,500 lines**: New trait definitions and domain types in llmspell-core
-- **Zero breaking changes**: Existing code continues working (Phase 1-13 APIs preserved)
+- **~50 files** need import updates across 11 crates (not 20 as initially estimated)
+- **Zero breaking changes**: Re-exports preserve all existing import paths
 - **50% reduction** in future maintenance: Single trait definition for all backends
 - **Eliminates circular dependencies**: Foundation crate (llmspell-core) has no internal deps
+- **Week 2 effort increase**: 11 crates to update (not 5), estimated +8 hours
 
 ---
 
@@ -43,6 +56,110 @@
 9. [Migration Strategy](#9-migration-strategy)
 10. [Risk Analysis](#10-risk-analysis)
 11. [Implementation Plan](#11-implementation-plan)
+12. **[What Was Initially Missed](#12-what-was-initially-missed)** ⚠️ NEW
+
+---
+
+## What Was Initially Missed (Critical Findings)
+
+### Initial Analysis Scope
+The first version of this document focused on:
+- llmspell-storage (backend implementations)
+- llmspell-graph (KnowledgeGraph trait)
+- llmspell-memory (memory traits)
+- llmspell-events (EventStorage adapter)
+- llmspell-kernel (StateManager usage)
+
+**Total**: 5 crates identified
+
+### Comprehensive Analysis Revealed
+After thorough `grep` and `Cargo.toml` analysis across ALL 21 crates:
+
+#### 1. **llmspell-bridge** (CRITICAL MISS)
+**Why missed**: Initial focus on "storage" crate names, overlooked bridge layer
+**Impact**: 9+ files use storage traits
+- `infrastructure.rs` - Creates SqliteBackend directly (no injection)
+- `rag_bridge.rs` - Uses Arc<dyn VectorStorage>
+- `memory_bridge.rs` - Uses MemoryManager (storage traits)
+- `globals/` - 3 files create backends inline
+
+**Risk**: Bridge is the main entry point for Lua/JS scripts - HIGH impact on refactor!
+
+#### 2. **llmspell-rag** (HIGH IMPACT)
+**Why missed**: Assumed RAG only used via kernel, not directly
+**Impact**: 8+ files use VectorStorage
+- **StateAwareVectorStorage** - Wraps VectorStorage for multi-tenancy
+- **HybridStorage trait** - Extends VectorStorage (trait inheritance!)
+- Pipeline, retrieval, ingestion all use Arc<dyn VectorStorage>
+
+**Risk**: RAG is a core feature - changes affect many users!
+
+#### 3. **llmspell-tenancy** (MEDIUM IMPACT - DECORATOR PATTERN)
+**Why missed**: Tenancy seemed like infrastructure, not storage consumer
+**Impact**: **MultiTenantVectorManager implements VectorStorage**
+- This is a **decorator pattern** wrapping any VectorStorage backend
+- Trait implementation depends on VectorStorage being in scope
+
+**Risk**: If VectorStorage moves to llmspell-core AFTER tenancy compiles, circular dependency possible!
+
+#### 4. **llmspell-agents** (MEDIUM IMPACT)
+**Why missed**: Agents seemed orthogonal to storage
+**Impact**: AgentRegistry uses StorageBackend for persistence
+- `registry/persistence.rs` - PersistentAgentRegistry struct
+
+**Risk**: LOW - only uses generic StorageBackend (KV)
+
+#### 5. **llmspell-context** (LOW IMPACT - INDIRECT)
+**Why missed**: Initially assumed it was domain-only
+**Impact**: Indirect dependency via llmspell-memory and llmspell-graph
+- No direct storage trait usage
+- Compilation will break if memory/graph break
+
+**Risk**: LOW - no code changes needed, just verification
+
+#### 6. **llmspell-cli** (LOW IMPACT)
+**Why missed**: CLI seemed like thin wrapper
+**Impact**: Uses kernel infrastructure (StateManager, etc.)
+- No direct backend creation
+- Just imports types for CLI commands
+
+**Risk**: VERY LOW - minimal changes
+
+### Summary of Missed Items
+
+| Item | Initial Estimate | Actual Count | Delta |
+|------|-----------------|--------------|-------|
+| **Crates impacted** | 5 | 11 | +6 (120% increase) |
+| **Files to update** | ~20 | ~50 | +30 (150% increase) |
+| **Critical crates** | 2 (storage, kernel) | 3 (storage, kernel, **bridge**) | +1 |
+| **Migration effort** | 4 weeks | **5 weeks** | +1 week |
+
+### Revised Risk Assessment
+
+**Original risks** (underestimated):
+- ✅ Type parameter mismatches
+- ✅ Doc test breakage
+- ✅ Integration test failures
+
+**New risks** (discovered):
+- ⚠️ **Bridge layer disruption**: llmspell-bridge is Lua/JS entry point - breaks all scripts if incorrect
+- ⚠️ **RAG pipeline refactor**: 8 files using VectorStorage - high user impact
+- ⚠️ **Tenancy decorator pattern**: MultiTenantVectorManager depends on VectorStorage location
+- ⚠️ **Test infrastructure**: Many tests create backends inline - needs factory pattern
+
+### Lessons Learned
+
+1. **Grep is essential**: Can't rely on crate names or mental models - must grep for trait usage
+2. **Bridge layer critical**: llmspell-bridge is infrastructure creation hub - always check it
+3. **Decorator patterns**: Traits implemented BY domain crates (not just used) create tight coupling
+4. **Test code matters**: Test files often create backends directly - need injection pattern there too
+
+### Mitigation Strategy
+
+1. **Week 2 extension**: Add 1 day for llmspell-bridge updates
+2. **Bridge-first approach**: Update llmspell-bridge BEFORE memory/rag to catch issues early
+3. **Test factories**: Create `TestStorageFactory` in llmspell-testing for all test backends
+4. **Incremental compilation**: Update crates in dependency order (core → storage → bridge → domain)
 
 ---
 
@@ -87,7 +204,165 @@
     └──> StateManager uses StorageBackend
 ```
 
-### 1.2 Current Trait Distribution
+**⚠️ WARNING: This diagram is INCOMPLETE!** See Section 1.3 for full crate dependency analysis.
+
+### 1.2 Complete Crate Dependency Map (All 21 Crates)
+
+After comprehensive analysis, **11 crates** directly depend on storage traits:
+
+| Crate | Depends On | Storage Traits Used | Direct Backend Creation | Impact Level |
+|-------|-----------|---------------------|------------------------|--------------|
+| **llmspell-storage** | llmspell-core, llmspell-graph | ALL (implements backends) | ✅ PostgresBackend, SqliteBackend | **CRITICAL** |
+| **llmspell-kernel** | llmspell-storage, llmspell-memory | StorageBackend, VectorStorage | ✅ SqliteBackend (StateManager) | **CRITICAL** |
+| **llmspell-bridge** | llmspell-storage, llmspell-memory | StorageBackend, VectorStorage | ✅ SqliteBackend (Infrastructure) | **CRITICAL** |
+| **llmspell-memory** | llmspell-storage, llmspell-graph | VectorStorage, KnowledgeGraph, ProceduralMemory | ❌ (receives injected) | **HIGH** |
+| **llmspell-rag** | llmspell-storage | VectorStorage | ✅ SqliteVectorStorage (tests) | **HIGH** |
+| **llmspell-tenancy** | llmspell-storage | VectorStorage | ✅ SqliteVectorStorage (tests) | **MEDIUM** |
+| **llmspell-agents** | llmspell-storage | StorageBackend | ❌ (receives injected) | **MEDIUM** |
+| **llmspell-events** | llmspell-storage | StorageBackend (adapter pattern) | ❌ (receives injected) | **MEDIUM** |
+| **llmspell-hooks** | llmspell-storage | StorageBackend | ❌ (receives injected) | **MEDIUM** |
+| **llmspell-context** | llmspell-memory, llmspell-graph | Indirect (via memory/graph) | ❌ | **LOW** |
+| **llmspell-cli** | llmspell-storage | StorageBackend (via kernel) | ❌ | **LOW** |
+
+**Crates with NO storage dependencies** (10): llmspell-core, llmspell-graph, llmspell-config, llmspell-providers, llmspell-tools, llmspell-templates, llmspell-workflows, llmspell-security, llmspell-testing, llmspell-utils
+
+### 1.3 Critical Finding: llmspell-bridge Storage Usage
+
+**llmspell-bridge is a MAJOR storage consumer** that was missing from initial analysis:
+
+```rust
+// llmspell-bridge/src/infrastructure.rs:53
+use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
+
+impl Infrastructure {
+    pub async fn from_config(config: &LLMSpellConfig) -> Result<Self> {
+        // PROBLEM: Direct backend construction (no injection pattern)
+        let storage_backend = Arc::new(SqliteBackend::new(config).await?);
+        let vector_storage = Arc::new(SqliteVectorStorage::new(backend, 384).await?);
+
+        // Creates StateManager, SessionManager, RAG, MemoryManager
+        // All receive backends inline
+    }
+}
+```
+
+**Bridge crate files using storage traits**:
+1. `infrastructure.rs` - Creates SqliteBackend, SqliteVectorStorage directly
+2. `rag_bridge.rs` - Uses `VectorStorage` trait (Arc<dyn VectorStorage>)
+3. `memory_bridge.rs` - Uses `MemoryManager` (which uses storage traits)
+4. `context_bridge.rs` - Uses `MemoryManager`
+5. `state_adapter.rs` - Uses `StorageBackend`
+6. `artifact_bridge.rs` - Uses `ArtifactStorage` (via SessionManager)
+7. `globals/rag_infrastructure.rs` - Creates SqliteVectorStorage
+8. `globals/state_infrastructure.rs` - Uses StorageBackend
+9. `globals/session_infrastructure.rs` - Uses StorageBackend
+
+**Impact**: llmspell-bridge needs trait refactoring in 9+ files!
+
+### 1.4 llmspell-rag Storage Usage
+
+**llmspell-rag heavily uses VectorStorage trait**:
+
+```rust
+// llmspell-rag/src/pipeline/rag_pipeline.rs:28
+pub struct RAGPipeline {
+    storage: Arc<dyn VectorStorage>,  // Trait object injection
+    // ...
+}
+
+// llmspell-rag/src/state_integration.rs:15
+pub struct StateAwareVectorStorage {
+    storage: Arc<dyn VectorStorage>,  // Wraps VectorStorage for multi-tenancy
+    // ...
+}
+```
+
+**Files using VectorStorage** (8 files):
+1. `traits/hybrid.rs` - `pub trait HybridStorage: VectorStorage` (extends trait)
+2. `pipeline/rag_pipeline.rs` - Main pipeline uses `Arc<dyn VectorStorage>`
+3. `pipeline/retrieval_flow.rs` - Retrieval uses `Arc<dyn VectorStorage>`
+4. `pipeline/builder.rs` - Builder pattern for pipeline construction
+5. `pipeline/ingestion.rs` - Ingestion pipeline
+6. `state_integration.rs` - **StateAwareVectorStorage wrapper**
+7. `session_integration.rs` - Session-scoped RAG
+
+**Test files creating backends**:
+- 4 test files create `SqliteBackend` and `SqliteVectorStorage` directly (not injected)
+
+**Impact**: Core RAG functionality depends on VectorStorage trait location!
+
+### 1.5 llmspell-tenancy Storage Usage
+
+**llmspell-tenancy wraps VectorStorage for multi-tenant isolation**:
+
+```rust
+// llmspell-tenancy/src/manager.rs:37
+pub struct MultiTenantVectorManager {
+    storage: Arc<dyn VectorStorage>,  // Injected backend
+    // ...
+}
+
+// llmspell-tenancy/src/manager.rs:435
+impl VectorStorage for MultiTenantVectorManager {
+    // Delegates to underlying storage with tenant filtering
+}
+```
+
+**Key finding**: MultiTenantVectorManager **implements VectorStorage trait** itself! This is a decorator pattern that adds tenant isolation on top of any VectorStorage backend.
+
+**Impact**: VectorStorage trait must be in llmspell-core for tenancy crate to compile!
+
+### 1.6 llmspell-agents Storage Usage
+
+**llmspell-agents uses StorageBackend for registry persistence**:
+
+```rust
+// llmspell-agents/src/registry/persistence.rs:24
+pub struct PersistentAgentRegistry {
+    storage: Arc<dyn StorageBackend>,  // Generic KV storage
+    // ...
+}
+```
+
+**Usage**: Saves/loads agent configurations to/from storage backend.
+
+**Impact**: LOW - Only uses StorageBackend (generic KV), no complex storage traits.
+
+### 1.7 llmspell-memory Storage Usage
+
+**llmspell-memory is the HIGHEST complexity storage user**:
+
+```rust
+// llmspell-memory/src/manager.rs
+pub struct DefaultMemoryManager {
+    episodic: Arc<dyn EpisodicMemory>,      // Uses VectorStorage internally
+    semantic: Arc<dyn SemanticMemory>,      // Uses KnowledgeGraph internally
+    procedural: Arc<dyn ProceduralMemory>,  // Direct storage trait
+    // ...
+}
+```
+
+**Memory crate defines 3 domain traits that WRAP storage traits**:
+1. `EpisodicMemory` → wraps `VectorStorage`
+2. `SemanticMemory` → wraps `KnowledgeGraph`
+3. `ProceduralMemory` → direct storage trait (should be in llmspell-core)
+
+**Consolidation engine uses KnowledgeGraph**:
+```rust
+// llmspell-memory/src/consolidation/validator.rs:21
+pub struct ConsolidationValidator {
+    knowledge_graph: Arc<dyn KnowledgeGraph>,
+}
+
+// llmspell-memory/src/consolidation/llm_engine.rs:108
+pub struct LLMConsolidationEngine {
+    knowledge_graph: Arc<dyn KnowledgeGraph>,
+}
+```
+
+**Impact**: CRITICAL - Memory system deeply integrates with all 3 storage trait categories!
+
+### 1.8 Current Trait Distribution
 
 | Trait Name | Current Location | Line Count | Implementations |
 |-----------|------------------|------------|-----------------|
@@ -597,18 +872,90 @@ impl Infrastructure {
 
 ### 9.2 Phase 2: Update Implementations (Week 2)
 
-**Tasks**:
-1. Update imports in `llmspell-storage/src/backends/postgres/*.rs`
-2. Update imports in `llmspell-storage/src/backends/sqlite/*.rs`
-3. Update `llmspell-memory` to import from llmspell-core
-4. Update `llmspell-graph` to import from llmspell-core
-5. Add re-exports in old locations (zero breaking changes)
+**Tasks - ALL 11 Impacted Crates**:
+
+1. **llmspell-storage** (CRITICAL):
+   - Update imports in `src/backends/postgres/*.rs` (10 files)
+   - Update imports in `src/backends/sqlite/*.rs` (10 files)
+   - Add re-exports in `src/traits.rs` and `src/vector_storage.rs`
+   - Update `Cargo.toml` dependencies
+
+2. **llmspell-kernel** (CRITICAL):
+   - Update `src/state/manager.rs` imports
+   - Update `src/state/backend_adapter.rs` imports
+   - Update `src/state/vector_storage.rs` (remove duplication!)
+   - 12+ files affected
+
+3. **llmspell-bridge** (CRITICAL):
+   - Update `src/infrastructure.rs` imports (SqliteBackend, SqliteVectorStorage)
+   - Update `src/rag_bridge.rs` imports
+   - Update `src/memory_bridge.rs` imports
+   - Update `src/state_adapter.rs` imports
+   - Update `src/globals/*.rs` (3 files)
+   - **9+ files affected** ⚠️
+
+4. **llmspell-memory** (HIGH):
+   - Update `src/manager.rs` imports
+   - Update `src/consolidation/*.rs` imports (2 files)
+   - Update trait re-exports if ProceduralMemory moves to core
+   - 5+ files affected
+
+5. **llmspell-rag** (HIGH):
+   - Update `src/traits/hybrid.rs` (extends VectorStorage)
+   - Update `src/pipeline/*.rs` (4 files)
+   - Update `src/state_integration.rs`
+   - Update `src/session_integration.rs`
+   - **8+ files affected** ⚠️
+
+6. **llmspell-tenancy** (MEDIUM):
+   - Update `src/manager.rs` (implements VectorStorage)
+   - Update test files (3 files)
+
+7. **llmspell-agents** (MEDIUM):
+   - Update `src/registry/persistence.rs`
+   - Update test files
+
+8. **llmspell-events** (MEDIUM):
+   - Update `src/storage_adapter.rs`
+   - Already uses adapter pattern, minimal changes
+
+9. **llmspell-hooks** (MEDIUM):
+   - Update hook persistence code
+   - Minimal changes (uses StorageBackend only)
+
+10. **llmspell-graph** (LOW):
+    - Add re-export for `KnowledgeGraph` trait
+    - Update documentation
+
+11. **llmspell-context** (LOW):
+    - No direct changes (indirect via memory/graph)
+    - Verify compilation
+
+**Re-export Strategy** (zero breaking changes):
+```rust
+// llmspell-storage/src/traits.rs
+#[deprecated(since = "0.14.0", note = "Import from llmspell_core::traits::storage instead")]
+pub use llmspell_core::traits::storage::StorageBackend;
+
+// llmspell-storage/src/vector_storage.rs
+#[deprecated(since = "0.14.0", note = "Import from llmspell_core::traits::storage instead")]
+pub use llmspell_core::traits::storage::VectorStorage;
+
+// llmspell-graph/src/traits/knowledge_graph.rs
+#[deprecated(since = "0.14.0", note = "Import from llmspell_core::traits::storage instead")]
+pub use llmspell_core::traits::storage::KnowledgeGraph;
+
+// llmspell-memory/src/traits/procedural.rs
+#[deprecated(since = "0.14.0", note = "Import from llmspell_core::traits::storage instead")]
+pub use llmspell_core::traits::storage::ProceduralMemory;
+```
 
 **Success Criteria**:
-- All backends compile
+- All 11 crates compile successfully
 - All existing imports still work (re-exports functional)
-- Zero clippy warnings
-- All tests passing
+- Zero clippy warnings across workspace
+- All 149+ tests passing
+- Benchmark performance maintained (<5% variance)
 
 ### 9.3 Phase 3: Runtime Injection (Week 3)
 
