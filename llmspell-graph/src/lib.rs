@@ -100,4 +100,3 @@ pub use error::{GraphError, Result};
 pub use storage::GraphBackend;
 pub use traits::KnowledgeGraph;
 pub use types::{Entity, Relationship, TemporalQuery};
-#[path = "/tmp/test_extract.rs"] mod test_extract;

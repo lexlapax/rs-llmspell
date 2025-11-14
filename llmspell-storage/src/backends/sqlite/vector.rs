@@ -136,7 +136,18 @@ impl SqliteVectorStorage {
             );
         }
 
-        // Tables are created by SqliteBackend::new() for consistency with postgres pattern
+        // Create dimension-specific vec_embeddings table at runtime (Task 13c.2.8.16)
+        // vector_metadata table and indices are created by migrations (V3)
+        // vec_embeddings_* tables are dimension-specific and created on-demand
+        let conn = backend.get_connection().await?;
+        let create_table_sql = format!(
+            "CREATE TABLE IF NOT EXISTS vec_embeddings_{} (rowid INTEGER PRIMARY KEY, embedding BLOB)",
+            dimension
+        );
+        conn.execute(&create_table_sql, ())
+            .await
+            .with_context(|| format!("Failed to create vec_embeddings_{} table", dimension))?;
+
         let persistence_path = PathBuf::from("./data/hnsw_indices");
         std::fs::create_dir_all(&persistence_path)?;
 

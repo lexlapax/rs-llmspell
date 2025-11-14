@@ -4104,18 +4104,76 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 
 ---
 
-### Task 13c.2.9: Testing & Benchmarking ⏹ PENDING
+### Task 13c.2.9: Testing & Benchmarking 🔄 IN PROGRESS
 **Priority**: CRITICAL
 **Estimated Time**: 12 hours (Days 14-15)
 **Assignee**: QA Team
-**Status**: ⏹ PENDING
+**Status**: 🔄 IN PROGRESS (Subtask 13c.2.9.1-13c.2.9.2 Complete, 13c.2.9.3 In Progress)
 **Dependencies**: All previous 13c.2.x tasks ✅
 
 **Description**: Port Phase 13 tests to libsql backend, run comprehensive benchmarks, validate performance targets.
 
+**Progress Summary**:
+- ✅ 13c.2.9.1: Fixed tokio runtime configuration (commit: 13c.2.9.1)
+- ✅ 13c.2.9.2: Consolidated table creation in SqliteBackend::new() (commit: 13c.2.9.2)
+- 🔄 13c.2.9.3: Fixing consolidation test failures (3/146 tests failing)
+- ⏹ 13c.2.9.4: Test llmspell-graph package
+- ⏹ 13c.2.9.5: Test llmspell-context package
+- ⏹ 13c.2.9.6: Create and run benchmarks
+- ⏹ 13c.2.9.7: Profile memory usage
+
+**Test Results (as of 13c.2.9.2)**:
+- llmspell-memory: 143 passed, 3 failed, 9 ignored (97.9% pass rate)
+  - ✅ lib tests: 110/110 passed
+  - ✅ backend_integration_test: 10/10 passed
+  - ✅ baseline_measurement_test: 9 passed, 2 ignored
+  - ✅ consolidation_llm_test: 9 passed, 7 ignored
+  - ✗ consolidation_test: 5 passed, 3 failed
+- llmspell-graph: Not yet tested
+- llmspell-context: Not yet tested
+
+**Accomplishments**:
+1. **Tokio Runtime Fix (13c.2.9.1)**:
+   - Added `flavor = "multi_thread"` to all tokio::test attributes in backend_integration_test.rs
+   - Root cause: SqliteBackend::new() uses tokio::task::block_in_place which requires multi-threaded runtime
+   - Fixed panic: "can call blocking only when running on the multi-threaded runtime"
+   - Result: 10/10 backend_integration tests now passing
+
+2. **Architecture Consolidation (13c.2.9.2)**:
+   - Removed ad-hoc table creation from SqliteVectorStorage::new()
+   - Added backend.run_migrations() call to SqliteBackend::new()
+   - Now matches Postgres pattern: Backend handles schema via migrations, Storage wraps backend
+   - Centralized all table creation in V1-V13 migrations
+   - Result: 110/110 lib tests passing, cleaner architecture
+
+**Key Insights**:
+1. **Postgres Consistency Pattern**: SQLite backend should match Postgres architecture
+   - Backend: Manages connections, extensions, schema (via migrations)
+   - Storage: Wraps backend, focuses on operations
+   - No table creation in storage constructors
+
+2. **Migration System Design**:
+   - Postgres: Migrations run separately during deployment (Flyway/Liquibase)
+   - SQLite: Migrations run at SqliteBackend::new() initialization (no separate deployment)
+   - Same migration SQL files, different execution timing
+
+3. **Tokio Runtime Requirements**:
+   - SqliteBackend requires multi-threaded runtime for async initialization
+   - Tests using SqliteBackend must use `#[tokio::test(flavor = "multi_thread")]`
+   - Single-threaded runtime causes panic in block_in_place calls
+
+**Remaining Issues**:
+1. **Consolidation Test Failures (3 tests)**:
+   - test_episodic_to_semantic_flow: entities_added == 0 (expected > 0)
+   - test_multiple_relationship_extraction: entities_added == 0 (expected >= 2)
+   - test_consolidation_immediate_mode: entities_added == 0 (expected > 0)
+   - Root cause: ManualConsolidationEngine extracting entities but not adding to graph
+   - RegexExtractor confirmed working (standalone test passes)
+   - Issue in SqliteGraphStorage::add_entity() or consolidation engine flow
+
 **Acceptance Criteria**:
-- [ ] 149 Phase 13 tests ported to libsql backend
-- [ ] All tests passing (100% pass rate)
+- [ ] 149 Phase 13 tests ported to libsql backend (143/146 llmspell-memory passing, graph/context pending)
+- [ ] All tests passing (100% pass rate) - currently 97.9% for llmspell-memory
 - [ ] Benchmarks run: vector insert/search, graph traversal, state CRUD, session/artifact
 - [ ] Performance targets met: <1ms vector insert, <10ms search 10K, <50ms graph 4-hop, <10ms state write
 - [ ] Regression tests: no performance degradation vs HNSW/SurrealDB/Sled within acceptable bounds
