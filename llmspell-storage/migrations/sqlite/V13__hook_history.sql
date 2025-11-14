@@ -174,3 +174,7 @@ CREATE INDEX IF NOT EXISTS idx_hook_history_metadata_triggering
 --      - Flag with contains_sensitive_data = 1
 --      - Shorter retention (30 days) regardless of priority
 --      - Optional encryption of hook_context BLOB
+
+-- Insert V13 migration record
+INSERT OR IGNORE INTO _migrations (version, name, checksum)
+VALUES (13, 'hook_history', 'v13-hook-execution-replay');

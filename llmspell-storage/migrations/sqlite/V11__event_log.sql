@@ -144,3 +144,7 @@ CREATE INDEX IF NOT EXISTS idx_event_log_payload_emitter
 --   2. Use VACUUM INCREMENTAL or auto_vacuum for space reclamation
 --   3. Monitor table size with:
 --      SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()
+
+-- Insert V11 migration record
+INSERT OR IGNORE INTO _migrations (version, name, checksum)
+VALUES (11, 'event_log', 'v11-time-series-events');

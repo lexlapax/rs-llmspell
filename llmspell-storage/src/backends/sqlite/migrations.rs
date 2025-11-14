@@ -173,15 +173,15 @@ mod tests {
             "kv_store table should exist"
         );
 
-        // Check agent_state table
+        // Check agent_states table (note: plural)
         let stmt = conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_state'")
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_states'")
             .await
             .unwrap();
         let mut rows = stmt.query(()).await.unwrap();
         assert!(
             rows.next().await.unwrap().is_some(),
-            "agent_state table should exist"
+            "agent_states table should exist"
         );
     }
 

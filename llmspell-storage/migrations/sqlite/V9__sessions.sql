@@ -117,3 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_data_artifact_count
 --   - get_session: <5ms (indexed lookup)
 --   - list_active_sessions: <50ms (tenant+status composite index)
 --   - cleanup_expired: <100ms (partial index on expires_at)
+
+-- Insert V9 migration record
+INSERT OR IGNORE INTO _migrations (version, name, checksum)
+VALUES (9, 'sessions', 'v9-session-storage');

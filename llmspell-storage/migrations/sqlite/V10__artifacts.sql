@@ -219,3 +219,7 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_metadata_created_by
 --   - get_artifact: <10ms (JOIN artifacts + artifact_content)
 --   - list_session_artifacts: <50ms (indexed session lookup)
 --   - delete_artifact: <15ms (DELETE + refcount decrement)
+
+-- Insert V10 migration record
+INSERT OR IGNORE INTO _migrations (version, name, checksum)
+VALUES (10, 'artifacts', 'v10-artifact-deduplication');
