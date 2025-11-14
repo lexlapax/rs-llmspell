@@ -4337,12 +4337,13 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 
 ---
 
-### Task 13c.2.10: Integration Testing  IN_PROGRESS
+### Task 13c.2.10: Integration Testing ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 8 hours (Day 16)
 **Assignee**: Integration Testing Team
-**Status**:  IN_PROGRESS (95% Complete - 7 doc-test compile failures remaining)
+**Status**: ✅ COMPLETE
 **Dependencies**: Task 13c.2.9 ✅
+**Completed**: 2025-11-14
 
 **Description**: End-to-end integration testing with MemoryManager, RAG, agents, and workflows using libsql backend.
 
@@ -4352,7 +4353,7 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - [x] Agent workflow integration test (state persistence via libsql) - 16 tests passing (8 agent state + 8 workflow state)
 - [x] Multi-tenancy isolation test (ensure tenant_id filtering works) - 9 tests passing (3 agent state + 3 workflow state + 3 KV store + 6 tenancy integration tests)
 - [x] Backup/restore integration test (1 file copy vs 4 procedures) - 2 tests passing (single-file backup/restore, simplicity comparison)
-- [~] All workspace tests: **5076/5083 passing** (7 doc-test compile failures in llmspell-memory documentation examples)
+- [x] All workspace tests passing: **215 test suites, 0 failures** (functional tests + doc-tests all passing, zero clippy warnings)
 
 **Implementation Steps**:
 1. Create MemoryManager integration test (llmspell-memory/tests/integration_sqlite.rs):
