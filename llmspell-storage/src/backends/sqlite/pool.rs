@@ -56,19 +56,17 @@ impl SqliteConnectionManager {
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to set synchronous: {}", e)))?;
 
-        // Set cache size
+        // Set cache size (performance optimization - non-fatal)
         let cache_pragma = format!("PRAGMA cache_size = {}", self.config.cache_size);
-        let _ = conn
-            .query(&cache_pragma, ())
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to set cache_size: {}", e)))?;
+        if let Err(e) = conn.query(&cache_pragma, ()).await {
+            tracing::warn!("Failed to set cache_size (non-fatal): {}", e);
+        }
 
-        // Set mmap size
+        // Set mmap size (performance optimization - non-fatal, may not be supported in all libsql contexts)
         let mmap_pragma = format!("PRAGMA mmap_size = {}", self.config.mmap_size);
-        let _ = conn
-            .query(&mmap_pragma, ())
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to set mmap_size: {}", e)))?;
+        if let Err(e) = conn.query(&mmap_pragma, ()).await {
+            tracing::warn!("Failed to set mmap_size (non-fatal): {}", e);
+        }
 
         // Set busy timeout
         let timeout_pragma = format!("PRAGMA busy_timeout = {}", self.config.busy_timeout);
