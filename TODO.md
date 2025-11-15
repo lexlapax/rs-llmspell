@@ -4647,6 +4647,67 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 **Breaking Changes**: ACCEPTED (pre-1.0 clean architecture)
 **Reference**: PHASE-13C3-CLEAN-REFACTOR-PLAN.md
 
+### Why This Refactor?
+
+**Current Problem**: Storage traits scattered across 3 crates create architectural debt:
+- `StorageBackend` and `VectorStorage` in `llmspell-storage`
+- `KnowledgeGraph` in `llmspell-graph`
+- `ProceduralMemory` in `llmspell-memory`
+- Risk of circular dependencies as crates depend on each other
+- No single source of truth for storage abstractions
+- Difficult to add new backends (must update multiple crates)
+
+**Architectural Goals**:
+1. **Single Source of Truth**: All storage traits in `llmspell-core` (zero dependencies)
+2. **Clean Architecture**: Foundation layer has no internal llmspell-* dependencies
+3. **100% Backend Parity**: Both PostgreSQL and SQLite implement identical trait sets
+4. **Data Portability**: Enable bidirectional migration between backends (growth path: SQLite → PostgreSQL, edge path: PostgreSQL → SQLite)
+5. **Future-Proof**: Easy to add new backends (DynamoDB, Redis, etc.) by implementing core traits
+
+### Methodology: Clean Break (NO Half-Measures)
+
+**NO RE-EXPORTS** - This is a clean architectural refactor where:
+1. All storage traits move to `llmspell-core` (single source of truth)
+2. **Every import statement updates** to use `llmspell_core::traits::storage::*`
+3. **Zero re-exports** in old locations - clean removal
+4. All documentation, tests, and examples updated
+5. Breaking changes throughout - clean slate for v0.14.0
+
+**Why not maintain backward compatibility?**
+- Pre-1.0 project - perfect time for breaking changes
+- Re-exports create technical debt and confusing dual import paths
+- Clean break forces all code to use correct architecture
+- Easier maintenance long-term (50% reduction in trait duplication)
+
+### Comprehensive Scope Analysis
+
+After exhaustive analysis across **all 1,141 Rust source files**:
+
+| Category | Count | Needs Update |
+|----------|-------|--------------|
+| **Rust source files** (total) | 1,141 | - |
+| **Files with storage imports** | 149 | ✅ ALL |
+| - Source files (non-test) | 86 | ✅ ALL |
+| - Test files | 77 | ✅ ALL |
+| **Total import statements** | 374 | ✅ ALL |
+| **Markdown files with traits** | 48 | ✅ ALL |
+| **Crate README files** | 11 | ✅ ALL |
+| **Rustdoc comments** | 20+ | ✅ ALL |
+
+**Critical Crates** (High Impact):
+- `llmspell-storage` (22 backend files) - 100% trait parity (11 PostgreSQL + 11 SQLite)
+- `llmspell-kernel` (12 files) - State management core
+- `llmspell-bridge` (9 files) - **CRITICAL PATH** - Lua/JS entry point
+- `llmspell-memory` (15 files) - Memory system integration
+
+**Benefits**:
+- ✅ Zero circular dependencies (llmspell-core is foundation)
+- ✅ Single source of truth for all storage abstractions
+- ✅ Easier to add new backends (implement 4 traits in llmspell-core)
+- ✅ Clean architecture for v0.14.0
+- ✅ Enables export/import tool for data portability
+- ✅ 50% reduction in maintenance burden (no duplicate trait definitions)
+
 ---
 
 ### Task 13c.3.0: Foundation - Trait Migration to llmspell-core ⏹ PENDING
