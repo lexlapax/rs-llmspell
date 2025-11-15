@@ -1,0 +1,222 @@
+================================================================================
+                        TRAIT LOCATIONS - ABSOLUTE PATHS
+================================================================================
+
+TRAIT 1: StorageBackend
+├─ Trait Definition
+│  └─ /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-storage/src/traits.rs
+│     Lines 45-101: pub trait StorageBackend
+│     Lines 9-21:   enum StorageBackendType
+│     Lines 23-43:  struct StorageCharacteristics  
+│     Lines 103-121: trait StorageSerialize
+│
+├─ Implementing Crates
+│  ├─ llmspell-storage/src/backends/sqlite/backend.rs
+│  ├─ llmspell-storage/src/backends/postgres/backend.rs
+│  └─ llmspell-storage/src/backends/memory.rs
+│
+└─ Re-export Location (after migration)
+   └─ llmspell-core/src/storage/backend.rs
+
+================================================================================
+
+TRAIT 2: VectorStorage + HNSWStorage
+├─ Trait Definition
+│  └─ /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-storage/src/vector_storage.rs
+│     Lines 18-304: pub trait VectorStorage + supporting types
+│     Lines 306-340: struct VectorEntry (with builder methods)
+│     Lines 415-444: struct VectorQuery (with builder methods)
+│     Lines 506-523: struct VectorResult
+│     Lines 525-545: struct StorageStats
+│     Lines 547-567: struct ScopedStats
+│     Lines 573-599: pub trait HNSWStorage extends VectorStorage
+│     Lines 601-642: struct HNSWConfig (with presets)
+│     Lines 698-713: enum DistanceMetric
+│     Lines 715-735: struct NamespaceStats
+│     Lines 737-881: Comprehensive unit tests
+│
+├─ Core Dependencies
+│  └─ Uses: llmspell_core::state::StateScope
+│     In: VectorEntry.scope
+│     In: VectorQuery.scope
+│     In: ScopedStats.scope
+│
+├─ Implementing Crates
+│  ├─ llmspell-storage/src/backends/sqlite/vector.rs
+│  ├─ llmspell-storage/src/backends/vector/mod.rs
+│  └─ vectorlite-rs/ (HNSW implementation)
+│
+└─ Re-export Location (after migration)
+   └─ llmspell-core/src/storage/vector.rs
+
+================================================================================
+
+TRAIT 3: KnowledgeGraph
+├─ Trait Definition
+│  └─ /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-graph/src/traits/knowledge_graph.rs
+│     Lines 10-142: pub trait KnowledgeGraph
+│     Key Method: traverse() at lines 135-141 (4-hop <50ms target)
+│
+├─ Supporting Types
+│  └─ /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-graph/src/types.rs
+│     Lines 13-32:   struct Entity
+│     Lines 34-61:   Entity impl (constructors and builders)
+│     Lines 63-86:   struct Relationship
+│     Lines 88-121:  Relationship impl (constructors and builders)
+│     Lines 124-199: struct TemporalQuery + impl
+│     Lines 201-206: Default trait for TemporalQuery
+│
+├─ Core Dependencies
+│  └─ None (uses chrono, uuid, serde_json)
+│
+├─ Implementing Crates
+│  ├─ llmspell-graph/src/storage/mod.rs
+│  ├─ llmspell-storage/src/backends/sqlite/graph.rs
+│  └─ llmspell-storage/src/backends/postgres/graph.rs
+│
+└─ Re-export Locations (after migration)
+   ├─ llmspell-core/src/graph/trait.rs
+   └─ llmspell-core/src/graph/types.rs
+
+================================================================================
+
+TRAIT 4: ProceduralMemory
+├─ Trait Definition
+│  └─ /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-memory/src/traits/procedural.rs
+│     Lines 24-42:   struct Pattern
+│     Lines 44-104:  pub trait ProceduralMemory
+│     Active Methods (Phase 13.7.4):
+│       - record_transition() at lines 67-73
+│       - get_pattern_frequency() at lines 75-80
+│       - get_learned_patterns() at lines 82-91
+│     Placeholder Methods (Phase 13.3):
+│       - get_pattern() at line 98
+│       - store_pattern() at line 103
+│
+├─ Core Dependencies
+│  └─ None (minimal - only serde)
+│
+├─ Implementing Crates
+│  └─ llmspell-memory/src/procedural.rs (implementation details)
+│
+└─ Re-export Location (after migration)
+   └─ llmspell-core/src/memory/procedural.rs
+
+================================================================================
+
+CROSS-CUTTING TYPE IMPORTS (in migrated code)
+================================================================================
+
+StateScope (used by VectorStorage):
+  Source: llmspell-core/src/state/mod.rs
+  Used by: VectorEntry, VectorQuery, ScopedStats
+  Action: Will be local import after migration
+
+SystemTime (used by VectorStorage):
+  Source: std::time::SystemTime
+  Used by: VectorEntry, VectorQuery
+  Action: No change needed
+
+DateTime<Utc> (used by KnowledgeGraph):
+  Source: chrono crate
+  Used by: Entity, Relationship, TemporalQuery
+  Action: No change needed
+
+serde_json::Value (used by VectorStorage and KnowledgeGraph):
+  Source: serde_json crate
+  Used by: Metadata and properties fields
+  Action: No change needed
+
+uuid::Uuid (used by KnowledgeGraph):
+  Source: uuid crate
+  Used by: Auto-generating entity IDs
+  Action: No change needed
+
+================================================================================
+
+CARGO.TOML FILES TO UPDATE
+================================================================================
+
+1. /Users/spuri/projects/lexlapax/rs-llmspell/Cargo.toml
+   Add: llmspell-core dependency
+
+2. /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-storage/Cargo.toml
+   Add: dependency on llmspell-core (for trait imports)
+   Remove: Direct trait implementations (moved to llmspell-core)
+
+3. /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-graph/Cargo.toml
+   Add: dependency on llmspell-core (for trait imports)
+
+4. /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-memory/Cargo.toml
+   Add: dependency on llmspell-core (for trait imports)
+
+5. /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/Cargo.toml
+   Add: chrono, uuid (for KnowledgeGraph trait)
+   Verify: async_trait, serde, serde_json already present
+
+================================================================================
+
+LIB.RS FILES TO UPDATE
+================================================================================
+
+1. /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-storage/src/lib.rs
+   Add: pub use llmspell_core::storage::{StorageBackend, VectorStorage, ...};
+
+2. /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-graph/src/lib.rs
+   Add: pub use llmspell_core::graph::{KnowledgeGraph, ...};
+
+3. /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-memory/src/lib.rs
+   Add: pub use llmspell_core::memory::{ProceduralMemory, ...};
+
+4. /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/lib.rs
+   Add: pub mod storage; pub mod graph; pub mod memory;
+
+================================================================================
+
+MIGRATION CHECKLIST
+================================================================================
+
+Phase 1: Copy Trait Definitions to llmspell-core
+  [ ] Create llmspell-core/src/storage/backend.rs with StorageBackend + types
+  [ ] Create llmspell-core/src/storage/vector.rs with VectorStorage + HNSWStorage
+  [ ] Create llmspell-core/src/graph/trait.rs with KnowledgeGraph
+  [ ] Create llmspell-core/src/graph/types.rs with Entity, Relationship, TemporalQuery
+  [ ] Create llmspell-core/src/memory/procedural.rs with ProceduralMemory + Pattern
+  [ ] Create llmspell-core/src/storage/mod.rs with re-exports
+  [ ] Create llmspell-core/src/graph/mod.rs with re-exports
+  [ ] Create llmspell-core/src/memory/mod.rs with re-exports
+
+Phase 2: Update Source Crates
+  [ ] Remove trait definitions from llmspell-storage/src/traits.rs
+  [ ] Remove trait definitions from llmspell-storage/src/vector_storage.rs
+  [ ] Remove types from llmspell-graph/src/types.rs (only Entity, Relationship, TemporalQuery)
+  [ ] Remove trait from llmspell-graph/src/traits/knowledge_graph.rs
+  [ ] Remove Pattern struct from llmspell-memory/src/traits/procedural.rs
+  [ ] Remove trait from llmspell-memory/src/traits/procedural.rs
+
+Phase 3: Update Imports
+  [ ] Add import to llmspell-storage/src/lib.rs
+  [ ] Add import to llmspell-graph/src/lib.rs
+  [ ] Add import to llmspell-memory/src/lib.rs
+  [ ] Update all internal usages in llmspell-storage
+  [ ] Update all internal usages in llmspell-graph
+  [ ] Update all internal usages in llmspell-memory
+
+Phase 4: Update Cargo.toml
+  [ ] Add llmspell-core to llmspell-storage/Cargo.toml
+  [ ] Add llmspell-core to llmspell-graph/Cargo.toml
+  [ ] Add llmspell-core to llmspell-memory/Cargo.toml
+  [ ] Add chrono, uuid to llmspell-core/Cargo.toml if needed
+  [ ] Verify no unused dependencies in source crates
+
+Phase 5: Verify
+  [ ] Run: cargo build --all --all-features
+  [ ] Run: cargo test --all --all-features
+  [ ] Run: cargo clippy --all --all-features
+  [ ] Verify re-exports work in all crates
+  [ ] Check for remaining references to removed files
+
+================================================================================
+
+END OF DOCUMENT
+Last updated: November 14, 2025
