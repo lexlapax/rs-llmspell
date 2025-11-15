@@ -34,8 +34,11 @@ pub use backend::{StorageBackendType, StorageCharacteristics};
 // Re-export session types
 pub use session::{SessionData, SessionStatus};
 
-// Re-export vector types (Day 3)
-// pub use vector::{VectorEntry, VectorQuery, VectorResult, DistanceMetric, ScoringMethod};
+// Re-export vector types
+pub use vector::{
+    DistanceMetric, HNSWConfig, NamespaceStats, ScopedStats, StorageStats, VectorEntry,
+    VectorQuery, VectorResult,
+};
 
 // Re-export workflow types
 pub use workflow::{WorkflowState, WorkflowStatus};

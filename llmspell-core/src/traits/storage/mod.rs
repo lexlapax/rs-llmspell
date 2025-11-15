@@ -30,5 +30,5 @@ pub use backend::StorageBackend;
 // pub use graph::KnowledgeGraph;
 // pub use procedural::ProceduralMemory;
 pub use session::SessionStorage;
-// pub use vector::{HNSWStorage, VectorStorage};
+pub use vector::{HNSWStorage, VectorStorage};
 pub use workflow::WorkflowStateStorage;
