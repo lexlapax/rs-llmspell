@@ -4641,459 +4641,742 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 ---
 
 
-## Phase 13c.3: Clean up, centralized trait refactoring and alignment of Postgresql and Sqlite implementations
+## Phase 13c.3: Centralized Trait Refactoring & PostgreSQL/SQLite Data Portability
+
+**Total Duration**: 30 days (~6 weeks)
+**Breaking Changes**: ACCEPTED (pre-1.0 clean architecture)
+**Reference**: PHASE-13C3-CLEAN-REFACTOR-PLAN.md
 
 ---
 
-### Task 13c.3.0:
-
----
-
-### Task 13c.3.1:
-
----
-
-### Task 13c.3.2: PostgreSQL/SQLite Schema Compatibility & Data Portability ⏹ PENDING
-**Priority**: HIGH
-**Estimated Time**: 8 hours (Days 17-18)
+### Task 13c.3.0: Foundation - Trait Migration to llmspell-core ⏹ PENDING
+**Priority**: CRITICAL - BLOCKING (all other 13c.3 tasks depend on this)
+**Estimated Time**: 3 days (Days 1-3)
 **Assignee**: Storage Architecture Team
 **Status**: ⏹ PENDING
-**Dependencies**: Tasks 13c.2.3, 13c.2.4, 13c.2.5, 13c.2.6, 13c.2.7 ✅
+**Dependencies**: Tasks 13c.2.7 ✅ (all Phase 13c.2 storage implementations complete)
 
-**Description**: Ensure schema compatibility and bidirectional data migration between PostgreSQL and SQLite backends. Users start with SQLite (local/dev) → grow to PostgreSQL (production multi-tenant) OR downgrade PostgreSQL → SQLite (edge/offline). Migration reorganization already done in 13c.2.1, this task focuses on export/import tools and type conversion.
+**Description**: Move all storage trait definitions and domain types from scattered crates (llmspell-storage, llmspell-graph, llmspell-memory) to `llmspell-core` as the single source of truth. This is the foundation for the entire Phase 13c.3 refactor - no other tasks can proceed until traits are centralized.
 
 **Strategic Rationale**:
-- **Growth Path**: SQLite (local dev, zero infrastructure) → PostgreSQL (production, horizontal scale, multi-writer)
-- **Edge Path**: PostgreSQL (cloud production) → SQLite (offline deployments, edge computing, single-user)
-- **Schema Parity**: Same table/column names, compatible types, bidirectional data export/import
-- **Pre-1.0 Opportunity**: Refactor migrations now before 1.0 locks schema design
+- **Single Source of Truth**: All storage traits in `llmspell-core/src/traits/storage/`
+- **Zero Circular Dependencies**: llmspell-core has NO internal dependencies
+- **100% Backend Parity**: Both PostgreSQL and SQLite implement identical trait sets
+- **Foundation Layer**: Enables runtime injection pattern and export/import tool
 
 **Acceptance Criteria**:
-- [ ] Migration scripts reorganized: `migrations/postgres/` (15 files) + `migrations/sqlite/` (15 equivalent files)
-- [ ] Schema compatibility matrix documented (type mappings: VECTOR → vectorlite, TIMESTAMPTZ → INTEGER, JSONB → TEXT)
-- [ ] Bidirectional export/import tool: `llmspell storage export/import` (PostgreSQL ↔ JSON ↔ SQLite)
-- [ ] Type conversion layer in backend implementations (UUID TEXT/BLOB, timestamps unix/ISO8601)
-- [ ] Tenant isolation compatibility (PostgreSQL RLS → SQLite session variables)
-- [ ] Full data roundtrip test: PostgreSQL → JSON → SQLite → JSON → PostgreSQL (zero data loss)
-- [ ] 15 SQLite migration scripts match PostgreSQL structure (V1-V15 equivalents)
+- [ ] llmspell-core compiles in isolation with zero external dependencies
+- [ ] 4 traits migrated to `llmspell-core/src/traits/storage/`:
+  - [ ] StorageBackend (from llmspell-storage)
+  - [ ] VectorStorage (from llmspell-storage)
+  - [ ] KnowledgeGraph (from llmspell-graph)
+  - [ ] ProceduralMemory (from llmspell-memory)
+- [ ] All domain types migrated to `llmspell-core/src/types/storage/`:
+  - [ ] VectorEntry, VectorQuery, VectorResult, DistanceMetric (from llmspell-storage)
+  - [ ] Entity, Relationship, TemporalQuery (from llmspell-graph)
+  - [ ] Pattern (from llmspell-memory)
+  - [ ] StorageBackendType, StorageCharacteristics (from llmspell-storage)
+- [ ] All trait method signatures preserved exactly (no breaking changes to methods)
+- [ ] All doc comments and examples migrated
+- [ ] Comprehensive rustdoc with usage examples for each trait
+- [ ] Zero clippy warnings: `cargo clippy -p llmspell-core -- -D warnings`
 
-**Implementation Steps**:
+**Implementation Steps** (Days 1-3):
 
-1. **Analyze PostgreSQL migrations for SQLite compatibility**:
-   ```bash
-   # Inventory PostgreSQL-specific features
-   rg "VECTOR\(|TIMESTAMPTZ|JSONB|GIST|GIN|ROW LEVEL SECURITY|tstzrange|OID|bytea" \
-     llmspell-storage/migrations/*.sql
+- [ ] **Day 1: Create trait infrastructure in llmspell-core**
+  - [ ] Create directory structure:
+    ```bash
+    mkdir -p llmspell-core/src/traits/storage
+    mkdir -p llmspell-core/src/types/storage
+    ```
+  - [ ] Create `llmspell-core/src/traits/storage/mod.rs` with exports
+  - [ ] Create `llmspell-core/src/types/storage/mod.rs` with exports
+  - [ ] Update `llmspell-core/src/traits/mod.rs` to include storage module
+  - [ ] Update `llmspell-core/src/types/mod.rs` to include storage module
+  - [ ] Update `llmspell-core/src/lib.rs` to export storage traits/types
+  - [ ] **Validation**: `cargo check -p llmspell-core` (must compile)
 
-   # Key findings:
-   # - VECTOR(n): 4 dimensions (384, 768, 1536, 3072) - V3
-   # - Bi-temporal graph: tstzrange, GiST indexes - V4
-   # - JSONB: agent_state, sessions, metadata - V6, V9, V10
-   # - RLS policies: all tables - V1-V15
-   # - Large Objects: OID for artifacts >=1MB - V10
-   # - Triggers/Functions: PL/pgSQL - V6, V9
-   ```
+- [ ] **Day 2: Migrate traits with full documentation**
+  - [ ] Migrate StorageBackend trait (~120 lines):
+    - [ ] Copy from `llmspell-storage/src/traits.rs` to `llmspell-core/src/traits/storage/backend.rs`
+    - [ ] Preserve all 13 methods: get, set, delete, exists, list_keys, get_batch, set_batch, delete_batch, clear, backend_type, characteristics, run_migrations, migration_version
+    - [ ] Preserve all doc comments and usage examples
+    - [ ] Add `#[async_trait]` attribute
+  - [ ] Migrate VectorStorage trait (~350 lines):
+    - [ ] Copy from `llmspell-storage/src/vector_storage.rs` to `llmspell-core/src/traits/storage/vector.rs`
+    - [ ] Preserve all 10 methods: insert, search, get, delete, update_metadata, stats_for_scope, delete_scope, clear, count, list
+    - [ ] Migrate helper types: VectorEntry, VectorQuery, VectorResult, DistanceMetric, ScoringMethod
+  - [ ] Migrate KnowledgeGraph trait (~250 lines):
+    - [ ] Copy from `llmspell-graph/src/traits/knowledge_graph.rs` to `llmspell-core/src/traits/storage/graph.rs`
+    - [ ] Preserve all 10 methods: add_entity, update_entity, get_entity, get_entity_at, add_relationship, get_related, get_relationships, query_temporal, traverse, delete_before
+    - [ ] Migrate types: Entity, Relationship, TemporalQuery
+  - [ ] Migrate ProceduralMemory trait (~150 lines):
+    - [ ] Copy from `llmspell-memory/src/traits/procedural.rs` to `llmspell-core/src/traits/storage/procedural.rs`
+    - [ ] Preserve all 5 methods: record_transition, get_pattern_frequency, get_learned_patterns, get_pattern, store_pattern
+    - [ ] Migrate types: Pattern
+  - [ ] **Validation**: `cargo check -p llmspell-core` (no errors)
 
-2. **Create schema compatibility matrix** (add to implementation section):
-   ```markdown
-   | Feature              | PostgreSQL (V1-V15)           | SQLite Equivalent        | Compatible? | Notes |
-   |----------------------|-------------------------------|--------------------------|-------------|-------|
-   | **Vector Storage**   | VECTOR(n) + VectorChord HNSW  | vectorlite REAL[] + HNSW | ✅ YES      | Different extension, same API |
-   | **UUID Type**        | UUID + uuid_generate_v4()     | TEXT (36 chars)          | ✅ YES      | Store as hyphenated string |
-   | **Timestamps**       | TIMESTAMPTZ                   | INTEGER (Unix epoch)     | ✅ YES      | Convert to/from i64 |
-   | **JSON Data**        | JSONB                         | TEXT (JSON functions)    | ✅ YES      | SQLite json1 extension |
-   | **Binary Data**      | BYTEA                         | BLOB                     | ✅ YES      | Direct mapping |
-   | **Large Objects**    | OID (Large Objects)           | BLOB (inline)            | ⚠️ PARTIAL  | SQLite: no 1MB threshold, all BLOB |
-   | **Indexes (Vector)** | HNSW (VectorChord)            | HNSW (vectorlite)        | ✅ YES      | Same algorithm, different impl |
-   | **Indexes (JSON)**   | GIN (JSONB)                   | B-tree (json_extract)    | ⚠️ PARTIAL  | Different performance |
-   | **Indexes (Temporal)**| GiST (tstzrange)             | B-tree (start, end cols) | ⚠️ PARTIAL  | No range types in SQLite |
-   | **RLS (Multi-tenant)**| Row-Level Security policies   | Session variables + WHERE| ⚠️ PARTIAL  | Manual filtering required |
-   | **Bi-temporal**      | tstzrange(start, end)         | Two INTEGER columns      | ✅ YES      | Convert range → start/end |
-   | **Triggers**         | PL/pgSQL functions            | SQLite triggers          | ✅ YES      | Similar syntax |
-   | **Foreign Keys**     | ON DELETE CASCADE             | ON DELETE CASCADE        | ✅ YES      | Must enable PRAGMA |
-   | **Full-text Search** | tsvector + GIN                | FTS5 extension           | ⚠️ PARTIAL  | Different syntax/capabilities |
-   ```
+- [ ] **Day 3: Migrate domain types and finalize**
+  - [ ] Create `llmspell-core/src/types/storage/backend.rs`:
+    - [ ] StorageBackendType enum
+    - [ ] StorageCharacteristics struct
+  - [ ] Create `llmspell-core/src/types/storage/vector.rs`:
+    - [ ] VectorEntry struct (~50 lines)
+    - [ ] VectorQuery struct (~30 lines)
+    - [ ] VectorResult struct (~20 lines)
+    - [ ] DistanceMetric enum
+    - [ ] ScoringMethod enum
+  - [ ] Create `llmspell-core/src/types/storage/graph.rs`:
+    - [ ] Entity struct (~40 lines)
+    - [ ] Relationship struct (~30 lines)
+    - [ ] TemporalQuery struct (~25 lines)
+  - [ ] Create `llmspell-core/src/types/storage/procedural.rs`:
+    - [ ] Pattern struct (~20 lines)
+  - [ ] Update all re-exports in mod.rs files
+  - [ ] Run comprehensive validation:
+    ```bash
+    cargo check -p llmspell-core
+    cargo clippy -p llmspell-core -- -D warnings
+    cargo doc -p llmspell-core --no-deps
+    ```
+  - [ ] Verify zero dependencies:
+    ```bash
+    cargo tree -p llmspell-core | grep -E "llmspell-(storage|graph|memory)"
+    # Should show ZERO matches
+    ```
+  - [ ] **BLOCKER**: Do NOT proceed to Task 13c.3.1 until this validation passes
 
-3. **Reorganize migrations directory**:
-   ```bash
-   # Create backend-specific directories
-   mkdir -p llmspell-storage/migrations/postgres
-   mkdir -p llmspell-storage/migrations/sqlite
+**Estimated LOC**: ~3,500 lines (870 trait definitions + 2,500 domain types + 130 module infrastructure)
 
-   # Move existing PostgreSQL migrations
-   mv llmspell-storage/migrations/V*.sql llmspell-storage/migrations/postgres/
+---
 
-   # Update migration runner to support backend-specific paths:
-   # - PostgresBackend loads from migrations/postgres/
-   # - SqliteBackend loads from migrations/sqlite/
-   ```
+### Task 13c.3.1: Trait Refactoring Execution (Weeks 1-6) ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 19 days (Days 4-22)
+**Assignee**: Storage Architecture Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.3.0 ✅ MUST BE COMPLETE (traits in llmspell-core)
 
-4. **Create SQLite migration V1** (initial setup):
-   ```sql
-   -- migrations/sqlite/V1__initial_setup.sql
-   PRAGMA foreign_keys = ON;
-   PRAGMA journal_mode = WAL;
+**Description**: Update all 11 crates using storage traits to import from llmspell-core, remove old trait definitions, update 22 backend implementation files, 77 test files, and 48 documentation files. Clean architecture with zero re-exports.
 
-   -- No schema support in SQLite (tables are global)
-   -- No UUID extension (use TEXT or BLOB)
+**Strategic Rationale**:
+- **Breaking Changes OK**: Pre-1.0, clean slate for v0.14.0
+- **11 Crates Updated**: storage, kernel, bridge, memory, rag, tenancy, agents, events, hooks, graph, context
+- **100% Trait Parity**: Both PostgreSQL and SQLite backends implement identical traits (11 files each)
 
-   -- Create version tracking table
-   CREATE TABLE IF NOT EXISTS _migrations (
-       version INTEGER PRIMARY KEY,
-       name TEXT NOT NULL,
-       applied_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-   );
-   ```
+**Acceptance Criteria**:
+- [ ] All 11 crates compile successfully with new imports
+- [ ] Zero old trait definitions remain (deleted from llmspell-storage, llmspell-graph, llmspell-memory)
+- [ ] 22 backend files updated (11 PostgreSQL + 11 SQLite):
+  - [ ] backend.rs, vector.rs, graph.rs, procedural.rs, agent_state.rs, kv_store.rs
+  - [ ] workflow_state.rs, session.rs, artifact.rs, event_log.rs, hook_history.rs
+- [ ] 149+ tests passing across workspace
+- [ ] Zero clippy warnings: `cargo clippy --workspace --all-targets -- -D warnings`
+- [ ] All documentation builds: `cargo doc --workspace --no-deps --all-features`
+- [ ] Performance maintained: <5% variance from baseline benchmarks
 
-5. **Create SQLite migration V3** (vector embeddings - equivalent to postgres V3):
-   ```sql
-   -- migrations/sqlite/V3__vector_embeddings.sql
-   -- Load vectorlite extension
-   -- .load /path/to/vectorlite.so (handled by SqliteBackend connection setup)
+**Implementation Steps** (Weeks 1-6):
 
-   CREATE TABLE IF NOT EXISTS vector_embeddings_384 (
-       id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),  -- UUID as TEXT
-       tenant_id TEXT NOT NULL,
-       scope TEXT NOT NULL,
-       embedding BLOB NOT NULL,  -- vectorlite stores as BLOB
-       metadata TEXT NOT NULL DEFAULT '{}',  -- JSON as TEXT
-       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),  -- Unix timestamp
-       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-   );
+#### Week 1: Foundation (Days 4-6)
 
-   -- B-tree indexes
-   CREATE INDEX IF NOT EXISTS idx_vector_384_tenant ON vector_embeddings_384(tenant_id);
-   CREATE INDEX IF NOT EXISTS idx_vector_384_scope ON vector_embeddings_384(scope);
-   CREATE INDEX IF NOT EXISTS idx_vector_384_created ON vector_embeddings_384(created_at);
+- [ ] **Day 4: Update llmspell-storage backends (22 files)**
+  - [ ] PostgreSQL backend (11 files):
+    - [ ] `backends/postgres/backend.rs`: `use llmspell_core::traits::storage::StorageBackend`
+    - [ ] `backends/postgres/vector.rs`: `use llmspell_core::traits::storage::VectorStorage`
+    - [ ] `backends/postgres/graph.rs`: `use llmspell_core::traits::storage::KnowledgeGraph`
+    - [ ] `backends/postgres/procedural.rs`: `use llmspell_core::traits::storage::ProceduralMemory`
+    - [ ] `backends/postgres/agent_state.rs`: Update imports
+    - [ ] `backends/postgres/kv_store.rs`: Update imports
+    - [ ] `backends/postgres/workflow_state.rs`: Already correct (skip)
+    - [ ] `backends/postgres/session.rs`: Already correct (skip)
+    - [ ] `backends/postgres/artifact.rs`: Already correct (skip)
+    - [ ] `backends/postgres/event_log.rs`: Update imports
+    - [ ] `backends/postgres/hook_history.rs`: Update imports
+  - [ ] SQLite backend (11 files) - same pattern as PostgreSQL
+  - [ ] Delete old trait files:
+    - [ ] Delete `src/traits.rs` (StorageBackend moved to core)
+    - [ ] Delete `src/vector_storage.rs` (VectorStorage moved to core)
+  - [ ] Update `src/lib.rs`: Remove trait re-exports, keep backend module exports only
+  - [ ] **Validation**: `cargo check -p llmspell-storage && cargo test -p llmspell-storage`
 
-   -- vectorlite HNSW index (cosine distance, m=16, ef_construction=64)
-   SELECT vectorlite_create_index('vector_embeddings_384', 'embedding', 384, 'cosine', 16, 64);
+- [ ] **Day 5: Update llmspell-graph**
+  - [ ] Update `src/backends/*.rs` imports (if any graph backend implementations exist)
+  - [ ] Delete `src/traits/knowledge_graph.rs` (moved to llmspell-core)
+  - [ ] Update `src/lib.rs`: Remove KnowledgeGraph re-export
+  - [ ] Keep graph extraction logic and domain-specific code
+  - [ ] **Validation**: `cargo check -p llmspell-graph && cargo test -p llmspell-graph`
 
-   -- Repeat for 768, 1536, 3072 dimensions...
-   ```
+- [ ] **Day 6: Update llmspell-memory trait structure**
+  - [ ] Delete `src/traits/procedural.rs` (ProceduralMemory moved to llmspell-core)
+  - [ ] Keep domain traits (EpisodicMemory, SemanticMemory stay in llmspell-memory)
+  - [ ] Update imports in domain trait implementations
+  - [ ] **Validation**: `cargo check -p llmspell-memory`
 
-6. **Create SQLite migration V4** (bi-temporal graph - equivalent to postgres V4):
-   ```sql
-   -- migrations/sqlite/V4__temporal_graph.sql
-   CREATE TABLE IF NOT EXISTS entities (
-       entity_id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-       tenant_id TEXT NOT NULL,
-       entity_type TEXT NOT NULL,
-       name TEXT NOT NULL,
-       properties TEXT NOT NULL DEFAULT '{}',  -- JSON as TEXT
+#### Week 2: Critical Crates (Days 7-11)
 
-       -- Bi-temporal: separate start/end columns (no tstzrange)
-       valid_time_start INTEGER NOT NULL,
-       valid_time_end INTEGER NOT NULL DEFAULT 9999999999,  -- "infinity" as max timestamp
-       transaction_time_start INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-       transaction_time_end INTEGER NOT NULL DEFAULT 9999999999,
+- [ ] **Day 7: llmspell-kernel (12 files)**
+  - [ ] Update `src/state/manager.rs`: Import StorageBackend from core
+  - [ ] Update `src/state/backend_adapter.rs`: Update trait imports
+  - [ ] **DELETE** `src/state/vector_storage.rs` (duplicate of llmspell-storage version!)
+  - [ ] Update 9 other kernel files with storage trait usage
+  - [ ] **Validation**: `cargo check -p llmspell-kernel && cargo test -p llmspell-kernel`
 
-       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+- [ ] **Day 8-9: llmspell-bridge (9+ files) - CRITICAL PATH**
+  - [ ] Update `src/infrastructure.rs`:
+    - [ ] Change: `use llmspell_storage::backends::sqlite::{...}` (backends stay)
+    - [ ] Add: `use llmspell_core::traits::storage::VectorStorage`
+  - [ ] Update `src/rag_bridge.rs`:
+    - [ ] Change: `use llmspell_core::traits::storage::VectorStorage`
+    - [ ] Change: `use llmspell_core::types::storage::{VectorEntry, VectorResult}`
+  - [ ] Update `src/memory_bridge.rs`: Indirect via MemoryManager (verify only)
+  - [ ] Update `src/context_bridge.rs`: Via MemoryManager
+  - [ ] Update `src/state_adapter.rs`: StorageBackend import
+  - [ ] Update `src/artifact_bridge.rs`: ArtifactStorage import
+  - [ ] Update `src/globals/rag_infrastructure.rs`: VectorStorage import
+  - [ ] Update `src/globals/state_infrastructure.rs`: StorageBackend import
+  - [ ] Update `src/globals/session_infrastructure.rs`: StorageBackend import
+  - [ ] **Validation**: `cargo check -p llmspell-bridge && cargo test -p llmspell-bridge`
+  - [ ] Run integration tests (Lua/JS script examples)
 
-       CHECK (valid_time_start < valid_time_end),
-       CHECK (transaction_time_start < transaction_time_end)
-   );
+- [ ] **Day 10-11: llmspell-memory (15 files)**
+  - [ ] Update `src/manager.rs`: Verify EpisodicMemory/SemanticMemory wrappers
+  - [ ] Update `src/episodic/sqlite_backend.rs`: VectorStorage from core
+  - [ ] Update `src/consolidation/validator.rs`: KnowledgeGraph from core
+  - [ ] Update `src/consolidation/llm_engine.rs`: KnowledgeGraph from core
+  - [ ] Update `src/semantic.rs`: KnowledgeGraph from core
+  - [ ] Update 10 more files with storage trait dependencies
+  - [ ] **Validation**: `cargo check -p llmspell-memory && cargo test -p llmspell-memory`
 
-   CREATE INDEX IF NOT EXISTS idx_entities_tenant ON entities(tenant_id);
-   CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);
-   CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
+#### Week 3: Domain Crates (Days 12-14)
 
-   -- B-tree indexes for temporal queries (no GiST)
-   CREATE INDEX IF NOT EXISTS idx_entities_valid_time ON entities(valid_time_start, valid_time_end);
-   CREATE INDEX IF NOT EXISTS idx_entities_tx_time ON entities(transaction_time_start, transaction_time_end);
+- [ ] **Day 12: llmspell-rag (8 files)**
+  - [ ] Update `src/traits/hybrid.rs`: `pub trait HybridStorage: VectorStorage` (trait inheritance)
+    - [ ] Change: `use llmspell_core::traits::storage::VectorStorage`
+  - [ ] Update `src/pipeline/rag_pipeline.rs`: `Arc<dyn VectorStorage>` import
+  - [ ] Update `src/pipeline/retrieval_flow.rs`: Same pattern
+  - [ ] Update `src/pipeline/builder.rs`: VectorStorage import
+  - [ ] Update `src/pipeline/ingestion.rs`: VectorStorage import
+  - [ ] Update `src/state_integration.rs`: StateAwareVectorStorage wrapper
+  - [ ] Update `src/session_integration.rs`: Session-scoped RAG
+  - [ ] Update 4 test files: SqliteBackend, SqliteVectorStorage creation
+  - [ ] **Validation**: `cargo check -p llmspell-rag && cargo test -p llmspell-rag`
 
-   -- JSON index using json_extract
-   CREATE INDEX IF NOT EXISTS idx_entities_properties_json ON entities(json_extract(properties, '$.type'));
+- [ ] **Day 13: llmspell-tenancy (3 files) + llmspell-agents (2 files)**
+  - [ ] llmspell-tenancy:
+    - [ ] Update `src/manager.rs`: MultiTenantVectorManager implements VectorStorage
+      - [ ] Change: `use llmspell_core::traits::storage::VectorStorage`
+    - [ ] Update 3 test files: Backend creation
+    - [ ] **Validation**: `cargo check -p llmspell-tenancy && cargo test -p llmspell-tenancy`
+  - [ ] llmspell-agents:
+    - [ ] Update `src/registry/persistence.rs`: PersistentAgentRegistry uses StorageBackend
+    - [ ] Update test files
+    - [ ] **Validation**: `cargo check -p llmspell-agents && cargo test -p llmspell-agents`
 
-   -- Relationships table (similar pattern)...
-   ```
+- [ ] **Day 14: llmspell-events (3 files) + llmspell-hooks (1 file) + others**
+  - [ ] llmspell-events:
+    - [ ] Update `src/storage_adapter.rs`: EventStorageAdapter<B: StorageBackend>
+    - [ ] **Validation**: `cargo check -p llmspell-events && cargo test -p llmspell-events`
+  - [ ] llmspell-hooks:
+    - [ ] Update hook persistence: HookReplayManager uses StorageBackend
+    - [ ] **Validation**: `cargo check -p llmspell-hooks && cargo test -p llmspell-hooks`
+  - [ ] llmspell-context (3 files - indirect):
+    - [ ] Verify compilation (no direct storage trait usage)
+    - [ ] **Validation**: `cargo check -p llmspell-context && cargo test -p llmspell-context`
+  - [ ] llmspell-templates (2 files):
+    - [ ] Verify via MemoryManager (indirect)
+    - [ ] **Validation**: `cargo check -p llmspell-templates`
+  - [ ] llmspell-testing (1 file):
+    - [ ] Create TestStorageFactory helper (NEW)
+    - [ ] **Validation**: `cargo check -p llmspell-testing`
+  - [ ] **Critical Validation**: `cargo check --workspace --all-features`
 
-7. **Implement bidirectional export/import tool** (llmspell-cli/src/commands/storage.rs):
-   ```rust
-   // Export PostgreSQL → JSON
-   pub async fn export_postgres_to_json(output_path: &Path) -> Result<()> {
-       let pg_storage = PostgresBackend::connect(config).await?;
-       let mut export = StorageExport::new();
+#### Week 4: Test Infrastructure (Days 15-18)
 
-       // Export vector embeddings (4 dimensions)
-       for dim in [384, 768, 1536, 3072] {
-           let vectors = pg_storage.query_all_vectors(dim).await?;
-           export.add_vectors(dim, vectors);
-       }
-
-       // Export entities + relationships (graph)
-       let entities = pg_storage.query_all_entities().await?;
-       let relationships = pg_storage.query_all_relationships().await?;
-       export.add_graph(entities, relationships);
-
-       // Export agent states, sessions, artifacts...
-       // ...
-
-       // Serialize to JSON with type conversions
-       let json = serde_json::to_string_pretty(&export)?;
-       fs::write(output_path, json)?;
-       Ok(())
-   }
-
-   // Import JSON → SQLite
-   pub async fn import_json_to_sqlite(input_path: &Path) -> Result<()> {
-       let export: StorageExport = serde_json::from_str(&fs::read_to_string(input_path)?)?;
-       let sqlite_storage = SqliteBackend::connect(config).await?;
-
-       // Import vectors with type conversion
-       for (dim, vectors) in export.vectors {
-           for v in vectors {
-               let converted = VectorEntry {
-                   id: v.id.to_string(),  // UUID → TEXT
-                   created_at: v.created_at.timestamp(),  // TIMESTAMPTZ → INTEGER
-                   // ...
-               };
-               sqlite_storage.insert_vector(dim, converted).await?;
-           }
-       }
-
-       // Import graph, agent states, sessions...
-       // ...
-
-       Ok(())
-   }
-   ```
-
-8. **Create data roundtrip integration test**:
-   ```rust
-   #[tokio::test]
-   async fn test_postgres_sqlite_data_portability() {
-       // 1. Start with PostgreSQL
-       let pg = PostgresBackend::connect(/* ... */).await.unwrap();
-       pg.insert_vector_384(test_vector.clone()).await.unwrap();
-       pg.insert_entity(test_entity.clone()).await.unwrap();
-
-       // 2. Export PostgreSQL → JSON
-       export_postgres_to_json("./test_export.json").await.unwrap();
-
-       // 3. Import JSON → SQLite
-       import_json_to_sqlite("./test_export.json").await.unwrap();
-
-       // 4. Verify SQLite data
-       let sqlite = SqliteBackend::connect(/* ... */).await.unwrap();
-       let vectors = sqlite.search_vectors_384(query).await.unwrap();
-       assert_eq!(vectors[0].id, test_vector.id.to_string());
-
-       // 5. Export SQLite → JSON
-       export_sqlite_to_json("./test_export_sqlite.json").await.unwrap();
-
-       // 6. Re-import JSON → PostgreSQL (new instance)
-       let pg2 = PostgresBackend::connect_fresh(/* ... */).await.unwrap();
-       import_json_to_postgres("./test_export_sqlite.json").await.unwrap();
-
-       // 7. Verify roundtrip (PostgreSQL → SQLite → PostgreSQL = identical)
-       let final_vector = pg2.get_vector_384(&test_vector.id).await.unwrap();
-       assert_eq!(final_vector, test_vector);  // Zero data loss
-   }
-   ```
-
-9. **Update backend implementations for type compatibility**:
-   ```rust
-   // llmspell-storage/src/backends/sqlite/types.rs
-   pub struct SqliteVectorEntry {
-       pub id: String,  // UUID as TEXT
-       pub tenant_id: String,
-       pub scope: String,
-       pub embedding: Vec<f32>,  // vectorlite serializes to BLOB
-       pub metadata: String,  // JSON as TEXT
-       pub created_at: i64,  // Unix timestamp
-       pub updated_at: i64,
-   }
-
-   impl From<PostgresVectorEntry> for SqliteVectorEntry {
-       fn from(pg: PostgresVectorEntry) -> Self {
-           Self {
-               id: pg.id.to_string(),  // UUID → TEXT
-               tenant_id: pg.tenant_id,
-               scope: pg.scope,
-               embedding: pg.embedding,
-               metadata: serde_json::to_string(&pg.metadata).unwrap(),  // JSONB → TEXT
-               created_at: pg.created_at.timestamp(),  // TIMESTAMPTZ → INTEGER
-               updated_at: pg.updated_at.timestamp(),
-           }
-       }
-   }
-   ```
-
-10. **Update migration runner** (llmspell-storage/src/backends/migrations.rs):
+- [ ] **Day 15: Create TestStorageFactory in llmspell-testing**
+  - [ ] Create `llmspell-testing/src/storage.rs` (NEW ~200 lines):
     ```rust
-    pub struct MigrationRunner {
-        backend_type: StorageBackendType,
-    }
+    use llmspell_core::traits::storage::{StorageBackend, VectorStorage};
+    use llmspell_storage::backends::memory::MemoryBackend;
+    use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 
-    impl MigrationRunner {
-        pub fn migrations_dir(&self) -> &str {
-            match self.backend_type {
-                StorageBackendType::PostgreSQL => "migrations/postgres",
-                StorageBackendType::SQLite => "migrations/sqlite",
-                _ => panic!("No migrations for this backend"),
-            }
-        }
+    pub struct TestStorageFactory;
 
-        pub async fn run_migrations(&self) -> Result<()> {
-            let dir = self.migrations_dir();
-            let migration_files = glob(&format!("{}/*.sql", dir))?;
-
-            for file in migration_files {
-                self.execute_migration_file(file).await?;
-            }
-            Ok(())
-        }
+    impl TestStorageFactory {
+        pub fn memory_backend() -> Arc<dyn StorageBackend> { /* ... */ }
+        pub async fn temp_sqlite_backend() -> Arc<SqliteBackend> { /* ... */ }
+        pub async fn temp_vector_storage(dimension: usize) -> Arc<dyn VectorStorage> { /* ... */ }
     }
     ```
+  - [ ] **Validation**: `cargo check -p llmspell-testing`
 
-**Definition of Done**:
-- [ ] Migration directory reorganized: `migrations/postgres/` (15 existing files) + `migrations/sqlite/` (15 new equivalents)
-- [ ] Schema compatibility matrix documented in sqlite-storage-architecture.md
-- [ ] Type conversion layer implemented in SqliteBackend (UUID TEXT, timestamps i64, JSON TEXT)
-- [ ] Bidirectional export/import CLI: `llmspell storage export/import --backend postgres|sqlite --format json`
-- [ ] Tenant isolation compatibility: PostgreSQL RLS vs SQLite session variables (both tested)
-- [ ] Full data roundtrip test passing (PostgreSQL → JSON → SQLite → JSON → PostgreSQL = identical)
-- [ ] All 15 SQLite migrations match PostgreSQL structure (V1-V15)
-- [ ] Migration runner updated to support backend-specific directories
-- [ ] Zero data loss validated across 10 storage components (vectors, graph, state, sessions, artifacts)
+- [ ] **Day 16: Update llmspell-storage tests (38 files!)**
+  - [ ] Update imports in 20 PostgreSQL test files:
+    - [ ] `tests/postgres_vector_tests.rs`: Update VectorStorage, VectorEntry imports
+    - [ ] `tests/postgres_knowledge_graph_tests.rs`: Update KnowledgeGraph, Entity imports
+    - [ ] 18 more files...
+  - [ ] Update imports in 15 SQLite test files:
+    - [ ] `tests/sqlite_vector_tests.rs`: Same pattern
+    - [ ] `tests/sqlite_workflow_state_tests.rs`: Already correct (skip)
+    - [ ] 13 more files...
+  - [ ] Update 3 other test files
+  - [ ] **Validation**: `cargo test -p llmspell-storage` (all tests passing)
 
-**Files to Create/Modify**:
-- `llmspell-storage/migrations/postgres/` (MOVE - existing 15 files)
-- `llmspell-storage/migrations/sqlite/V1__initial_setup.sql` through `V15__bitemporal_composite_keys.sql` (NEW - 15 files)
-- `llmspell-storage/src/backends/migrations.rs` (UPDATE - backend-aware directory loading)
-- `llmspell-storage/src/backends/sqlite/types.rs` (NEW - type conversion)
-- `llmspell-cli/src/commands/storage.rs` (UPDATE - add export/import subcommands)
-- `llmspell-storage/tests/data_portability.rs` (NEW - roundtrip test)
-- `docs/technical/sqlite-storage-architecture.md` (UPDATE - add compatibility matrix section)
+- [ ] **Day 17: Update llmspell-bridge tests (12 files)**
+  - [ ] Update integration test imports (RAG, memory, state)
+  - [ ] Use TestStorageFactory where appropriate
+  - [ ] **Validation**: `cargo test -p llmspell-bridge`
+
+- [ ] **Day 18: Update remaining test files (27 files)**
+  - [ ] llmspell-memory tests (10 files): Update imports
+  - [ ] llmspell-rag tests (5 files): Update imports
+  - [ ] llmspell-tenancy tests (4 files): Use TestStorageFactory
+  - [ ] Other crate tests (8 files): Various imports
+  - [ ] **Critical Validation**: `cargo test --workspace --all-features` (all 149+ tests passing)
+
+#### Week 5: Documentation (Days 19-21)
+
+- [ ] **Day 19: Update technical documentation (15 files, ~30 code examples)**
+  - [ ] `docs/technical/current-architecture.md`:
+    - [ ] Update 10+ code examples with new imports
+    - [ ] Update architecture diagrams showing trait locations
+  - [ ] `docs/technical/master-architecture-vision.md`:
+    - [ ] Update 20+ code examples (CRITICAL - master vision doc)
+  - [ ] `docs/technical/postgresql-guide.md`:
+    - [ ] Update 8+ PostgreSQL backend examples
+  - [ ] `docs/technical/sqlite-vector-storage-architecture.md`:
+    - [ ] Update 12+ SQLite backend examples
+  - [ ] `docs/technical/rag-system-guide.md`:
+    - [ ] Update 6+ RAG examples with VectorStorage imports
+  - [ ] Update 10 other technical docs
+
+- [ ] **Day 20: Update developer guide + crate READMEs (19 files, ~60 code examples)**
+  - [ ] `docs/developer-guide/03-extending-components.md`:
+    - [ ] Update "PART 6: Storage Backend Extension" section
+    - [ ] Show how to implement StorageBackend with new imports
+  - [ ] `docs/developer-guide/reference/storage-backends.md`:
+    - [ ] Complete storage backend reference with new imports
+  - [ ] Update 11 crate README files:
+    - [ ] `llmspell-storage/README.md`: 4 code examples (lines 26-96)
+    - [ ] `llmspell-memory/README.md`: MemoryManager examples
+    - [ ] `llmspell-graph/README.md`: KnowledgeGraph examples
+    - [ ] `llmspell-rag/README.md`: VectorStorage examples
+    - [ ] `llmspell-tenancy/README.md`: MultiTenantVectorManager examples
+    - [ ] 6 other crate READMEs
+
+- [ ] **Day 21: Update rustdoc comments (20+ occurrences)**
+  - [ ] Update doc comment examples in trait definitions (llmspell-core):
+    ```rust
+    /// # Examples
+    /// ```rust
+    /// use llmspell_core::traits::storage::VectorStorage;
+    /// use llmspell_core::types::storage::VectorEntry;
+    /// ```
+    ```
+  - [ ] Update doc comments in backend implementations
+  - [ ] Fix broken doc links across workspace
+  - [ ] **Validation**: `cargo doc --workspace --no-deps --all-features`
+  - [ ] **Validation**: `cargo test --doc --workspace` (all doc tests passing)
+
+#### Week 6: Validation & Polish (Days 22)
+
+- [ ] **Day 22: Comprehensive validation and release prep**
+  - [ ] Run full test suite:
+    ```bash
+    cargo test --workspace --all-features
+    # Verify: 149+ tests passing
+    ```
+  - [ ] Run benchmarks and compare to baseline:
+    ```bash
+    cargo bench --bench memory_operations > refactor.txt
+    cargo bench --bench sqlite_vector_bench > refactor_vector.txt
+    # Compare: <5% variance acceptable
+    ```
+  - [ ] Run all quality gates:
+    ```bash
+    ./scripts/quality/quality-check-minimal.sh  # Format, clippy, compile
+    ./scripts/quality/quality-check-fast.sh     # + unit tests, docs
+    ./scripts/quality/quality-check.sh          # Full validation
+    ```
+  - [ ] Verify zero old imports remain:
+    ```bash
+    rg "use llmspell_storage::(VectorStorage|StorageBackend)" llmspell-*/src/
+    rg "use llmspell_graph::KnowledgeGraph" llmspell-*/src/
+    rg "use llmspell_memory::ProceduralMemory" llmspell-*/src/
+    # Should show ZERO matches
+    ```
+  - [ ] Verify zero clippy warnings:
+    ```bash
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    ```
+  - [ ] Test Lua/JS script examples via bridge layer
+  - [ ] Test CLI commands
+  - [ ] Run E2E tests
+  - [ ] Update CHANGELOG.md for v0.14.0
+  - [ ] Update version in all Cargo.toml files
+  - [ ] Create migration guide for downstream users (if any exist)
+  - [ ] **BLOCKER**: All quality gates must pass before proceeding to Task 13c.3.2
+
+**Estimated LOC Changed**: ~250 files, ~4,700 lines (mostly import updates)
 
 ---
 
-### Task 13c.3.3: Documentation & Validation for 13c.2 and 13c.3 ⏹ PENDING
+### Task 13c.3.2: PostgreSQL/SQLite Export/Import Tool (Days 23-30) ⏹ PENDING
 **Priority**: HIGH
-**Estimated Time**: 8 hours (Days 19-20)
-**Assignee**: Documentation Team
+**Estimated Time**: 8 days (Days 23-30)
+**Assignee**: Storage Architecture Team
 **Status**: ⏹ PENDING
-**Dependencies**: Tasks 13c.2.1-13c.2.11, 13c.3.1-13c.3.2 ✅
+**Dependencies**: Tasks 13c.3.0 ✅ AND 13c.3.1 ✅ (traits in core, all implementations updated)
 
-**Description**: Comprehensive documentation for libsql unified storage integrated into existing documentation structure (user guide, developer guide, technical docs). Focus on usage, architecture, and configuration.
+**Description**: Build `llmspell storage export/import` CLI tool for bidirectional PostgreSQL ↔ SQLite data migration with zero data loss. Enables growth path (SQLite → PostgreSQL) and edge deployment path (PostgreSQL → SQLite).
+
+**Strategic Rationale**:
+- **Growth Path**: SQLite (local dev, zero infrastructure) → PostgreSQL (production, horizontal scale)
+- **Edge Path**: PostgreSQL (cloud) → SQLite (offline, edge, single-user)
+- **100% Lossless**: All PostgreSQL types have lossless SQLite equivalents (Section 3.2 of refactor plan)
+- **11/15 Migrations Supported**: Full bidirectional support for core data (V3-V11, V13)
 
 **Acceptance Criteria**:
-- [ ] User guide updated: storage setup quick start (07-storage-setup.md), configuration reference (03-configuration.md)
-- [ ] Technical docs updated: architecture guide (sqlite-storage-architecture.md), current architecture (current-architecture.md), performance guide, RAG integration
-- [ ] Developer guide updated: storage backend extension patterns (03-extending-components.md)
-- [ ] README-DEVEL.md updated with libsql backend setup instructions
-- [ ] Backup/restore procedures documented (1 file copy vs 4)
-- [ ] Final validation: zero clippy warnings, all tests passing, quality gates met
+- [ ] Bidirectional export/import tool: `llmspell storage export` and `llmspell storage import`
+- [ ] 7 type converters implemented (UUID, Timestamp, JSONB, Vector, Tstzrange, Enum, LargeObject)
+- [ ] All 10 storage components exportable/importable:
+  - [ ] V3: Vector Embeddings (all 4 dimensions: 384, 768, 1536, 3072)
+  - [ ] V4: Temporal Graph (entities + relationships with bi-temporal data)
+  - [ ] V5: Procedural Patterns
+  - [ ] V6: Agent State
+  - [ ] V7: KV Store
+  - [ ] V8: Workflow States
+  - [ ] V9: Sessions
+  - [ ] V10: Artifacts (including large objects)
+  - [ ] V11: Event Log
+  - [ ] V13: Hook History
+- [ ] Tenant isolation preserved across backends
+- [ ] Full data roundtrip test passing: PostgreSQL → JSON → SQLite → JSON → PostgreSQL (zero data loss)
+- [ ] Schema compatibility matrix documented (already in Section 2.3, 3.2, 3.3 of refactor plan)
+- [ ] PostgreSQL-only features handled gracefully:
+  - [ ] V2, V12 (RLS features): Skip with warnings on SQLite export
+  - [ ] V14, V15 (not yet in SQLite): Skip with clear error messages
+- [ ] Performance: Export/import 10K vectors in <10 seconds
 
-**Implementation Steps**:
+**Implementation Steps** (Days 23-30):
 
-1. **Update docs/user-guide/07-storage-setup.md** - Add SQLite quick start section:
-   - Add "Quick Start: SQLite (Embedded)" section after PostgreSQL section
-   - Include: vectorlite installation (brew install vectorlite, build from source)
-   - Include: Basic configuration (backend = "sqlite", connection_string, pool_size)
-   - Include: Verification steps (cargo run -- storage info --backend sqlite)
-   - Include: Performance characteristics table (same as README-DEVEL.md)
-   - Include: 1-file backup procedure (cp ~/.llmspell/storage.db)
-   - Keep it concise (mimic PostgreSQL quick start format)
+#### Type Conversion Infrastructure (Days 23-24)
 
-2. **Update docs/user-guide/03-configuration.md** - Add SQLite configuration reference:
-   - Add [storage.sqlite] section with all config options (pool_size, encryption, wal_mode)
-   - Add [storage.sqlite.vector] section (extension, hnsw_m, hnsw_ef_construction, hnsw_ef_search)
-   - Add [storage.sqlite.graph] section (max_depth)
-   - Add [storage.sqlite.artifact] section (max_artifact_size_mb)
-   - Link to technical/sqlite-storage-architecture.md for deep dive
+- [ ] **Day 23: Create type converter trait and implementations (Part 1)**
+  - [ ] Create `llmspell-storage/src/export_import/mod.rs`:
+    ```rust
+    pub mod converters;
+    pub mod exporter;
+    pub mod importer;
+    pub mod format;
+    ```
+  - [ ] Create `llmspell-storage/src/export_import/converters.rs`:
+    - [ ] Define TypeConverter trait:
+      ```rust
+      pub trait TypeConverter {
+          fn postgres_to_json(&self, value: PostgresValue) -> serde_json::Value;
+          fn json_to_sqlite(&self, value: serde_json::Value) -> SqliteValue;
+          fn sqlite_to_json(&self, value: SqliteValue) -> serde_json::Value;
+          fn json_to_postgres(&self, value: serde_json::Value) -> PostgresValue;
+      }
+      ```
+    - [ ] Implement UuidConverter:
+      - [ ] PostgreSQL UUID → JSON string (hyphenated)
+      - [ ] JSON string → SQLite TEXT
+      - [ ] Lossless roundtrip test
+    - [ ] Implement TimestampConverter:
+      - [ ] PostgreSQL TIMESTAMPTZ → JSON ISO8601 string
+      - [ ] JSON ISO8601 → SQLite INTEGER (Unix epoch)
+      - [ ] Preserve timezone info
+      - [ ] Lossless roundtrip test
+    - [ ] Implement JsonbConverter:
+      - [ ] PostgreSQL JSONB → JSON object
+      - [ ] JSON object → SQLite TEXT (serialized JSON)
+      - [ ] Lossless roundtrip test
+  - [ ] **Validation**: `cargo test -p llmspell-storage -- converters::uuid`
+  - [ ] **Validation**: `cargo test -p llmspell-storage -- converters::timestamp`
+  - [ ] **Validation**: `cargo test -p llmspell-storage -- converters::jsonb`
 
-3. **Create docs/technical/sqlite-storage-architecture.md** - Comprehensive technical guide:
-   - Follow postgresql-guide.md structure (100+ lines)
-   - Sections: Overview & Architecture, Setup & Configuration, Schema Reference, Performance Optimization, Operations
-   - 3-Tier Storage Architecture diagram (like postgresql-guide.md lines 26-60)
-   - Backend Comparison table (InMemory, Sled, PostgreSQL, SQLite)
-   - libsql v0.9.24 features (encryption at rest, embedded replicas, WAL mode)
-   - vectorlite HNSW extension (m=16, ef_construction=128, ef_search=64)
-   - Recursive CTEs for bi-temporal graph (WITH RECURSIVE examples)
-   - Connection pooling: R2D2 pattern with 20 connections
-   - Performance characteristics: vector insert (~400µs), vector search (2-7ms), graph traversal (~35ms)
-   - Backup/restore: 1-file copy vs 4 separate procedures
-   - Tuning guide: connection pooling, BLOB storage, vector search, graph traversal
-   - Schema reference: tables (episodic_memory, semantic_graph, procedural_patterns, sessions, artifacts)
+- [ ] **Day 24: Create type converter implementations (Part 2)**
+  - [ ] Implement VectorConverter:
+    - [ ] PostgreSQL VECTOR(n) → JSON array of f32
+    - [ ] JSON array → SQLite BLOB (MessagePack serialization)
+    - [ ] Handle all 4 dimensions (384, 768, 1536, 3072)
+    - [ ] Lossless roundtrip test
+  - [ ] Implement TstzrangeConverter:
+    - [ ] PostgreSQL tstzrange → JSON object {start: ISO8601, end: ISO8601}
+    - [ ] JSON object → SQLite (start INTEGER, end INTEGER)
+    - [ ] Handle infinite bounds (9999999999)
+    - [ ] Lossless roundtrip test
+  - [ ] Implement EnumConverter:
+    - [ ] PostgreSQL ENUM → JSON string
+    - [ ] JSON string → SQLite TEXT with CHECK constraint validation
+    - [ ] Lossless roundtrip test
+  - [ ] Implement LargeObjectConverter:
+    - [ ] PostgreSQL OID (Large Objects) → JSON base64 string
+    - [ ] JSON base64 → SQLite BLOB (inline, no 1MB threshold)
+    - [ ] Handle chunked reads for large objects >1MB
+    - [ ] Lossless roundtrip test
+  - [ ] **Validation**: `cargo test -p llmspell-storage -- converters` (all 7 converters passing)
 
-4. **Update docs/technical/current-architecture.md** - Add SQLite backend:
-   - Add SQLite to Phase 13c Architecture Evolution section
-   - Update storage backend comparison (lines 80-91) to include SQLite column
-   - Mention libsql consolidation (4 backends → 1)
-   - Reference sqlite-storage-architecture.md for details
+#### Storage Exporter (Days 25-26)
 
-5. **Update docs/technical/rag-memory-integration.md** - Add SQLite integration:
-   - Update component diagram to show SQLite as storage backend option
-   - Add note: "Storage backends: InMemory (dev), HNSW files (legacy), SQLite (unified), PostgreSQL (production)"
-   - Update configuration examples to show SQLite option
+- [ ] **Day 25: Implement StorageExporter structure and core export logic**
+  - [ ] Create `llmspell-storage/src/export_import/format.rs`:
+    - [ ] Define ExportFormat struct:
+      ```rust
+      pub struct ExportFormat {
+          version: String,           // "1.0"
+          exported_at: DateTime<Utc>,
+          source_backend: String,    // "postgresql" | "sqlite"
+          migrations: Vec<String>,   // ["V3", "V4", "V5", ...]
+          data: ExportData,
+      }
 
-6. **Update docs/technical/performance-guide.md** - Add SQLite performance characteristics:
-   - Add "Storage Backends" section with performance comparison table
-   - Include: Vector Insert (~400µs), Vector Search (2-7ms), Graph Traversal (~35ms), State Write (~10ms)
-   - Compare: InMemory (µs), HNSW files (ms), SQLite (ms), PostgreSQL (ms)
-   - Note: 3-7x slower than HNSW files but still meets <10ms targets
+      pub struct ExportData {
+          vector_embeddings: HashMap<usize, Vec<VectorEmbeddingExport>>,  // dim → vectors
+          knowledge_graph: KnowledgeGraphExport,
+          procedural_memory: Vec<PatternExport>,
+          agent_state: Vec<AgentStateExport>,
+          kv_store: Vec<KVEntry>,
+          workflow_states: Vec<WorkflowStateExport>,
+          sessions: Vec<SessionExport>,
+          artifacts: Vec<ArtifactExport>,
+          event_log: Vec<EventExport>,
+          hook_history: Vec<HookExport>,
+      }
+      ```
+    - [ ] Implement serde Serialize/Deserialize
+  - [ ] Create `llmspell-storage/src/export_import/exporter.rs`:
+    - [ ] Define StorageExporter:
+      ```rust
+      pub struct StorageExporter {
+          source_backend: Arc<dyn StorageBackend>,
+          converters: TypeConverters,
+      }
+      ```
+    - [ ] Implement export_to_json() method
+  - [ ] **Validation**: `cargo check -p llmspell-storage`
 
-7. **Update docs/developer-guide/03-extending-components.md** - Add SQLite extension patterns:
-   - Update "PART 6: Storage Backend Extension" section
-   - Add SqliteVectorStorage example (similar to existing examples)
-   - Show: connection pooling setup, vectorlite extension loading, HNSW index creation
-   - Show: SqliteGraphStorage example with recursive CTEs
-   - Reference: sqlite-storage-architecture.md for schema details
+- [ ] **Day 26: Implement component-specific export logic**
+  - [ ] Implement export_vector_embeddings():
+    - [ ] Query all 4 dimensions (384, 768, 1536, 3072)
+    - [ ] Use VectorConverter for PostgreSQL VECTOR → JSON
+    - [ ] Handle tenant isolation (export by scope)
+    - [ ] Progress reporting for large exports
+  - [ ] Implement export_knowledge_graph():
+    - [ ] Export all entities with bi-temporal data
+    - [ ] Export all relationships
+    - [ ] Use TstzrangeConverter for temporal ranges
+    - [ ] Use JsonbConverter for properties
+  - [ ] Implement export for remaining 8 components:
+    - [ ] export_procedural_memory() (V5)
+    - [ ] export_agent_state() (V6)
+    - [ ] export_kv_store() (V7)
+    - [ ] export_workflow_states() (V8)
+    - [ ] export_sessions() (V9)
+    - [ ] export_artifacts() (V10) - use LargeObjectConverter
+    - [ ] export_event_log() (V11)
+    - [ ] export_hook_history() (V13)
+  - [ ] Handle PostgreSQL-only migrations:
+    - [ ] Warn on V2 (test_table_rls): "Skipping PostgreSQL-only RLS test table"
+    - [ ] Warn on V12 (application_role_rls): "Skipping PostgreSQL RLS enforcement"
+  - [ ] **Validation**: Create test PostgreSQL database, export to JSON, verify structure
 
-8. **Update README-DEVEL.md** - Add SQLite backend section:
-   - Add "SQLite Unified Local Storage (libsql)" section after "Testing" section
-   - Include: Benefits (-76% binary size, 1-file backup, zero infrastructure)
-   - Include: Quick installation (config.toml example)
-   - Include: Setup steps (vectorlite extension installation, verification)
-   - Include: Performance table (4 operations vs HNSW files)
-   - Include: Backup/restore (1 file copy vs 4 procedures)
-   - Keep concise (50-80 lines), reference docs/technical/sqlite-storage-architecture.md for details
+#### Storage Importer (Days 27-28)
 
-9. Run final validation:
-   ```bash
-   # Format check
-   cargo fmt --all -- --check
+- [ ] **Day 27: Implement StorageImporter structure and core import logic**
+  - [ ] Create `llmspell-storage/src/export_import/importer.rs`:
+    - [ ] Define StorageImporter:
+      ```rust
+      pub struct StorageImporter {
+          target_backend: Arc<dyn StorageBackend>,
+          converters: TypeConverters,
+      }
+      ```
+    - [ ] Implement import_from_json() method:
+      - [ ] Parse JSON to ExportFormat
+      - [ ] Validate schema version compatibility
+      - [ ] Validate target backend has required migrations
+      - [ ] Check for missing migrations (V14, V15)
+  - [ ] Implement pre-import validation:
+    - [ ] Verify target backend migration version >= required
+    - [ ] Error on missing migrations with clear message:
+      - [ ] "Migration V14 (api_keys) not available in SQLite backend"
+      - [ ] "Migration V15 (bitemporal_composite_keys) not available in SQLite backend"
+  - [ ] **Validation**: `cargo check -p llmspell-storage`
 
-   # Clippy check
-   cargo clippy --workspace --all-features --all-targets -- -D warnings
+- [ ] **Day 28: Implement component-specific import logic**
+  - [ ] Implement import_vector_embeddings():
+    - [ ] Use VectorConverter for JSON → SQLite BLOB
+    - [ ] Insert vectors for all 4 dimensions
+    - [ ] Rebuild HNSW indexes after import (vectorlite)
+    - [ ] Verify index creation successful
+  - [ ] Implement import_knowledge_graph():
+    - [ ] Use TstzrangeConverter for JSON → SQLite INTEGER columns
+    - [ ] Use JsonbConverter for JSON object → SQLite TEXT
+    - [ ] Import entities first, then relationships (FK dependencies)
+    - [ ] Verify temporal constraints preserved
+  - [ ] Implement import for remaining 8 components:
+    - [ ] import_procedural_memory() (V5)
+    - [ ] import_agent_state() (V6)
+    - [ ] import_kv_store() (V7)
+    - [ ] import_workflow_states() (V8)
+    - [ ] import_sessions() (V9)
+    - [ ] import_artifacts() (V10) - use LargeObjectConverter
+    - [ ] import_event_log() (V11)
+    - [ ] import_hook_history() (V13)
+  - [ ] Handle tenant isolation:
+    - [ ] Preserve scope/tenant_id across import
+    - [ ] Verify tenant isolation queries work post-import
+  - [ ] **Validation**: Import test JSON to fresh SQLite DB, verify all data present
 
-   # Test check
-   cargo test --workspace --all-features
+#### CLI Integration (Day 29)
 
-   # Documentation check
-   cargo doc --workspace --no-deps --all-features
+- [ ] **Day 29: Add CLI commands and integrate with llmspell binary**
+  - [ ] Create `llmspell-cli/src/commands/storage.rs` (NEW):
+    - [ ] Add export command:
+      ```rust
+      pub async fn cmd_storage_export(
+          backend: BackendType,
+          output: PathBuf,
+      ) -> Result<()> {
+          let exporter = StorageExporter::new(backend).await?;
+          let json = exporter.export_to_json().await?;
+          fs::write(output, json)?;
+          println!("Exported to {}", output.display());
+      }
+      ```
+    - [ ] Add import command:
+      ```rust
+      pub async fn cmd_storage_import(
+          backend: BackendType,
+          input: PathBuf,
+      ) -> Result<()> {
+          let importer = StorageImporter::new(backend).await?;
+          importer.import_from_json(&input).await?;
+          println!("Imported from {}", input.display());
+      }
+      ```
+    - [ ] Add progress bars using indicatif:
+      - [ ] Show export progress (component by component)
+      - [ ] Show import progress (component by component)
+      - [ ] Show HNSW index rebuild progress
+  - [ ] Update `llmspell-cli/src/main.rs`:
+    - [ ] Add storage subcommand to CLI
+    - [ ] Add --from and --to flags for backend selection
+    - [ ] Add --output and --input flags for file paths
+  - [ ] Test CLI with real databases:
+    ```bash
+    # Export PostgreSQL → JSON
+    llmspell storage export --from postgresql --output dump.json
 
-   # Build check
-   cargo build --workspace --all-features --release
+    # Import JSON → SQLite
+    llmspell storage import --to sqlite --input dump.json
+    ```
+  - [ ] **Validation**: Manual CLI testing with test databases
 
-   # Quality gate
-   ./scripts/quality/quality-check.sh
-   ```
+#### Roundtrip Testing & Final Validation (Day 30)
 
-**Definition of Done**:
-- [ ] User guide updated: 07-storage-setup.md (SQLite quick start), 03-configuration.md (SQLite config)
-- [ ] Technical guide created: sqlite-storage-architecture.md (100+ lines, comprehensive like postgresql-guide.md)
-- [ ] Technical guides updated: current-architecture.md, rag-memory-integration.md, performance-guide.md (SQLite integration)
-- [ ] Developer guide updated: 03-extending-components.md (SQLite extension patterns in PART 6)
-- [ ] README-DEVEL.md updated with libsql setup section (50-80 lines)
-- [ ] All documentation integrated into existing structure (no orphaned files)
-- [ ] Final validation: zero clippy warnings, all tests passing
-- [ ] Quality gates: ./scripts/quality/quality-check.sh passing
+- [ ] **Day 30: Comprehensive roundtrip testing and validation**
+  - [ ] Create integration test `llmspell-storage/tests/roundtrip_test.rs`:
+    ```rust
+    #[tokio::test]
+    async fn test_full_roundtrip_zero_data_loss() {
+        // 1. Setup test data in PostgreSQL
+        let pg = PostgresBackend::connect(test_config()).await.unwrap();
+        insert_test_vectors(&pg, 1000).await;  // 1K vectors
+        insert_test_entities(&pg, 500).await;   // 500 entities
+        insert_test_agent_state(&pg, 100).await;
+        // ... insert test data for all 10 components
 
-**Files to Create/Modify**:
-- `docs/user-guide/07-storage-setup.md` (UPDATE - add SQLite quick start section)
-- `docs/user-guide/03-configuration.md` (UPDATE - add [storage.sqlite] config reference)
-- `docs/technical/sqlite-storage-architecture.md` (NEW - comprehensive guide like postgresql-guide.md)
-- `docs/technical/current-architecture.md` (UPDATE - add SQLite backend to architecture)
-- `docs/technical/rag-memory-integration.md` (UPDATE - mention SQLite backend option)
-- `docs/technical/performance-guide.md` (UPDATE - add SQLite performance characteristics)
-- `docs/developer-guide/03-extending-components.md` (UPDATE - add SQLite extension patterns to PART 6)
-- `README-DEVEL.md` (UPDATE - add libsql section)
+        // 2. Export PostgreSQL → JSON
+        let exporter = StorageExporter::new(Arc::clone(&pg));
+        exporter.export_to_file("test_pg.json").await.unwrap();
+
+        // 3. Import JSON → SQLite
+        let sqlite = SqliteBackend::connect(temp_db()).await.unwrap();
+        let importer = StorageImporter::new(Arc::clone(&sqlite));
+        importer.import_from_file("test_pg.json").await.unwrap();
+
+        // 4. Verify SQLite data matches PostgreSQL
+        verify_vectors_match(&pg, &sqlite, 1000).await;
+        verify_entities_match(&pg, &sqlite, 500).await;
+        verify_agent_state_match(&pg, &sqlite, 100).await;
+        // ... verify all 10 components
+
+        // 5. Export SQLite → JSON
+        let exporter2 = StorageExporter::new(Arc::clone(&sqlite));
+        exporter2.export_to_file("test_sqlite.json").await.unwrap();
+
+        // 6. Import JSON → PostgreSQL (fresh instance)
+        let pg2 = PostgresBackend::connect(fresh_db()).await.unwrap();
+        let importer2 = StorageImporter::new(Arc::clone(&pg2));
+        importer2.import_from_file("test_sqlite.json").await.unwrap();
+
+        // 7. Verify final PostgreSQL matches original
+        verify_full_roundtrip(&pg, &pg2).await;  // CRITICAL: Zero data loss
+    }
+    ```
+  - [ ] Test HNSW index rebuild:
+    - [ ] Verify vector search works after import
+    - [ ] Verify search results match pre-export
+    - [ ] Performance: Similar recall/precision
+  - [ ] Test tenant isolation preservation:
+    - [ ] Export multi-tenant PostgreSQL data
+    - [ ] Import to SQLite
+    - [ ] Verify tenant queries return correct isolated data
+  - [ ] Performance validation:
+    - [ ] Export 10K vectors: Should complete in <5 seconds
+    - [ ] Import 10K vectors: Should complete in <10 seconds (includes HNSW rebuild)
+  - [ ] Edge case testing:
+    - [ ] Empty database export/import
+    - [ ] Large artifacts (>1MB) via LargeObjectConverter
+    - [ ] Unicode in text fields (entity names, metadata)
+    - [ ] Null values in optional fields
+    - [ ] Infinity values in temporal ranges
+  - [ ] Run full test suite:
+    ```bash
+    cargo test --workspace --all-features
+    ```
+  - [ ] Run quality gates:
+    ```bash
+    ./scripts/quality/quality-check.sh
+    ```
+  - [ ] Update documentation:
+    - [ ] Add export/import examples to docs/user-guide/
+    - [ ] Document PostgreSQL → SQLite migration workflow
+    - [ ] Document SQLite → PostgreSQL growth path
+    - [ ] Add troubleshooting section for common issues
+
+**Estimated LOC**: ~2,200 lines (400 converters + 600 exporter + 700 importer + 200 CLI + 300 tests)
 
 ---
 
+## Phase 13c.3 Summary
+
+**Total Effort**: 30 days (~6 weeks)
+**Total Files Changed**: ~260 files
+**Total Lines Changed**: ~6,900 lines
+
+**Dependency Chain**:
+1. ✅ Task 13c.3.0 (Days 1-3) → Foundation - MUST COMPLETE FIRST
+2. ✅ Task 13c.3.1 (Days 4-22) → Depends on 13c.3.0
+3. ✅ Task 13c.3.2 (Days 23-30) → Depends on 13c.3.0 AND 13c.3.1
+
+**Breaking Changes**: ACCEPTED (pre-1.0, clean architecture for v0.14.0)
+
+**Key Deliverables**:
+- ✅ Centralized trait architecture in llmspell-core
+- ✅ Zero circular dependencies
+- ✅ 100% trait parity between PostgreSQL and SQLite backends
+- ✅ Bidirectional data portability tool
+- ✅ Zero data loss migration capability
+
+**Reference Documents**:
+- PHASE-13C3-CLEAN-REFACTOR-PLAN.md (comprehensive analysis and plan)
+- PHASE-13C3-STORAGE-ARCHITECTURE-ANALYSIS.md (original architectural analysis)
+
+---
 ## Phase 13c.4: Profile System Enhancement (Days 1-2)
 
 **Goal**: Create 3 real-world profiles (postgres, ollama-production, memory-development)
