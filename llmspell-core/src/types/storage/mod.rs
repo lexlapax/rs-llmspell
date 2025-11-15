@@ -22,8 +22,8 @@ pub mod workflow;
 // Re-export artifact types
 pub use artifact::{Artifact, ArtifactId, ArtifactType, ContentHash, SessionStorageStats};
 
-// Re-export backend types (Day 3)
-// pub use backend::{StorageBackendType, StorageCharacteristics};
+// Re-export backend types
+pub use backend::{StorageBackendType, StorageCharacteristics};
 
 // Re-export graph types (Day 3)
 // pub use graph::{Entity, Relationship, TemporalQuery};

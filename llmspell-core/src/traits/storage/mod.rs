@@ -25,8 +25,8 @@ pub mod vector;
 pub mod workflow;
 
 pub use artifact::ArtifactStorage;
-// Day 2 exports - will be enabled after trait migration
-// pub use backend::StorageBackend;
+pub use backend::StorageBackend;
+// Day 2 exports - remaining traits
 // pub use graph::KnowledgeGraph;
 // pub use procedural::ProceduralMemory;
 pub use session::SessionStorage;

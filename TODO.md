@@ -4710,11 +4710,11 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 
 ---
 
-### Task 13c.3.0: Foundation - Trait Migration to llmspell-core ⏹ PENDING
+### Task 13c.3.0: Foundation - Trait Migration to llmspell-core ⏳ IN PROGRESS
 **Priority**: CRITICAL - BLOCKING (all other 13c.3 tasks depend on this)
 **Estimated Time**: 3 days (Days 1-3)
 **Assignee**: Storage Architecture Team
-**Status**: ⏹ PENDING
+**Status**: ⏳ IN PROGRESS (Day 1 ✅ COMPLETE, Day 2 in progress)
 **Dependencies**: Tasks 13c.2.7 ✅ (all Phase 13c.2 storage implementations complete)
 
 **Description**: Move all storage trait definitions and domain types from scattered crates (llmspell-storage, llmspell-graph, llmspell-memory) to `llmspell-core` as the single source of truth. This is the foundation for the entire Phase 13c.3 refactor - no other tasks can proceed until traits are centralized.
@@ -4744,18 +4744,24 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 
 **Implementation Steps** (Days 1-3):
 
-- [ ] **Day 1: Create trait infrastructure in llmspell-core**
-  - [ ] Create directory structure:
-    ```bash
-    mkdir -p llmspell-core/src/traits/storage
-    mkdir -p llmspell-core/src/types/storage
-    ```
-  - [ ] Create `llmspell-core/src/traits/storage/mod.rs` with exports
-  - [ ] Create `llmspell-core/src/types/storage/mod.rs` with exports
-  - [ ] Update `llmspell-core/src/traits/mod.rs` to include storage module
-  - [ ] Update `llmspell-core/src/types/mod.rs` to include storage module
-  - [ ] Update `llmspell-core/src/lib.rs` to export storage traits/types
-  - [ ] **Validation**: `cargo check -p llmspell-core` (must compile)
+- [x] **Day 1: Create trait infrastructure in llmspell-core** ✅ COMPLETE
+  - [x] Create directory structure (already existed, placeholders added)
+  - [x] Create `llmspell-core/src/traits/storage/mod.rs` with exports
+  - [x] Create `llmspell-core/src/types/storage/mod.rs` with exports
+  - [x] Create placeholder trait files:
+    - backend.rs, vector.rs, graph.rs, procedural.rs
+  - [x] Create placeholder type files:
+    - backend.rs, vector.rs, graph.rs, procedural.rs
+  - [x] Update `llmspell-core/src/traits/mod.rs` to include storage module (verified exists)
+  - [x] Update `llmspell-core/src/types/mod.rs` to include storage module (verified exists)
+  - [x] Update `llmspell-core/src/lib.rs` to export storage traits/types (verified exists)
+  - [x] **Validation**: `cargo check -p llmspell-core` ✅ PASSED (3.40s compile time)
+  - **Insights**:
+    - Trait exports temporarily commented out until Day 2 actual migration
+    - Created comprehensive documentation headers explaining Phase 13c.3
+    - Research docs (TRAIT_MIGRATION_ANALYSIS.md, TRAIT_LOCATIONS.txt) provide complete blueprint
+    - Total: 12 files modified/created (7 trait infrastructure + 5 type infrastructure)
+    - Git commit: 668126c6 "13c.3.0 - Day 1: Create trait infrastructure"
 
 - [ ] **Day 2: Migrate traits with full documentation**
   - [ ] Migrate StorageBackend trait (~120 lines):
