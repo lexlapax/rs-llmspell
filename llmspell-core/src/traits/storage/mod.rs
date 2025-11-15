@@ -27,8 +27,7 @@ pub mod workflow;
 pub use artifact::ArtifactStorage;
 pub use backend::StorageBackend;
 pub use graph::KnowledgeGraph;
-// Day 2 exports - remaining traits
-// pub use procedural::ProceduralMemory;
+pub use procedural::ProceduralMemory;
 pub use session::SessionStorage;
 pub use vector::{HNSWStorage, VectorStorage};
 pub use workflow::WorkflowStateStorage;
