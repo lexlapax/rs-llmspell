@@ -25,8 +25,8 @@ pub use artifact::{Artifact, ArtifactId, ArtifactType, ContentHash, SessionStora
 // Re-export backend types
 pub use backend::{StorageBackendType, StorageCharacteristics};
 
-// Re-export graph types (Day 3)
-// pub use graph::{Entity, Relationship, TemporalQuery};
+// Re-export graph types
+pub use graph::{Entity, Relationship, TemporalQuery};
 
 // Re-export procedural types (Day 3)
 // pub use procedural::Pattern;
