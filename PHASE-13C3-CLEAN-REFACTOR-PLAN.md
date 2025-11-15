@@ -51,14 +51,22 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 
 ## Table of Contents
 
+### Part I: Architectural Analysis
 1. [Detailed Scope Analysis](#1-detailed-scope-analysis)
-2. [File-by-File Breakdown](#2-file-by-file-breakdown)
-3. [Import Pattern Changes](#3-import-pattern-changes)
-4. [Documentation Updates](#4-documentation-updates)
-5. [Test Infrastructure](#5-test-infrastructure)
-6. [Migration Sequence](#6-migration-sequence)
-7. [Validation Strategy](#7-validation-strategy)
-8. [Risk Mitigation](#8-risk-mitigation)
+2. [Storage Component Inventory](#2-storage-component-inventory)
+3. [Backend Implementation Matrix](#3-backend-implementation-matrix)
+4. [Trait Method Inventory](#4-trait-method-inventory)
+5. [Runtime Injection Architecture](#5-runtime-injection-architecture)
+
+### Part II: Execution Plan
+6. [File-by-File Breakdown](#6-file-by-file-breakdown)
+7. [Import Pattern Changes](#7-import-pattern-changes)
+8. [Documentation Updates](#8-documentation-updates)
+9. [Test Infrastructure](#9-test-infrastructure)
+10. [Migration Sequence](#10-migration-sequence)
+11. [Validation Strategy](#11-validation-strategy)
+12. [Risk Mitigation](#12-risk-mitigation)
+13. [Success Metrics](#13-success-metrics)
 
 ---
 
@@ -121,9 +129,389 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 
 ---
 
-## 2. File-by-File Breakdown
+## 2. Storage Component Inventory
 
-### 2.1 Critical Path: llmspell-storage (20 files)
+### 2.1 Complete Storage Component Map (10 Components)
+
+| Component | PostgreSQL Migration | SQLite Migration | Backend Trait | Domain Trait | Current Status |
+|-----------|---------------------|------------------|---------------|--------------|----------------|
+| **V3: Vector Embeddings** | V3 (4 dimensions: 384/768/1536/3072) | V3 (vectorlite HNSW) | `VectorStorage` | `EpisodicMemory` | ✅ Complete |
+| **V4: Temporal Graph** | V4 (tstzrange bi-temporal) | V4 (INTEGER start/end) | `KnowledgeGraph` | `SemanticMemory` | ✅ Complete |
+| **V5: Procedural Patterns** | V5 (frequency tracking) | V5 (UPSERT pattern) | `ProceduralMemory` | - | ✅ Complete |
+| **V6: Agent State** | V6 (JSONB state data) | V6 (TEXT JSON) | `StorageBackend` | - | ✅ Complete |
+| **V7: KV Store** | V7 (generic key-value) | V7 (scope isolation) | `StorageBackend` | - | ✅ Complete |
+| **V8: Workflow States** | V8 (lifecycle tracking) | V8 (status transitions) | `WorkflowStateStorage` ✅ | - | ✅ Complete |
+| **V9: Sessions** | V9 (expiration management) | V9 (cleanup_expired) | `SessionStorage` ✅ | - | ✅ Complete |
+| **V10: Artifacts** | V10 (Large Objects for >1MB) | V10 (BLOB inline) | `ArtifactStorage` ✅ | - | ✅ Complete |
+| **V11: Event Log** | V11 (monthly partitioning) | V11 (time-series events) | `EventStorage` | - | ✅ Complete |
+| **V13: Hook History** | V13 (correlation tracking) | V13 (replay support) | `StorageBackend` | - | ✅ Complete |
+
+**Key Observations**:
+- **10 components** with 100% PostgreSQL/SQLite feature parity
+- **3 traits already in llmspell-core** (Workflow, Session, Artifact) ✅
+- **4 traits to migrate** (StorageBackend, VectorStorage, KnowledgeGraph, ProceduralMemory)
+- **3 traits stay in domain crates** (EpisodicMemory, SemanticMemory, EventStorage)
+
+### 2.2 Implementation File Structure
+
+```
+llmspell-storage/src/backends/
+├── postgres/
+│   ├── backend.rs          (PostgresBackend: StorageBackend)
+│   ├── vector.rs           (PostgresVectorStorage: VectorStorage)
+│   ├── graph.rs            (PostgresGraphStorage: KnowledgeGraph)
+│   ├── procedural.rs       (PostgresProceduralStorage: ProceduralMemory)
+│   ├── workflow_state.rs   (PostgresWorkflowStateStorage: WorkflowStateStorage)
+│   ├── session.rs          (PostgresSessionStorage: SessionStorage)
+│   ├── artifacts.rs        (PostgresArtifactStorage: ArtifactStorage)
+│   ├── event_log.rs        (PostgresEventLogStorage: EventStorage)
+│   └── hook_history.rs     (PostgresHookHistoryStorage: StorageBackend)
+│
+└── sqlite/
+    ├── backend.rs          (SqliteBackend: StorageBackend)
+    ├── vector.rs           (SqliteVectorStorage: VectorStorage)
+    ├── graph.rs            (SqliteGraphStorage: KnowledgeGraph)
+    ├── procedural.rs       (SqliteProceduralStorage: ProceduralMemory)
+    ├── agent_state.rs      (SqliteAgentStateStorage: StorageBackend)
+    ├── kv_store.rs         (SqliteKVStorage: StorageBackend)
+    ├── workflow_state.rs   (SqliteWorkflowStateStorage: WorkflowStateStorage)
+    ├── session.rs          (SqliteSessionStorage: SessionStorage)
+    ├── artifact.rs         (SqliteArtifactStorage: ArtifactStorage)
+    ├── event_log.rs        (SqliteEventLogStorage: EventStorage)
+    └── hook_history.rs     (SqliteHookHistoryStorage: StorageBackend)
+```
+
+**Current state**: These backend implementations are in `llmspell-storage`, but the traits they implement (`KnowledgeGraph`, `ProceduralMemory`) are currently scattered across other crates. The refactor will centralize all traits in `llmspell-core`.
+
+
+---
+
+## 3. Backend Implementation Matrix
+
+### 3.1 Feature Parity Matrix
+
+| Feature | PostgreSQL | SQLite | Notes |
+|---------|-----------|--------|-------|
+| **Vector Search** | VectorChord HNSW | vectorlite-rs HNSW | Both use HNSW indexing |
+| **Vector Dimensions** | 384, 768, 1536, 3072 | 384, 768, 1536, 3072 | Identical support |
+| **Graph Bi-Temporal** | tstzrange (native) | INTEGER start/end | Different representation, same semantics |
+| **Graph Traversal** | Recursive CTEs | Recursive CTEs | SQLite has native CTE support |
+| **Procedural Patterns** | UPSERT with ON CONFLICT | INSERT OR REPLACE | Syntax differs, functionality identical |
+| **Agent State** | JSONB | TEXT (json_extract) | SQLite json1 extension equivalent |
+| **Workflow States** | ENUM types | TEXT with CHECK | No ENUMs in SQLite, use TEXT |
+| **Sessions** | Expiration via TIMESTAMPTZ | Expiration via INTEGER (Unix) | Both support cleanup_expired() |
+| **Artifacts** | Large Objects (>1MB) | BLOB inline (all sizes) | PostgreSQL optimizes >1MB separately |
+| **Event Log** | Monthly partitioning | Single table | Performance difference at scale |
+| **Hook History** | Correlation tracking | Correlation tracking | Identical interface |
+| **Multi-Tenancy** | RLS (Row-Level Security) | Application-level WHERE | PostgreSQL enforces at DB level |
+
+**Conclusion**: **100% feature parity** achieved in Phase 13c.2!
+
+---
+
+## 4. Trait Method Inventory
+
+### 4.1 StorageBackend Trait (Generic KV Storage)
+
+**Location**: `llmspell-core/src/traits/storage/backend.rs` (after migration)
+
+```rust
+#[async_trait]
+pub trait StorageBackend: Send + Sync + std::fmt::Debug {
+    // Core KV operations
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>>;
+    async fn set(&self, key: &str, value: Vec<u8>) -> Result<()>;
+    async fn delete(&self, key: &str) -> Result<()>;
+    async fn exists(&self, key: &str) -> Result<bool>;
+
+    // Batch operations
+    async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
+    async fn get_batch(&self, keys: &[String]) -> Result<HashMap<String, Vec<u8>>>;
+    async fn set_batch(&self, items: HashMap<String, Vec<u8>>) -> Result<()>;
+    async fn delete_batch(&self, keys: &[String]) -> Result<()>;
+
+    // Administrative
+    async fn clear(&self) -> Result<()>;
+    fn backend_type(&self) -> StorageBackendType;
+    fn characteristics(&self) -> StorageCharacteristics;
+
+    // Migration support
+    async fn run_migrations(&self) -> Result<()>;
+    async fn migration_version(&self) -> Result<usize>;
+}
+```
+
+**Methods**: 13 total
+**Complexity**: LOW - simple KV interface
+**Implementations**: MemoryBackend, SqliteBackend, PostgresBackend
+
+### 4.2 VectorStorage Trait (Semantic Search)
+
+**Location**: `llmspell-core/src/traits/storage/vector.rs` (after migration)
+
+```rust
+#[async_trait]
+pub trait VectorStorage: Send + Sync {
+    // Core vector operations
+    async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>>;
+    async fn search(&self, query: &VectorQuery) -> Result<Vec<VectorResult>>;
+    async fn get(&self, id: &str) -> Result<Option<VectorEntry>>;
+    async fn delete(&self, id: &str) -> Result<()>;
+
+    // Metadata operations
+    async fn update_metadata(&self, id: &str, metadata: HashMap<String, Value>) -> Result<()>;
+
+    // Tenant operations
+    async fn stats_for_scope(&self, scope: &StateScope) -> Result<ScopedStats>;
+    async fn delete_scope(&self, scope: &StateScope) -> Result<usize>;
+
+    // Bulk operations
+    async fn clear(&self) -> Result<()>;
+    async fn count(&self) -> Result<usize>;
+    async fn list(&self, offset: usize, limit: usize) -> Result<Vec<VectorEntry>>;
+}
+```
+
+**Methods**: 10 total
+**Complexity**: MEDIUM - vector search with metadata
+**Implementations**: SqliteVectorStorage, PostgresVectorStorage
+**Decorators**: StateAwareVectorStorage (llmspell-rag), MultiTenantVectorManager (llmspell-tenancy)
+
+### 4.3 KnowledgeGraph Trait (Bi-Temporal Graph)
+
+**Location**: `llmspell-core/src/traits/storage/graph.rs` (after migration)
+
+```rust
+#[async_trait]
+pub trait KnowledgeGraph: Send + Sync {
+    // Entity operations
+    async fn add_entity(&self, entity: Entity) -> Result<String>;
+    async fn update_entity(&self, id: &str, changes: HashMap<String, Value>) -> Result<()>;
+    async fn get_entity(&self, id: &str) -> Result<Entity>;
+    async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Entity>;
+
+    // Relationship operations
+    async fn add_relationship(&self, relationship: Relationship) -> Result<String>;
+    async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>>;
+    async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>>;
+
+    // Query operations
+    async fn query_temporal(&self, query: TemporalQuery) -> Result<Vec<Entity>>;
+    async fn traverse(
+        &self,
+        start_entity: &str,
+        relationship_type: Option<&str>,
+        max_depth: usize,
+        at_time: Option<DateTime<Utc>>,
+    ) -> Result<Vec<(Entity, usize, String)>>;
+
+    // Cleanup
+    async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize>;
+}
+```
+
+**Methods**: 10 total
+**Complexity**: HIGH - bi-temporal graph with traversal
+**Implementations**: SqliteGraphStorage, PostgresGraphStorage, SurrealDBBackend (legacy)
+
+### 4.4 ProceduralMemory Trait (Pattern Learning)
+
+**Location**: `llmspell-core/src/traits/storage/procedural.rs` (after migration)
+
+```rust
+#[async_trait]
+pub trait ProceduralMemory: Send + Sync {
+    // Pattern tracking
+    async fn record_transition(
+        &self,
+        scope: &str,
+        key: &str,
+        from_value: Option<&str>,
+        to_value: &str,
+    ) -> Result<u32>;
+
+    async fn get_pattern_frequency(&self, scope: &str, key: &str, value: &str) -> Result<u32>;
+    async fn get_learned_patterns(&self, min_frequency: u32) -> Result<Vec<Pattern>>;
+
+    // Legacy placeholders (deprecated)
+    async fn get_pattern(&self, id: &str) -> Result<()>;
+    async fn store_pattern(&self, pattern: &str) -> Result<String>;
+}
+```
+
+**Methods**: 5 total
+**Complexity**: LOW - simple frequency tracking
+**Implementations**: SqliteProceduralStorage, PostgresProceduralStorage
+
+---
+
+## 5. Runtime Injection Architecture
+
+### 5.1 Current Problem: Inline Backend Creation
+
+**Current pattern** (scattered across codebase):
+```rust
+// llmspell-bridge/src/infrastructure.rs (creates backend inline)
+let config = SqliteConfig::new("./data/storage.db");
+let backend = Arc::new(SqliteBackend::new(config).await?);
+let vector_storage = Arc::new(SqliteVectorStorage::new(backend, 384).await?);
+
+// llmspell-kernel/src/state/manager.rs (creates backend inline)
+let backend = match config.backend {
+    BackendType::Sqlite => Arc::new(SqliteBackend::new(&config.sqlite).await?),
+    BackendType::Postgres => Arc::new(PostgresBackend::new(&config.postgres).await?),
+};
+```
+
+**Problems**:
+1. Backend creation logic duplicated across crates
+2. No centralized configuration
+3. Difficult to swap backends at runtime
+4. Test code duplicates production setup
+
+### 5.2 Proposed Solution: StorageFactory Pattern
+
+**Create centralized factory** in `llmspell-storage` or `llmspell-kernel`:
+
+```rust
+// llmspell-storage/src/factory.rs (NEW)
+use llmspell_core::traits::storage::{StorageBackend, VectorStorage, KnowledgeGraph, ProceduralMemory};
+use std::sync::Arc;
+
+pub struct StorageFactory;
+
+impl StorageFactory {
+    /// Create all storage backends from configuration
+    pub async fn from_config(config: &StorageConfig) -> Result<StorageBackends> {
+        match config.backend_type {
+            StorageBackendType::Sqlite => {
+                let backend = Arc::new(SqliteBackend::new(config.sqlite.clone()).await?);
+                Ok(StorageBackends::Sqlite(backend))
+            }
+            StorageBackendType::Postgres => {
+                let backend = Arc::new(PostgresBackend::new(config.postgres.clone()).await?);
+                Ok(StorageBackends::Postgres(backend))
+            }
+            StorageBackendType::Memory => {
+                let backend = Arc::new(MemoryBackend::new());
+                Ok(StorageBackends::Memory(backend))
+            }
+        }
+    }
+}
+
+/// Enum wrapping all backend types
+pub enum StorageBackends {
+    Memory(Arc<MemoryBackend>),
+    Sqlite(Arc<SqliteBackend>),
+    #[cfg(feature = "postgres")]
+    Postgres(Arc<PostgresBackend>),
+}
+
+impl StorageBackends {
+    /// Get StorageBackend trait object
+    pub fn as_storage_backend(&self) -> Arc<dyn StorageBackend> {
+        match self {
+            Self::Memory(b) => Arc::clone(b) as Arc<dyn StorageBackend>,
+            Self::Sqlite(b) => Arc::clone(b) as Arc<dyn StorageBackend>,
+            #[cfg(feature = "postgres")]
+            Self::Postgres(b) => Arc::clone(b) as Arc<dyn StorageBackend>,
+        }
+    }
+
+    /// Get VectorStorage trait object
+    pub async fn as_vector_storage(&self, dimension: usize) -> Result<Arc<dyn VectorStorage>> {
+        match self {
+            Self::Sqlite(b) => {
+                Ok(Arc::new(SqliteVectorStorage::new(Arc::clone(b), dimension).await?) as Arc<dyn VectorStorage>)
+            }
+            #[cfg(feature = "postgres")]
+            Self::Postgres(b) => {
+                Ok(Arc::new(PostgresVectorStorage::new(Arc::clone(b), dimension).await?) as Arc<dyn VectorStorage>)
+            }
+            Self::Memory(_) => {
+                Ok(Arc::new(InMemoryVectorStorage::new(dimension)) as Arc<dyn VectorStorage>)
+            }
+        }
+    }
+
+    /// Get KnowledgeGraph trait object
+    pub fn as_knowledge_graph(&self) -> Arc<dyn KnowledgeGraph> {
+        match self {
+            Self::Sqlite(b) => Arc::new(SqliteGraphStorage::new(Arc::clone(b))) as Arc<dyn KnowledgeGraph>,
+            #[cfg(feature = "postgres")]
+            Self::Postgres(b) => Arc::new(PostgresGraphStorage::new(Arc::clone(b))) as Arc<dyn KnowledgeGraph>,
+            Self::Memory(_) => Arc::new(InMemoryGraphStorage::new()) as Arc<dyn KnowledgeGraph>,
+        }
+    }
+
+    /// Get ProceduralMemory trait object
+    pub fn as_procedural_memory(&self) -> Arc<dyn ProceduralMemory> {
+        match self {
+            Self::Sqlite(b) => Arc::new(SqliteProceduralStorage::new(Arc::clone(b))) as Arc<dyn ProceduralMemory>,
+            #[cfg(feature = "postgres")]
+            Self::Postgres(b) => Arc::new(PostgresProceduralStorage::new(Arc::clone(b))) as Arc<dyn ProceduralMemory>,
+            Self::Memory(_) => Arc::new(InMemoryProceduralStorage::new()) as Arc<dyn ProceduralMemory>,
+        }
+    }
+}
+```
+
+### 5.3 Usage in Kernel (After Refactor)
+
+```rust
+// llmspell-kernel/src/infrastructure.rs
+pub struct Infrastructure {
+    storage_backends: StorageBackends,
+    state_manager: Arc<StateManager>,
+    memory_manager: Option<Arc<MemoryManager>>,
+}
+
+impl Infrastructure {
+    pub async fn from_config(config: &Config) -> Result<Self> {
+        // Single creation point
+        let storage_backends = StorageFactory::from_config(&config.storage).await?;
+
+        // Inject into components
+        let state_manager = StateManager::new(
+            storage_backends.as_storage_backend()
+        );
+
+        let memory_manager = if config.memory.enabled {
+            Some(Arc::new(MemoryManager::new(
+                storage_backends.as_vector_storage(384).await?,  // Episodic
+                storage_backends.as_knowledge_graph(),            // Semantic
+                storage_backends.as_procedural_memory(),          // Procedural
+                embedding_service,
+            )?))
+        } else {
+            None
+        };
+
+        Ok(Self {
+            storage_backends,
+            state_manager: Arc::new(state_manager),
+            memory_manager,
+        })
+    }
+}
+```
+
+### 5.4 Benefits of Factory Pattern
+
+| Benefit | Description |
+|---------|-------------|
+| **Single creation point** | All backend instantiation in one place |
+| **Config-driven** | Runtime backend selection via config |
+| **Test-friendly** | Easy to inject test backends |
+| **Type-safe** | Enum ensures all backends implement all traits |
+| **Centralized** | Easy to add new backends in the future |
+
+---
+
+## 6. File-by-File Breakdown
+
+### 6.1 Critical Path: llmspell-storage (20 files)
 
 #### Backend Implementations
 
@@ -149,7 +537,7 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 | `src/vector_storage.rs` | **DELETE** (moved to core) | HIGH - remove 600+ lines |
 | `src/lib.rs` | Update exports | MEDIUM - remove old, add new re-exports from core |
 
-### 2.2 Critical Path: llmspell-bridge (9+ files)
+### 6.2 Critical Path: llmspell-bridge (9+ files)
 
 | File | Current Pattern | New Pattern | Impact |
 |------|----------------|-------------|--------|
@@ -158,7 +546,7 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 | `src/memory_bridge.rs` | `use llmspell_memory::{...}` | Indirect - memory crate updates | Low direct impact |
 | `src/globals/rag_infrastructure.rs` | Similar to infrastructure.rs | Same pattern | Import reorganization |
 
-### 2.3 High-Impact: llmspell-memory (15 files)
+### 6.3 High-Impact: llmspell-memory (15 files)
 
 | File | Traits Used | Change Type |
 |------|-------------|-------------|
@@ -169,7 +557,7 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 | `src/semantic.rs` | KnowledgeGraph | Same |
 | ... | (10 more files) | Similar patterns |
 
-### 2.4 Test Files - Storage Crate (38 files!)
+### 6.4 Test Files - Storage Crate (38 files!)
 
 **Pattern**: All test files create backends directly
 
@@ -196,9 +584,9 @@ use llmspell_core::types::storage::{VectorEntry, VectorQuery};
 
 ---
 
-## 3. Import Pattern Changes
+## 7. Import Pattern Changes
 
-### 3.1 Before → After Patterns
+### 7.1 Before → After Patterns
 
 #### Pattern 1: VectorStorage Trait
 ```rust
@@ -257,7 +645,7 @@ use llmspell_core::types::storage::{VectorEntry, VectorQuery, VectorResult};
 use llmspell_storage::backends::memory::MemoryBackend; // Backend stays in storage crate
 ```
 
-### 3.2 Crate Re-exports (Domain Crates Keep Wrappers)
+### 7.2 Crate Re-exports (Domain Crates Keep Wrappers)
 
 **llmspell-memory** (keeps EpisodicMemory, SemanticMemory - domain wrappers):
 ```rust
@@ -305,9 +693,9 @@ pub mod backends;   // SurrealDB backend stays
 
 ---
 
-## 4. Documentation Updates
+## 8. Documentation Updates
 
-### 4.1 Critical Documentation Files (Must Update)
+### 8.1 Critical Documentation Files (Must Update)
 
 #### Technical Documentation
 
@@ -368,7 +756,7 @@ pub mod backends;   // SurrealDB backend stays
 
 ... (6 more crate READMEs)
 
-### 4.2 Rustdoc Comments (20+ occurrences)
+### 8.2 Rustdoc Comments (20+ occurrences)
 
 **Pattern**: Trait definitions have doc comment examples
 
@@ -398,9 +786,9 @@ pub mod backends;   // SurrealDB backend stays
 
 ---
 
-## 5. Test Infrastructure
+## 9. Test Infrastructure
 
-### 5.1 Test Helper Pattern (Create `TestStorageFactory`)
+### 9.1 Test Helper Pattern (Create `TestStorageFactory`)
 
 **Problem**: 77 test files create backends inline with duplicate code
 
@@ -451,7 +839,7 @@ let storage = TestStorageFactory::temp_vector_storage(384).await;
 
 **Impact**: Simplifies 77 test files, reduces duplication by ~200 lines
 
-### 5.2 Test Files by Type
+### 9.2 Test Files by Type
 
 | Test Type | Count | Update Effort | Factory Usage |
 |-----------|-------|---------------|---------------|
@@ -463,9 +851,9 @@ let storage = TestStorageFactory::temp_vector_storage(384).await;
 
 ---
 
-## 6. Migration Sequence
+## 10. Migration Sequence
 
-### 6.1 Week 1: Foundation (Days 1-3)
+### 10.1 Week 1: Foundation (Days 1-3)
 
 **Day 1**: Trait Migration to llmspell-core
 - Create `llmspell-core/src/traits/storage/` directory
@@ -491,7 +879,7 @@ let storage = TestStorageFactory::temp_vector_storage(384).await;
 - Update `src/lib.rs` (remove re-export)
 - **Validation**: `cargo check -p llmspell-graph`
 
-### 6.2 Week 2: Critical Crates (Days 4-8)
+### 10.2 Week 2: Critical Crates (Days 4-8)
 
 **Day 4**: llmspell-kernel (12 files)
 - Update `src/state/manager.rs`
@@ -524,7 +912,7 @@ let storage = TestStorageFactory::temp_vector_storage(384).await;
 - Update `src/session_integration.rs`
 - **Validation**: `cargo check -p llmspell-rag`
 
-### 6.3 Week 3: Medium-Impact Crates (Days 9-11)
+### 10.3 Week 3: Medium-Impact Crates (Days 9-11)
 
 **Day 9**: llmspell-tenancy, llmspell-agents, llmspell-events
 - Tenancy: 3 files, implements VectorStorage
@@ -543,7 +931,7 @@ let storage = TestStorageFactory::temp_vector_storage(384).await;
 - Fix any remaining compilation errors
 - Verify zero dependency cycles
 
-### 6.4 Week 4: Tests (Days 12-15)
+### 10.4 Week 4: Tests (Days 12-15)
 
 **Day 12**: llmspell-storage tests (38 files!)
 - Update imports in all PostgreSQL tests (20 files)
@@ -570,7 +958,7 @@ let storage = TestStorageFactory::temp_vector_storage(384).await;
 - Remove duplicated test setup code
 - **Target**: Convert ~60 tests to use factory
 
-### 6.5 Week 5: Documentation (Days 16-18)
+### 10.5 Week 5: Documentation (Days 16-18)
 
 **Day 16**: Technical Documentation
 - Update `current-architecture.md` (10 examples)
@@ -592,7 +980,7 @@ let storage = TestStorageFactory::temp_vector_storage(384).await;
 - Fix broken doc links
 - **Validation**: `cargo doc --workspace --no-deps --all-features`
 
-### 6.6 Week 6: Validation & Polish (Days 19-22)
+### 10.6 Week 6: Validation & Polish (Days 19-22)
 
 **Day 19**: Comprehensive Testing
 - Run full test suite: `cargo test --workspace --all-features`
@@ -619,9 +1007,9 @@ let storage = TestStorageFactory::temp_vector_storage(384).await;
 
 ---
 
-## 7. Validation Strategy
+## 11. Validation Strategy
 
-### 7.1 Continuous Validation
+### 11.1 Continuous Validation
 
 **After each crate update**:
 ```bash
@@ -648,7 +1036,7 @@ cargo tree -p llmspell-core | grep -E "llmspell-(storage|graph|memory)"
 # Should show ZERO dependencies (llmspell-core is foundation)
 ```
 
-### 7.2 Compilation Checkpoints
+### 11.2 Compilation Checkpoints
 
 | Checkpoint | Command | Expected Result |
 |------------|---------|-----------------|
@@ -660,7 +1048,7 @@ cargo tree -p llmspell-core | grep -E "llmspell-(storage|graph|memory)"
 | **Day 18** | `cargo doc --workspace --no-deps` | ✅ All docs build |
 | **Day 22** | `./scripts/quality/quality-check.sh` | ✅ All quality gates pass |
 
-### 7.3 Performance Benchmarks
+### 11.3 Performance Benchmarks
 
 **Baseline** (before refactor):
 ```bash
@@ -681,9 +1069,9 @@ diff baseline.txt refactor.txt
 
 ---
 
-## 8. Risk Mitigation
+## 12. Risk Mitigation
 
-### 8.1 High Risks
+### 12.1 High Risks
 
 **Risk 1: Bridge Layer Breakage**
 - **Impact**: ALL Lua/JS scripts fail
@@ -712,7 +1100,7 @@ diff baseline.txt refactor.txt
 - **Mitigation**: Dedicated documentation week (Week 5)
 - **Validation**: Manual review of all code examples
 
-### 8.2 Medium Risks
+### 12.2 Medium Risks
 
 **Risk 5: Performance Regression**
 - **Impact**: Trait object overhead from `Arc<dyn Trait>`
@@ -725,7 +1113,7 @@ diff baseline.txt refactor.txt
 - **Mitigation**: llmspell-core has ZERO internal deps (verify daily)
 - **Detection**: `cargo tree -p llmspell-core`
 
-### 8.3 Mitigation Tools
+### 12.3 Mitigation Tools
 
 **Git Workflow**:
 ```bash
@@ -763,9 +1151,9 @@ echo "✅ All checks passed!"
 
 ---
 
-## 9. Breaking Changes Summary
+## 13. Success Metrics & Breaking Changes
 
-### 9.1 Import Changes (ALL Code)
+### 13.1 Import Changes (ALL Code)
 
 **Every file using storage traits must update imports**:
 
@@ -778,13 +1166,13 @@ echo "✅ All checks passed!"
 | `use llmspell_storage::{VectorEntry, VectorQuery};` | `use llmspell_core::types::storage::{VectorEntry, VectorQuery};` |
 | `use llmspell_graph::types::{Entity, Relationship};` | `use llmspell_core::types::storage::{Entity, Relationship};` |
 
-### 9.2 Removed Exports
+### 13.2 Removed Exports
 
 **llmspell-storage**: NO trait re-exports (only backend modules exported)
 **llmspell-graph**: NO KnowledgeGraph re-export
 **llmspell-memory**: ProceduralMemory re-export removed (EpisodicMemory/SemanticMemory stay)
 
-### 9.3 Downstream Impact
+### 13.3 Downstream Impact
 
 **For users with custom backends**:
 - Must update trait imports to `llmspell_core::traits::storage::*`
@@ -795,9 +1183,7 @@ echo "✅ All checks passed!"
 - Type imports must change
 - Backend instantiation unchanged
 
----
-
-## 10. Success Metrics
+### 13.4 Success Metrics
 
 | Metric | Target | Validation |
 |--------|--------|------------|
