@@ -5088,22 +5088,22 @@ After exhaustive analysis across **all 1,141 Rust source files**:
   - Total test coverage: 75 tests passed across all validated crates
 
 
-#### Sub-Task 13c.3.1.10: Create TestStorageFactory in llmspell-testing**
-  - [ ] Create `llmspell-testing/src/storage.rs` (NEW ~200 lines):
-    ```rust
-    use llmspell_core::traits::storage::{StorageBackend, VectorStorage};
-    use llmspell_storage::backends::memory::MemoryBackend;
-    use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
+#### Sub-Task 13c.3.1.10: Create TestStorageFactory in llmspell-testing** ✅ DONE
+  - [x] Create `llmspell-testing/src/storage.rs` (183 lines):
+    - TestStorageFactory with helper methods for creating test storage
+    - `memory_backend()` - Creates in-memory StorageBackend
+    - `temp_sqlite_backend()` - Creates temporary SQLite backend with auto-cleanup
+    - `temp_vector_storage(dimension)` - Creates temporary SQLite vector storage
+    - TempStorageBackend and TempVectorStorage wrapper types with RAII cleanup
+    - 3 unit tests validating factory methods
+  - [x] Added storage module to llmspell-testing/src/lib.rs
+  - [x] **Validation**: `cargo check -p llmspell-testing` ✅ PASSED (3.05s)
 
-    pub struct TestStorageFactory;
-
-    impl TestStorageFactory {
-        pub fn memory_backend() -> Arc<dyn StorageBackend> { /* ... */ }
-        pub async fn temp_sqlite_backend() -> Arc<SqliteBackend> { /* ... */ }
-        pub async fn temp_vector_storage(dimension: usize) -> Arc<dyn VectorStorage> { /* ... */ }
-    }
-    ```
-  - [ ] **Validation**: `cargo check -p llmspell-testing`
+  **Insights**:
+  - Simplified implementation focused on factory methods rather than full trait implementations
+  - Uses SqliteConfig for proper backend configuration
+  - TempDir ensures automatic cleanup of test databases when dropped
+  - Provides convenient wrappers for accessing backends and storage trait objects
 
 #### Sub-Task 13c.3.1.11: Update llmspell-storage tests (38 files!)**
   - [ ] Update imports in 20 PostgreSQL test files:
