@@ -94,12 +94,12 @@ impl SqliteGraphStorage {
         "default".to_string()
     }
 
-    /// Convert DateTime<Utc> to Unix timestamp (seconds)
+    /// Convert `DateTime<Utc>` to Unix timestamp (seconds)
     fn datetime_to_unix(dt: DateTime<Utc>) -> i64 {
         dt.timestamp()
     }
 
-    /// Convert Unix timestamp to DateTime<Utc>
+    /// Convert Unix timestamp to `DateTime<Utc>`
     fn unix_to_datetime(timestamp: i64) -> DateTime<Utc> {
         DateTime::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now)
     }

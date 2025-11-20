@@ -233,7 +233,7 @@ impl TenantScoped for PostgresBackend {
     ///
     /// # Implementation Notes
     /// - Calls internal `set_tenant_context()` which updates both:
-    ///   1. Internal Rust state (Arc<RwLock<Option<String>>>)
+    ///   1. Internal Rust state (`Arc<RwLock<Option<String>>>`)
     ///   2. PostgreSQL session variable (`app.current_tenant_id`)
     /// - The scope parameter is ignored because PostgreSQL RLS operates at session scope
     /// - All subsequent `get_client()` calls will apply this tenant context

@@ -58,12 +58,12 @@ impl SqliteWorkflowStateStorage {
         &self.tenant_id
     }
 
-    /// Convert database timestamp (Unix epoch seconds) to DateTime<Utc>
+    /// Convert database timestamp (Unix epoch seconds) to `DateTime<Utc>`
     fn timestamp_to_datetime(timestamp: i64) -> DateTime<Utc> {
         DateTime::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now)
     }
 
-    /// Convert DateTime<Utc> to database timestamp (Unix epoch seconds)
+    /// Convert `DateTime<Utc>` to database timestamp (Unix epoch seconds)
     fn datetime_to_timestamp(dt: DateTime<Utc>) -> i64 {
         dt.timestamp()
     }

@@ -16,8 +16,8 @@ use uuid::Uuid;
 /// PostgreSQL-backed graph storage with bi-temporal support
 ///
 /// Maps between llmspell-graph types and PostgreSQL bi-temporal schema:
-/// - `event_time` (Option<DateTime>) → `valid_time_start/end` (range)
-/// - `ingestion_time` (DateTime) → `transaction_time_start/end` (range)
+/// - `event_time` (`Option<DateTime>`) → `valid_time_start/end` (range)
+/// - `ingestion_time` (`DateTime`) → `transaction_time_start/end` (range)
 ///
 /// # Performance
 /// - get_entity_at(): O(log n) via GiST indexes on time ranges
