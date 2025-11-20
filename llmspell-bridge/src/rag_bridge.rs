@@ -1,6 +1,8 @@
 //! ABOUTME: Native Rust bridge for RAG functionality
 //! ABOUTME: Provides vector storage, retrieval, and multi-tenant RAG operations
 
+use llmspell_core::traits::storage::VectorStorage;
+use llmspell_core::types::storage::{VectorEntry, VectorResult};
 use llmspell_core::{execution_context::ExecutionContext, logging::warn, Result};
 use llmspell_kernel::sessions::{SessionId, SessionManager};
 use llmspell_kernel::state::{StateManager, StateScope};
@@ -9,8 +11,6 @@ use llmspell_rag::{
     multi_tenant_integration::MultiTenantRAG, session_integration::SessionAwareRAGPipeline,
     state_integration::StateAwareVectorStorage,
 };
-use llmspell_core::traits::storage::VectorStorage;
-use llmspell_core::types::storage::{VectorEntry, VectorResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;

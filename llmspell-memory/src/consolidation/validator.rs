@@ -264,7 +264,7 @@ mod tests {
                     ingestion_time: Utc::now(),
                 })
             } else {
-                Err(anyhow::anyhow!("Entity not found: {}", id))
+                Err(anyhow::anyhow!("Entity not found: {id}"))
             }
         }
 

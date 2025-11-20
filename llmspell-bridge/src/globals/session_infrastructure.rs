@@ -3,13 +3,13 @@
 
 use crate::globals::GlobalContext;
 use llmspell_config::SessionConfig;
+use llmspell_core::traits::storage::StorageBackend;
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
 use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
 use llmspell_kernel::state::StateManager;
 use llmspell_storage::backends::MemoryBackend;
-use llmspell_core::traits::storage::StorageBackend;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 

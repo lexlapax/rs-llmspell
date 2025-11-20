@@ -619,7 +619,7 @@ mod tests {
         }
 
         async fn get_entity(&self, id: &str) -> anyhow::Result<Entity> {
-            Err(anyhow::anyhow!("Entity not found: {}", id))
+            Err(anyhow::anyhow!("Entity not found: {id}"))
         }
 
         async fn get_entity_at(

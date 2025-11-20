@@ -11,12 +11,12 @@ use super::performance::{
 use super::{StateError, StateResult, StateScope};
 use crate::state::agent_state::ToolUsageStats;
 use llmspell_core::state::{ArtifactCorrelationManager, ArtifactId, StateOperation};
+use llmspell_core::traits::storage::StorageBackend;
 use llmspell_core::types::ComponentId as CoreComponentId;
 use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{
     ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
 };
-use llmspell_core::traits::storage::StorageBackend;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};

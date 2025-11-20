@@ -4,6 +4,7 @@
 
 use crate::globals::GlobalContext;
 use llmspell_config::RAGConfig;
+use llmspell_core::traits::storage::{StorageBackend, VectorStorage};
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
@@ -12,7 +13,6 @@ use llmspell_kernel::state::StateManager;
 use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
 use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 use llmspell_storage::backends::MemoryBackend;
-use llmspell_core::traits::storage::{StorageBackend, VectorStorage};
 use llmspell_tenancy::MultiTenantVectorManager;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
