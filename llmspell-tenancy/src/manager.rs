@@ -4,8 +4,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use llmspell_core::state::StateScope;
-use llmspell_storage::{
-    ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
+use llmspell_core::traits::storage::VectorStorage;
+use llmspell_core::types::storage::{
+    ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
