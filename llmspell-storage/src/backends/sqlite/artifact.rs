@@ -31,11 +31,13 @@ use std::sync::Arc;
 /// ```no_run
 /// use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig};
 /// use llmspell_storage::backends::sqlite::SqliteArtifactStorage;
+/// use llmspell_core::traits::storage::ArtifactStorage;
 /// use llmspell_core::types::storage::{Artifact, ArtifactType};
 /// use std::sync::Arc;
 ///
 /// # async fn example() -> anyhow::Result<()> {
-/// let backend = Arc::new(SqliteBackend::new(SqliteConfig::new("test.db")).await?);
+/// let config = SqliteConfig::new("./test.db");
+/// let backend = Arc::new(SqliteBackend::new(config).await?);
 /// backend.set_tenant_context("tenant-1").await?;
 /// let storage = SqliteArtifactStorage::new(backend.clone(), "tenant-1".to_string());
 ///

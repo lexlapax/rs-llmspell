@@ -16,13 +16,15 @@
 //! # Examples
 //!
 //! ```rust,no_run
-//! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
+//! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage, SqliteConfig};
 //! use llmspell_core::types::storage::Entity;
+//! use llmspell_graph::storage::GraphBackend;
 //! use serde_json::json;
 //! use std::sync::Arc;
 //!
 //! # async fn example() -> anyhow::Result<()> {
-//! let backend = Arc::new(SqliteBackend::new(/* config */).await?);
+//! let config = SqliteConfig::new("./test.db");
+//! let backend = Arc::new(SqliteBackend::new(config).await?);
 //! let storage = SqliteGraphStorage::new(backend);
 //!
 //! // Add entity

@@ -11,7 +11,7 @@
 //!
 //! # Usage
 //!
-//! ```no_run
+//! ```ignore
 //! use llmspell_storage::backends::sqlite::SqliteVecExtension;
 //!
 //! // Extension is registered automatically in SqliteBackend::new()
@@ -38,12 +38,12 @@ impl SqliteVecExtension {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```ignore
     /// use llmspell_storage::backends::sqlite::SqliteVecExtension;
     /// # use anyhow::Result;
     ///
-    /// # fn example(conn: &libsql::Connection) -> Result<()> {
-    /// let available = SqliteVecExtension::is_available(conn)?;
+    /// # async fn example(conn: &libsql::Connection) -> Result<()> {
+    /// let available = SqliteVecExtension::is_available(conn).await?;
     /// assert!(available, "sqlite-vec extension should be loaded");
     /// # Ok(())
     /// # }

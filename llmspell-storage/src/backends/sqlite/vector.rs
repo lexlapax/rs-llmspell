@@ -51,13 +51,15 @@ use vectorlite_rs::{DistanceMetric as VectorliteMetric, HnswIndex};
 /// # Examples
 ///
 /// ```rust,no_run
-/// use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteVectorStorage};
-/// use llmspell_storage::vector_storage::{VectorEntry, VectorQuery};
+/// use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteVectorStorage, SqliteConfig};
+/// use llmspell_core::traits::storage::VectorStorage;
+/// use llmspell_core::types::storage::{VectorEntry, VectorQuery};
 /// use llmspell_core::state::StateScope;
 /// use std::sync::Arc;
 ///
 /// # async fn example() -> anyhow::Result<()> {
-/// let backend = Arc::new(SqliteBackend::new(/* config */).await?);
+/// let config = SqliteConfig::new("./test.db");
+/// let backend = Arc::new(SqliteBackend::new(config).await?);
 /// let storage = SqliteVectorStorage::new(backend, 768).await?;
 ///
 /// // Insert vectors

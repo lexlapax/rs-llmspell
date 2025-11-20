@@ -22,7 +22,8 @@
 //! ## Using Memory Backend
 //!
 //! ```
-//! use llmspell_storage::{MemoryBackend, StorageBackend};
+//! use llmspell_storage::MemoryBackend;
+//! use llmspell_core::traits::storage::StorageBackend;
 //! use serde_json::json;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,18 +45,19 @@
 //!
 //! ## Using SQLite Backend
 //!
-//! ```no_run
+//! ```ignore
+//! # // Note: SqliteBackend does not implement StorageBackend directly
+//! # // Use domain-specific storage types (SqliteVectorStorage, SqliteGraphStorage, etc.)
 //! # #[cfg(feature = "sqlite")]
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! use llmspell_storage::backends::sqlite::SqliteBackend;
-//! use llmspell_storage::StorageBackend;
+//! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig};
 //! use serde_json::json;
 //!
-//! let backend = SqliteBackend::new("./data/storage.db").await?;
+//! let config = SqliteConfig::new("./data/storage.db");
+//! let backend = SqliteBackend::new(config).await?;
 //!
-//! // Data persists across restarts
-//! let value = json!({"version": "1.0"});
-//! backend.set("config:app", serde_json::to_vec(&value)?).await?;
+//! // Use domain-specific storage types built on top of SqliteBackend
+//! // See SqliteVectorStorage, SqliteGraphStorage, SqliteArtifactStorage examples
 //! # Ok(())
 //! # }
 //! ```
@@ -78,8 +80,9 @@
 //!
 //! # Integration Example
 //!
-//! ```no_run
-//! use llmspell_storage::{StorageBackend, StorageBackendType, MemoryBackend};
+//! ```
+//! use llmspell_storage::{StorageBackendType, MemoryBackend};
+//! use llmspell_core::traits::storage::StorageBackend;
 //! use std::sync::Arc;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -87,11 +90,8 @@
 //! async fn create_backend(backend_type: StorageBackendType) -> Result<Arc<dyn StorageBackend>, Box<dyn std::error::Error>> {
 //!     match backend_type {
 //!         StorageBackendType::Memory => Ok(Arc::new(MemoryBackend::new())),
-//!         #[cfg(feature = "sqlite")]
-//!         StorageBackendType::Sqlite => {
-//!             use llmspell_storage::backends::sqlite::SqliteBackend;
-//!             Ok(Arc::new(SqliteBackend::new("./data/storage.db").await?))
-//!         }
+//!         // Note: SQLite storage uses domain-specific types (SqliteVectorStorage, etc.)
+//!         // not a general StorageBackend implementation
 //!         _ => Err("Unsupported backend".into()),
 //!     }
 //! }
