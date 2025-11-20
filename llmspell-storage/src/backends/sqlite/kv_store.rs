@@ -3,7 +3,8 @@
 
 use super::backend::SqliteBackend;
 use super::error::SqliteError;
-use crate::traits::{StorageBackend, StorageBackendType, StorageCharacteristics};
+use llmspell_core::traits::storage::StorageBackend;
+use llmspell_core::types::storage::{StorageBackendType, StorageCharacteristics};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;

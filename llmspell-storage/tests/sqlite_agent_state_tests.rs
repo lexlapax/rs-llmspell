@@ -7,7 +7,7 @@
 //! - Multi-agent state management
 
 use llmspell_storage::backends::sqlite::{SqliteAgentStateStorage, SqliteBackend, SqliteConfig};
-use llmspell_storage::traits::StorageBackend;
+use llmspell_storage::StorageBackend;
 use std::sync::Arc;
 use tempfile::TempDir;
 

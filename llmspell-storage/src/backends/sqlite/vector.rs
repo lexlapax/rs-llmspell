@@ -21,9 +21,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
-use crate::vector_storage::{
+use llmspell_core::traits::storage::VectorStorage;
+use llmspell_core::types::storage::{
     DistanceMetric, ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult,
-    VectorStorage,
 };
 use llmspell_core::state::StateScope;
 

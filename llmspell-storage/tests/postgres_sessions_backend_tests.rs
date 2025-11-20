@@ -10,7 +10,7 @@
 
 #![cfg(feature = "postgres")]
 
-use llmspell_storage::traits::StorageBackend;
+use llmspell_storage::StorageBackend;
 use llmspell_storage::{PostgresBackend, PostgresConfig};
 use std::collections::HashMap;
 use tokio::sync::OnceCell;

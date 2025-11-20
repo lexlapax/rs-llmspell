@@ -104,14 +104,25 @@
 //! # }
 //! ```
 
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+
 pub mod backends;
 pub mod migration;
-pub mod traits;
-pub mod vector_storage;
 
-// Re-export commonly used types
+// Re-export core traits
+pub use llmspell_core::traits::storage::{
+    HNSWStorage, KnowledgeGraph, ProceduralMemory, StorageBackend, VectorStorage,
+};
+
+// Re-export core types
+pub use llmspell_core::types::storage::{
+    DistanceMetric, HNSWConfig, NamespaceStats, ScopedStats, StorageBackendType,
+    StorageCharacteristics, StorageStats, VectorEntry, VectorQuery, VectorResult,
+};
+
+// Re-export backend implementations
 pub use backends::MemoryBackend;
-pub use traits::{StorageBackend, StorageBackendType, StorageCharacteristics, StorageSerialize};
 
 // Re-export PostgreSQL types (Phase 13b.2+)
 #[cfg(feature = "postgres")]
@@ -120,8 +131,22 @@ pub use backends::postgres::{
     PostgresPool,
 };
 
-// Re-export vector storage types
-pub use vector_storage::{
-    DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
-    VectorEntry, VectorQuery, VectorResult, VectorStorage,
-};
+// Helper trait for serialization/deserialization
+pub trait StorageSerialize: Sized {
+    fn to_storage_bytes(&self) -> Result<Vec<u8>>;
+    fn from_storage_bytes(bytes: &[u8]) -> Result<Self>;
+}
+
+// Default implementation for serde types
+impl<T> StorageSerialize for T
+where
+    T: Serialize + for<'de> Deserialize<'de>,
+{
+    fn to_storage_bytes(&self) -> Result<Vec<u8>> {
+        Ok(serde_json::to_vec(self)?)
+    }
+
+    fn from_storage_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}

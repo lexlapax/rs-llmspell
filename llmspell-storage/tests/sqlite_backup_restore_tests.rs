@@ -13,7 +13,7 @@ use llmspell_storage::backends::sqlite::{
     SqliteAgentStateStorage, SqliteBackend, SqliteConfig, SqliteKVStorage,
     SqliteWorkflowStateStorage,
 };
-use llmspell_storage::traits::StorageBackend;
+use llmspell_storage::StorageBackend;
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;

@@ -7,7 +7,7 @@ use super::traits::MigrationTarget;
 use crate::backends::postgres::PostgresBackend;
 
 #[cfg(feature = "postgres")]
-use crate::traits::StorageBackend;
+use llmspell_core::traits::storage::StorageBackend;
 
 #[cfg(feature = "postgres")]
 use anyhow::Result;

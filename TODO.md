@@ -4885,25 +4885,41 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 
 **Implementation Steps** (Weeks 1-6):
 
-#### Sub-Task 13c.3.1.1: Update llmspell-storage backends (22 files)**
-  - [ ] PostgreSQL backend (11 files):
-    - [ ] `backends/postgres/backend.rs`: `use llmspell_core::traits::storage::StorageBackend`
-    - [ ] `backends/postgres/vector.rs`: `use llmspell_core::traits::storage::VectorStorage`
-    - [ ] `backends/postgres/graph.rs`: `use llmspell_core::traits::storage::KnowledgeGraph`
-    - [ ] `backends/postgres/procedural.rs`: `use llmspell_core::traits::storage::ProceduralMemory`
-    - [ ] `backends/postgres/agent_state.rs`: Update imports
-    - [ ] `backends/postgres/kv_store.rs`: Update imports
-    - [ ] `backends/postgres/workflow_state.rs`: Already correct (skip)
-    - [ ] `backends/postgres/session.rs`: Already correct (skip)
-    - [ ] `backends/postgres/artifact.rs`: Already correct (skip)
-    - [ ] `backends/postgres/event_log.rs`: Update imports
-    - [ ] `backends/postgres/hook_history.rs`: Update imports
-  - [ ] SQLite backend (11 files) - same pattern as PostgreSQL
-  - [ ] Delete old trait files:
-    - [ ] Delete `src/traits.rs` (StorageBackend moved to core)
-    - [ ] Delete `src/vector_storage.rs` (VectorStorage moved to core)
-  - [ ] Update `src/lib.rs`: Remove trait re-exports, keep backend module exports only
-  - [ ] **Validation**: `cargo check -p llmspell-storage && cargo test -p llmspell-storage`
+#### Sub-Task 13c.3.1.1: Update llmspell-storage backends (22 files)** ✅ COMPLETE
+  - [x] PostgreSQL backend (1 file updated - vector.rs only):
+    - [x] `backends/postgres/vector.rs`: `use llmspell_core::traits::storage::VectorStorage`
+    - [x] `backends/postgres/graph.rs`: ❌ SKIPPED (uses llmspell_graph::traits::KnowledgeGraph - not migrated yet)
+    - [x] Other files: ✅ NO UPDATES NEEDED (no trait imports)
+  - [x] SQLite backend (4 files updated):
+    - [x] `backends/sqlite/vector.rs`: Updated to llmspell_core imports
+    - [x] `backends/sqlite/agent_state.rs`: Updated StorageBackend imports
+    - [x] `backends/sqlite/kv_store.rs`: Updated StorageBackend imports
+    - [x] `backends/sqlite/graph.rs`: ❌ SKIPPED (uses llmspell_graph types - not migrated yet)
+  - [x] Additional files updated:
+    - [x] `backends/memory.rs`: Updated StorageBackend imports
+    - [x] `migration/adapters.rs`: Updated StorageBackend imports
+  - [x] Delete old trait files:
+    - [x] Deleted `src/traits.rs` (StorageBackend moved to core)
+    - [x] Deleted `src/vector_storage.rs` (VectorStorage moved to core)
+  - [x] Update `src/lib.rs`:
+    - [x] Re-export traits from llmspell_core
+    - [x] Re-export types from llmspell_core
+    - [x] Preserved StorageSerialize helper trait (still needed by other crates)
+  - [x] Update 31 test files: Updated all `use llmspell_storage::traits::` → `use llmspell_storage::`
+  - [x] **Validation**: `cargo check -p llmspell-storage && cargo test -p llmspell-storage`
+    - ✅ cargo check: PASSED
+    - ✅ cargo test --lib: 16 tests PASSED
+    - ✅ cargo test --tests --features sqlite: 21 integration tests PASSED
+    - ⚠️ Doc tests: 7 failures (examples need updating - deferred)
+
+**Completion Insights** (2025-11-20):
+- **Actual Scope**: 7 source files + 31 test files (38 files total, not 22)
+- **Key Discovery**: Graph storage backends (postgres/graph.rs, sqlite/graph.rs) were NOT updated because they implement `llmspell_graph::traits::KnowledgeGraph`, not the llmspell-core version. This is correct - graph traits are updated in sub-task 13c.3.1.2.
+- **StorageSerialize Preserved**: This helper trait remained in llmspell-storage (moved to lib.rs) because it's used by llmspell-agents, llmspell-events, and llmspell-kernel
+- **Test Strategy**: Bulk sed replacement worked efficiently for 31 test files
+- **Doc Tests Deferred**: 7 doc test failures in examples (outdated API usage) - will fix in sub-task 13c.3.1.14
+- **Zero Warnings**: cargo check produces zero warnings
+- **Next Step**: Sub-Task 13c.3.1.2 (Update llmspell-graph)
 
 #### Sub-Task 13c.3.1.2: Update llmspell-graph**
   - [ ] Update `src/backends/*.rs` imports (if any graph backend implementations exist)

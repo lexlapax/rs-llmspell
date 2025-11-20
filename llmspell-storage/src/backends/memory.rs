@@ -1,7 +1,8 @@
 //! ABOUTME: In-memory storage backend implementation
 //! ABOUTME: Provides fast non-persistent storage for testing and development
 
-use crate::traits::{StorageBackend, StorageBackendType, StorageCharacteristics};
+use llmspell_core::traits::storage::StorageBackend;
+use llmspell_core::types::storage::{StorageBackendType, StorageCharacteristics};
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
