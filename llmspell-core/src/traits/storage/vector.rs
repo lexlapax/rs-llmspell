@@ -11,8 +11,7 @@
 
 use crate::state::StateScope;
 use crate::types::storage::vector::{
-    HNSWConfig, NamespaceStats, ScopedStats, StorageStats, VectorEntry,
-    VectorQuery, VectorResult,
+    HNSWConfig, NamespaceStats, ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult,
 };
 use anyhow::Result;
 use async_trait::async_trait;
