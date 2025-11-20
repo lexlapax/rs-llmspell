@@ -2,7 +2,8 @@
 
 use anyhow::Result;
 use llmspell_core::state::StateScope;
-use llmspell_storage::{VectorEntry, VectorStorage};
+use llmspell_core::traits::storage::VectorStorage;
+use llmspell_core::types::storage::VectorEntry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

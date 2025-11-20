@@ -2,9 +2,9 @@
 
 use crate::multi_tenant_integration::MultiTenantRAG;
 use anyhow::Result;
+use llmspell_core::traits::storage::VectorStorage;
 use llmspell_kernel::state::StateManager;
 use llmspell_kernel::state::StateScope;
-use llmspell_storage::VectorStorage;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::debug;
