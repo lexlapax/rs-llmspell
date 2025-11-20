@@ -9,7 +9,8 @@ use llmspell_rag::{
     multi_tenant_integration::MultiTenantRAG, session_integration::SessionAwareRAGPipeline,
     state_integration::StateAwareVectorStorage,
 };
-use llmspell_storage::{VectorEntry, VectorResult, VectorStorage};
+use llmspell_core::traits::storage::VectorStorage;
+use llmspell_core::types::storage::{VectorEntry, VectorResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
