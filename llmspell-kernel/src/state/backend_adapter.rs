@@ -4,7 +4,8 @@
 use super::config::StorageBackendType;
 use super::performance::UnifiedSerializer;
 use crate::state::{StateError, StateResult};
-use llmspell_storage::{StorageBackend, StorageSerialize};
+use llmspell_core::traits::storage::StorageBackend;
+use llmspell_storage::StorageSerialize;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

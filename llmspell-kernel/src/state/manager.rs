@@ -16,7 +16,7 @@ use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, Uni
 use llmspell_hooks::{
     ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
 };
-use llmspell_storage::StorageBackend;
+use llmspell_core::traits::storage::StorageBackend;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
