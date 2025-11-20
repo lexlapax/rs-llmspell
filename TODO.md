@@ -5061,23 +5061,31 @@ After exhaustive analysis across **all 1,141 Rust source files**:
   - llmspell-agents: Updated 1 file (registry/persistence.rs)
   - Pattern: StorageBackend trait from core, StorageSerialize helper stays in storage
 
-#### Sub-Task 13c.3.1.9: llmspell-events (3 files) + llmspell-hooks (1 file) + others**
-  - [ ] llmspell-events:
-    - [ ] Update `src/storage_adapter.rs`: EventStorageAdapter<B: StorageBackend>
-    - [ ] **Validation**: `cargo check -p llmspell-events && cargo test -p llmspell-events`
-  - [ ] llmspell-hooks:
-    - [ ] Update hook persistence: HookReplayManager uses StorageBackend
-    - [ ] **Validation**: `cargo check -p llmspell-hooks && cargo test -p llmspell-hooks`
-  - [ ] llmspell-context (3 files - indirect):
-    - [ ] Verify compilation (no direct storage trait usage)
-    - [ ] **Validation**: `cargo check -p llmspell-context && cargo test -p llmspell-context`
-  - [ ] llmspell-templates (2 files):
-    - [ ] Verify via MemoryManager (indirect)
-    - [ ] **Validation**: `cargo check -p llmspell-templates`
-  - [ ] llmspell-testing (1 file):
-    - [ ] Create TestStorageFactory helper (NEW)
-    - [ ] **Validation**: `cargo check -p llmspell-testing`
-  - [ ] **Critical Validation**: `cargo check --workspace --all-features`
+#### Sub-Task 13c.3.1.9: llmspell-events (3 files) + llmspell-hooks (1 file) + others** ✅ DONE
+  - [x] llmspell-events:
+    - [x] Update `src/storage_adapter.rs`: EventStorageAdapter<B: StorageBackend>
+    - [x] Update `src/bus.rs`: StorageBackend import
+    - [x] Add llmspell-core dependency to Cargo.toml
+    - [x] **Validation**: `cargo check -p llmspell-events && cargo test -p llmspell-events` ✅ 56 tests passed
+  - [x] llmspell-hooks:
+    - [x] Verified: Uses domain-specific StorageBackend (hook persistence), not state storage
+    - [x] Already depends on llmspell-core, no changes needed
+    - [x] **Validation**: `cargo check -p llmspell-hooks && cargo test -p llmspell-hooks` ✅ 9 tests passed
+  - [x] llmspell-context (3 files - indirect):
+    - [x] Verify compilation (no direct storage trait usage) ✅
+    - [x] **Validation**: `cargo check -p llmspell-context && cargo test -p llmspell-context` ✅ 10 tests passed
+  - [x] llmspell-templates (2 files):
+    - [x] Verify via MemoryManager (indirect) ✅
+    - [x] **Validation**: `cargo check -p llmspell-templates` ✅ PASSED
+  - [x] llmspell-testing:
+    - [x] No changes needed (TestStorageFactory is Sub-Task 13c.3.1.10)
+  - [x] **Critical Validation**: `cargo check --workspace --all-features` ✅ PASSED (1m 27s)
+
+  **Insights**:
+  - llmspell-events: Updated 3 files, added llmspell-core dependency
+  - llmspell-hooks: Has its own domain-specific StorageBackend for hook execution persistence (not state storage)
+  - llmspell-context, llmspell-templates: No changes needed, verified via indirect dependencies
+  - Total test coverage: 75 tests passed across all validated crates
 
 
 #### Sub-Task 13c.3.1.10: Create TestStorageFactory in llmspell-testing**

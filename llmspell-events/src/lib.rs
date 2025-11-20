@@ -20,7 +20,7 @@
 //!
 //! ```rust,no_run
 //! use llmspell_events::{EventBus, UniversalEvent, Language, EventStorageAdapter};
-//! use llmspell_storage::MemoryBackend;
+//! use llmspell_storage::backends::MemoryBackend;
 //! use tokio::sync::mpsc;
 //!
 //! #[tokio::main]

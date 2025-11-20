@@ -10,6 +10,7 @@ keywords = ["llm", "events", "async", "cross-language"]
 categories = ["asynchronous", "api-bindings"]
 
 [dependencies]
+llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-storage = { path = "../llmspell-storage" }
 anyhow = "1.0"
