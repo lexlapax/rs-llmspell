@@ -93,10 +93,13 @@ pub mod extraction;
 pub mod prelude;
 pub mod storage;
 pub mod traits;
-pub mod types;
 
-// Re-exports for convenience
+// Re-export error types
 pub use error::{GraphError, Result};
+
+// Re-export domain-specific storage trait
 pub use storage::GraphBackend;
-pub use traits::KnowledgeGraph;
-pub use types::{Entity, Relationship, TemporalQuery};
+
+// Re-export core traits and types from llmspell-core
+pub use llmspell_core::traits::storage::KnowledgeGraph;
+pub use llmspell_core::types::storage::{Entity, Relationship, TemporalQuery};

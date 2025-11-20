@@ -733,7 +733,7 @@ mod tests {
     async fn test_semantic_memory_integration() {
         let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
 
-        let entity = llmspell_graph::types::Entity::new(
+        let entity = llmspell_graph::Entity::new(
             "Rust".into(),
             "programming_language".into(),
             json!({"paradigm": "systems"}),

@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
-use crate::error::Result;
-use crate::types::{Entity, Relationship, TemporalQuery};
+use anyhow::Result;
+use llmspell_core::types::storage::{Entity, Relationship, TemporalQuery};
 
 /// Swappable backend trait for knowledge graph storage
 ///

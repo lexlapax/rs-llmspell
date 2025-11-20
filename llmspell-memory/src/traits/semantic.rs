@@ -28,7 +28,7 @@ use chrono::{DateTime, Utc};
 use crate::error::Result;
 
 // Re-export graph types as canonical types for semantic memory
-pub use llmspell_graph::types::{Entity, Relationship};
+pub use llmspell_graph::{Entity, Relationship};
 
 /// Semantic memory stores bi-temporal knowledge graph
 ///

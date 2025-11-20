@@ -17,7 +17,7 @@
 //!
 //! ```rust,no_run
 //! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
-//! use llmspell_graph::types::Entity;
+//! use llmspell_core::types::storage::Entity;
 //! use serde_json::json;
 //! use std::sync::Arc;
 //!
@@ -43,9 +43,9 @@ use std::sync::Arc;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use llmspell_graph::error::{GraphError, Result};
+use anyhow::Result;
+use llmspell_core::types::storage::{Entity, Relationship, TemporalQuery};
 use llmspell_graph::storage::GraphBackend;
-use llmspell_graph::types::{Entity, Relationship, TemporalQuery};
 
 use super::backend::SqliteBackend;
 
@@ -120,9 +120,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// UUID of created entity
     async fn add_entity(&self, entity: Entity) -> Result<String> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
         let entity_id = if entity.id.is_empty() {
@@ -137,7 +138,7 @@ impl GraphBackend for SqliteGraphStorage {
         let entity_type = entity.entity_type.clone();
         let entity_name = entity.name.clone();
         let properties = serde_json::to_string(&entity.properties).map_err(|e| {
-            GraphError::Storage(format!("Failed to serialize entity properties: {}", e))
+            anyhow::anyhow!(format!("Failed to serialize entity properties: {}", e))
         })?;
 
         conn.execute(
@@ -157,7 +158,7 @@ impl GraphBackend for SqliteGraphStorage {
             ],
         )
         .await
-        .map_err(|e| GraphError::Storage(format!("Failed to insert entity: {}", e)))?;
+        .map_err(|e| anyhow::anyhow!(format!("Failed to insert entity: {}", e)))?;
 
         debug!(
             "Added entity: id={}, type={}, name={}",
@@ -181,9 +182,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// Ok if update successful
     async fn update_entity(&self, id: &str, changes: HashMap<String, Value>) -> Result<()> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
 
@@ -197,22 +199,21 @@ impl GraphBackend for SqliteGraphStorage {
                 libsql::params![id, tenant_id.clone()],
             )
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to query current entity: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to query current entity: {}", e)))?;
 
         let row = rows
             .next()
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to get query result: {}", e)))?
-            .ok_or_else(|| GraphError::Storage("Entity not found".to_string()))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get query result: {}", e)))?
+            .ok_or_else(|| anyhow::anyhow!("Entity not found".to_string()))?;
 
         let properties_str: String = row
             .get(0)
-            .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get properties: {}", e)))?;
 
         // Parse current properties and apply changes
-        let mut properties: Value = serde_json::from_str(&properties_str).map_err(|e| {
-            GraphError::Storage(format!("Failed to parse current properties: {}", e))
-        })?;
+        let mut properties: Value = serde_json::from_str(&properties_str)
+            .map_err(|e| anyhow::anyhow!(format!("Failed to parse current properties: {}", e)))?;
 
         if let Value::Object(ref mut map) = properties {
             for (key, value) in changes {
@@ -221,7 +222,7 @@ impl GraphBackend for SqliteGraphStorage {
         }
 
         let updated_properties = serde_json::to_string(&properties).map_err(|e| {
-            GraphError::Storage(format!("Failed to serialize updated properties: {}", e))
+            anyhow::anyhow!(format!("Failed to serialize updated properties: {}", e))
         })?;
 
         // In-place update (simplified for MVP)
@@ -233,7 +234,7 @@ impl GraphBackend for SqliteGraphStorage {
             libsql::params![updated_properties, id, tenant_id],
         )
         .await
-        .map_err(|e| GraphError::Storage(format!("Failed to update entity properties: {}", e)))?;
+        .map_err(|e| anyhow::anyhow!(format!("Failed to update entity properties: {}", e)))?;
 
         debug!("Updated entity: id={}", id);
 
@@ -252,9 +253,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// Entity with current properties
     async fn get_entity(&self, id: &str) -> Result<Entity> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
 
@@ -269,35 +271,35 @@ impl GraphBackend for SqliteGraphStorage {
                 libsql::params![id, tenant_id],
             )
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to query entity: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to query entity: {}", e)))?;
 
         let row = rows
             .next()
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to get query result: {}", e)))?
-            .ok_or_else(|| GraphError::EntityNotFound(id.to_string()))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get query result: {}", e)))?
+            .ok_or_else(|| anyhow::anyhow!("Entity not found: {}", id.to_string()))?;
 
         let entity_id: String = row
             .get(0)
-            .map_err(|e| GraphError::Storage(format!("Failed to get entity_id: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_id: {}", e)))?;
         let name: String = row
             .get(1)
-            .map_err(|e| GraphError::Storage(format!("Failed to get name: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get name: {}", e)))?;
         let entity_type: String = row
             .get(2)
-            .map_err(|e| GraphError::Storage(format!("Failed to get entity_type: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_type: {}", e)))?;
         let properties_str: String = row
             .get(3)
-            .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get properties: {}", e)))?;
         let valid_time_start: i64 = row
             .get(4)
-            .map_err(|e| GraphError::Storage(format!("Failed to get valid_time_start: {}", e)))?;
-        let transaction_time_start: i64 = row.get(5).map_err(|e| {
-            GraphError::Storage(format!("Failed to get transaction_time_start: {}", e))
-        })?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get valid_time_start: {}", e)))?;
+        let transaction_time_start: i64 = row
+            .get(5)
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get transaction_time_start: {}", e)))?;
 
         let properties: Value = serde_json::from_str(&properties_str)
-            .map_err(|e| GraphError::Storage(format!("Failed to parse properties JSON: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to parse properties JSON: {}", e)))?;
 
         Ok(Entity {
             id: entity_id,
@@ -323,9 +325,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// Entity as it was at event_time
     async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Entity> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
         let event_timestamp = Self::datetime_to_unix(event_time);
@@ -342,37 +345,35 @@ impl GraphBackend for SqliteGraphStorage {
                 libsql::params![id, tenant_id, event_timestamp],
             )
             .await
-            .map_err(|e| {
-                GraphError::Storage(format!("Failed to query entity at event time: {}", e))
-            })?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to query entity at event time: {}", e)))?;
 
         let row = rows
             .next()
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to get query result: {}", e)))?
-            .ok_or_else(|| GraphError::EntityNotFound(id.to_string()))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get query result: {}", e)))?
+            .ok_or_else(|| anyhow::anyhow!("Entity not found: {}", id.to_string()))?;
 
         let entity_id: String = row
             .get(0)
-            .map_err(|e| GraphError::Storage(format!("Failed to get entity_id: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_id: {}", e)))?;
         let name: String = row
             .get(1)
-            .map_err(|e| GraphError::Storage(format!("Failed to get name: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get name: {}", e)))?;
         let entity_type: String = row
             .get(2)
-            .map_err(|e| GraphError::Storage(format!("Failed to get entity_type: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_type: {}", e)))?;
         let properties_str: String = row
             .get(3)
-            .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get properties: {}", e)))?;
         let valid_time_start: i64 = row
             .get(4)
-            .map_err(|e| GraphError::Storage(format!("Failed to get valid_time_start: {}", e)))?;
-        let transaction_time_start: i64 = row.get(5).map_err(|e| {
-            GraphError::Storage(format!("Failed to get transaction_time_start: {}", e))
-        })?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get valid_time_start: {}", e)))?;
+        let transaction_time_start: i64 = row
+            .get(5)
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get transaction_time_start: {}", e)))?;
 
         let properties: Value = serde_json::from_str(&properties_str)
-            .map_err(|e| GraphError::Storage(format!("Failed to parse properties JSON: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to parse properties JSON: {}", e)))?;
 
         Ok(Entity {
             id: entity_id,
@@ -397,9 +398,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// UUID of created relationship
     async fn add_relationship(&self, relationship: Relationship) -> Result<String> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
         let relationship_id = if relationship.id.is_empty() {
@@ -418,7 +420,7 @@ impl GraphBackend for SqliteGraphStorage {
         let from_entity = relationship.from_entity.clone();
         let to_entity = relationship.to_entity.clone();
         let properties = serde_json::to_string(&relationship.properties).map_err(|e| {
-            GraphError::Storage(format!(
+            anyhow::anyhow!(format!(
                 "Failed to serialize relationship properties: {}",
                 e
             ))
@@ -443,7 +445,7 @@ impl GraphBackend for SqliteGraphStorage {
             ],
         )
         .await
-        .map_err(|e| GraphError::Storage(format!("Failed to insert relationship: {}", e)))?;
+        .map_err(|e| anyhow::anyhow!(format!("Failed to insert relationship: {}", e)))?;
 
         debug!(
             "Added relationship: id={}, type={}, from={}, to={}",
@@ -467,9 +469,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// Vector of related entities
     async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
         let now = Utc::now().timestamp();
@@ -490,37 +493,36 @@ impl GraphBackend for SqliteGraphStorage {
                 libsql::params![entity_id, tenant_id, relationship_type, now],
             )
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to query related entities: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to query related entities: {}", e)))?;
 
         let mut entities = Vec::new();
 
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to iterate query results: {}", e)))?
+            .map_err(|e| anyhow::anyhow!(format!("Failed to iterate query results: {}", e)))?
         {
             let entity_id: String = row
                 .get(0)
-                .map_err(|e| GraphError::Storage(format!("Failed to get entity_id: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_id: {}", e)))?;
             let name: String = row
                 .get(1)
-                .map_err(|e| GraphError::Storage(format!("Failed to get name: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get name: {}", e)))?;
             let entity_type: String = row
                 .get(2)
-                .map_err(|e| GraphError::Storage(format!("Failed to get entity_type: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_type: {}", e)))?;
             let properties_str: String = row
                 .get(3)
-                .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
-            let valid_time_start: i64 = row.get(4).map_err(|e| {
-                GraphError::Storage(format!("Failed to get valid_time_start: {}", e))
-            })?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get properties: {}", e)))?;
+            let valid_time_start: i64 = row
+                .get(4)
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get valid_time_start: {}", e)))?;
             let transaction_time_start: i64 = row.get(5).map_err(|e| {
-                GraphError::Storage(format!("Failed to get transaction_time_start: {}", e))
+                anyhow::anyhow!(format!("Failed to get transaction_time_start: {}", e))
             })?;
 
-            let properties: Value = serde_json::from_str(&properties_str).map_err(|e| {
-                GraphError::Storage(format!("Failed to parse properties JSON: {}", e))
-            })?;
+            let properties: Value = serde_json::from_str(&properties_str)
+                .map_err(|e| anyhow::anyhow!(format!("Failed to parse properties JSON: {}", e)))?;
 
             entities.push(Entity {
                 id: entity_id,
@@ -553,9 +555,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// All relationships involving this entity
     async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
         let now = Utc::now().timestamp();
@@ -572,35 +575,35 @@ impl GraphBackend for SqliteGraphStorage {
                 libsql::params![entity_id, tenant_id, now],
             )
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to query relationships: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to query relationships: {}", e)))?;
 
         let mut relationships = Vec::new();
 
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to iterate query results: {}", e)))?
+            .map_err(|e| anyhow::anyhow!(format!("Failed to iterate query results: {}", e)))?
         {
-            let relationship_id: String = row.get(0).map_err(|e| {
-                GraphError::Storage(format!("Failed to get relationship_id: {}", e))
-            })?;
+            let relationship_id: String = row
+                .get(0)
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get relationship_id: {}", e)))?;
             let from_entity: String = row
                 .get(1)
-                .map_err(|e| GraphError::Storage(format!("Failed to get from_entity: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get from_entity: {}", e)))?;
             let to_entity: String = row
                 .get(2)
-                .map_err(|e| GraphError::Storage(format!("Failed to get to_entity: {}", e)))?;
-            let relationship_type: String = row.get(3).map_err(|e| {
-                GraphError::Storage(format!("Failed to get relationship_type: {}", e))
-            })?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get to_entity: {}", e)))?;
+            let relationship_type: String = row
+                .get(3)
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get relationship_type: {}", e)))?;
             let properties_str: String = row
                 .get(4)
-                .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
-            let valid_time_start: i64 = row.get(5).map_err(|e| {
-                GraphError::Storage(format!("Failed to get valid_time_start: {}", e))
-            })?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get properties: {}", e)))?;
+            let valid_time_start: i64 = row
+                .get(5)
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get valid_time_start: {}", e)))?;
             let transaction_time_start: i64 = row.get(6).map_err(|e| {
-                GraphError::Storage(format!("Failed to get transaction_time_start: {}", e))
+                anyhow::anyhow!(format!("Failed to get transaction_time_start: {}", e))
             })?;
 
             let properties: serde_json::Value =
@@ -636,9 +639,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// Vector of entities matching query
     async fn query_temporal(&self, query: TemporalQuery) -> Result<Vec<Entity>> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
 
@@ -698,37 +702,36 @@ impl GraphBackend for SqliteGraphStorage {
         let mut rows = conn
             .query(&sql, libsql::params_from_iter(params))
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to execute temporal query: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to execute temporal query: {}", e)))?;
 
         let mut entities = Vec::new();
 
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to iterate query results: {}", e)))?
+            .map_err(|e| anyhow::anyhow!(format!("Failed to iterate query results: {}", e)))?
         {
             let entity_id: String = row
                 .get(0)
-                .map_err(|e| GraphError::Storage(format!("Failed to get entity_id: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_id: {}", e)))?;
             let name: String = row
                 .get(1)
-                .map_err(|e| GraphError::Storage(format!("Failed to get name: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get name: {}", e)))?;
             let entity_type: String = row
                 .get(2)
-                .map_err(|e| GraphError::Storage(format!("Failed to get entity_type: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_type: {}", e)))?;
             let properties_str: String = row
                 .get(3)
-                .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
-            let valid_time_start: i64 = row.get(4).map_err(|e| {
-                GraphError::Storage(format!("Failed to get valid_time_start: {}", e))
-            })?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get properties: {}", e)))?;
+            let valid_time_start: i64 = row
+                .get(4)
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get valid_time_start: {}", e)))?;
             let transaction_time_start: i64 = row.get(5).map_err(|e| {
-                GraphError::Storage(format!("Failed to get transaction_time_start: {}", e))
+                anyhow::anyhow!(format!("Failed to get transaction_time_start: {}", e))
             })?;
 
-            let properties: Value = serde_json::from_str(&properties_str).map_err(|e| {
-                GraphError::Storage(format!("Failed to parse properties JSON: {}", e))
-            })?;
+            let properties: Value = serde_json::from_str(&properties_str)
+                .map_err(|e| anyhow::anyhow!(format!("Failed to parse properties JSON: {}", e)))?;
 
             entities.push(Entity {
                 id: entity_id,
@@ -759,9 +762,10 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// Number of entities deleted
     async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
         let cutoff = Self::datetime_to_unix(timestamp);
@@ -775,7 +779,7 @@ impl GraphBackend for SqliteGraphStorage {
             )
             .await
             .map_err(|e| {
-                GraphError::Storage(format!("Failed to delete entities before timestamp: {}", e))
+                anyhow::anyhow!(format!("Failed to delete entities before timestamp: {}", e))
             })?;
 
         info!(
@@ -815,9 +819,10 @@ impl GraphBackend for SqliteGraphStorage {
         max_depth: usize,
         at_time: Option<DateTime<Utc>>,
     ) -> Result<Vec<(Entity, usize, String)>> {
-        let conn = self.backend.get_connection().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to get database connection: {}", e))
-        })?;
+        let conn =
+            self.backend.get_connection().await.map_err(|e| {
+                anyhow::anyhow!(format!("Failed to get database connection: {}", e))
+            })?;
 
         let tenant_id = self.get_tenant_id();
         let capped_depth = max_depth.min(10); // Cap at 10 hops
@@ -910,44 +915,42 @@ impl GraphBackend for SqliteGraphStorage {
                 libsql::params![start_entity, tenant_id, query_time, capped_depth as i64],
             )
             .await
-            .map_err(|e| {
-                GraphError::Storage(format!("Failed to execute traversal query: {}", e))
-            })?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to execute traversal query: {}", e)))?;
 
         let mut results = Vec::new();
 
         while let Some(row) = rows
             .next()
             .await
-            .map_err(|e| GraphError::Storage(format!("Failed to fetch traversal result: {}", e)))?
+            .map_err(|e| anyhow::anyhow!(format!("Failed to fetch traversal result: {}", e)))?
         {
             let entity_id: String = row
                 .get(0)
-                .map_err(|e| GraphError::Storage(format!("Failed to get entity_id: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_id: {}", e)))?;
             let entity_type: String = row
                 .get(1)
-                .map_err(|e| GraphError::Storage(format!("Failed to get entity_type: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get entity_type: {}", e)))?;
             let name: String = row
                 .get(2)
-                .map_err(|e| GraphError::Storage(format!("Failed to get name: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get name: {}", e)))?;
             let properties_str: String = row
                 .get(3)
-                .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
-            let valid_time_start: i64 = row.get(4).map_err(|e| {
-                GraphError::Storage(format!("Failed to get valid_time_start: {}", e))
-            })?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get properties: {}", e)))?;
+            let valid_time_start: i64 = row
+                .get(4)
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get valid_time_start: {}", e)))?;
             let transaction_time_start: i64 = row.get(5).map_err(|e| {
-                GraphError::Storage(format!("Failed to get transaction_time_start: {}", e))
+                anyhow::anyhow!(format!("Failed to get transaction_time_start: {}", e))
             })?;
             let depth: i64 = row
                 .get(6)
-                .map_err(|e| GraphError::Storage(format!("Failed to get depth: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get depth: {}", e)))?;
             let path_json: String = row
                 .get(7)
-                .map_err(|e| GraphError::Storage(format!("Failed to get path: {}", e)))?;
+                .map_err(|e| anyhow::anyhow!(format!("Failed to get path: {}", e)))?;
 
             let properties: Value = serde_json::from_str(&properties_str).map_err(|e| {
-                GraphError::Storage(format!("Failed to parse entity properties: {}", e))
+                anyhow::anyhow!(format!("Failed to parse entity properties: {}", e))
             })?;
 
             let entity = Entity {
@@ -975,78 +978,40 @@ impl GraphBackend for SqliteGraphStorage {
 // Implement KnowledgeGraph trait by delegating to GraphBackend implementation
 #[async_trait]
 impl llmspell_graph::traits::KnowledgeGraph for SqliteGraphStorage {
-    async fn add_entity(&self, entity: Entity) -> llmspell_graph::error::Result<String> {
-        <Self as GraphBackend>::add_entity(self, entity)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    async fn add_entity(&self, entity: Entity) -> Result<String> {
+        <Self as GraphBackend>::add_entity(self, entity).await
     }
 
-    async fn update_entity(
-        &self,
-        id: &str,
-        changes: HashMap<String, Value>,
-    ) -> llmspell_graph::error::Result<()> {
-        <Self as GraphBackend>::update_entity(self, id, changes)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    async fn update_entity(&self, id: &str, changes: HashMap<String, Value>) -> Result<()> {
+        <Self as GraphBackend>::update_entity(self, id, changes).await
     }
 
-    async fn get_entity(&self, id: &str) -> llmspell_graph::error::Result<Entity> {
+    async fn get_entity(&self, id: &str) -> Result<Entity> {
         <Self as GraphBackend>::get_entity(self, id).await
     }
 
-    async fn get_entity_at(
-        &self,
-        id: &str,
-        event_time: DateTime<Utc>,
-    ) -> llmspell_graph::error::Result<Entity> {
+    async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Entity> {
         <Self as GraphBackend>::get_entity_at(self, id, event_time).await
     }
 
-    async fn add_relationship(
-        &self,
-        relationship: Relationship,
-    ) -> llmspell_graph::error::Result<String> {
-        <Self as GraphBackend>::add_relationship(self, relationship)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    async fn add_relationship(&self, relationship: Relationship) -> Result<String> {
+        <Self as GraphBackend>::add_relationship(self, relationship).await
     }
 
-    async fn get_related(
-        &self,
-        entity_id: &str,
-        relationship_type: &str,
-    ) -> llmspell_graph::error::Result<Vec<Entity>> {
-        <Self as GraphBackend>::get_related(self, entity_id, relationship_type)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>> {
+        <Self as GraphBackend>::get_related(self, entity_id, relationship_type).await
     }
 
-    async fn get_relationships(
-        &self,
-        entity_id: &str,
-    ) -> llmspell_graph::error::Result<Vec<Relationship>> {
-        <Self as GraphBackend>::get_relationships(self, entity_id)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>> {
+        <Self as GraphBackend>::get_relationships(self, entity_id).await
     }
 
-    async fn query_temporal(
-        &self,
-        query: TemporalQuery,
-    ) -> llmspell_graph::error::Result<Vec<Entity>> {
-        <Self as GraphBackend>::query_temporal(self, query)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    async fn query_temporal(&self, query: TemporalQuery) -> Result<Vec<Entity>> {
+        <Self as GraphBackend>::query_temporal(self, query).await
     }
 
-    async fn delete_before(
-        &self,
-        timestamp: DateTime<Utc>,
-    ) -> llmspell_graph::error::Result<usize> {
-        <Self as GraphBackend>::delete_before(self, timestamp)
-            .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
+    async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize> {
+        <Self as GraphBackend>::delete_before(self, timestamp).await
     }
 
     async fn traverse(
@@ -1055,7 +1020,7 @@ impl llmspell_graph::traits::KnowledgeGraph for SqliteGraphStorage {
         relationship_type: Option<&str>,
         max_depth: usize,
         at_time: Option<DateTime<Utc>>,
-    ) -> llmspell_graph::error::Result<Vec<(Entity, usize, String)>> {
+    ) -> Result<Vec<(Entity, usize, String)>> {
         <Self as GraphBackend>::traverse(
             self,
             start_entity_id,
@@ -1064,7 +1029,6 @@ impl llmspell_graph::traits::KnowledgeGraph for SqliteGraphStorage {
             at_time,
         )
         .await
-        .map_err(|e| llmspell_graph::error::GraphError::Storage(e.to_string()))
     }
 }
 

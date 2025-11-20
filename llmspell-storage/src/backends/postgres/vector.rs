@@ -10,13 +10,13 @@
 //! 3072 has no vector index due to pgvector's 2000-dimension limit).
 
 use super::backend::PostgresBackend;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use llmspell_core::state::StateScope;
 use llmspell_core::traits::storage::VectorStorage;
 use llmspell_core::types::storage::{
     ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult,
 };
-use anyhow::{anyhow, Result};
-use async_trait::async_trait;
-use llmspell_core::state::StateScope;
 use pgvector::Vector;
 use serde_json::Value;
 use std::collections::HashMap;

@@ -605,7 +605,7 @@ impl LLMConsolidationEngine {
             })?;
 
         // Convert to graph entity
-        let entity = llmspell_graph::types::Entity {
+        let entity = llmspell_graph::Entity {
             id: entity_payload.id.clone(),
             name: entity_payload.name.clone(),
             entity_type: entity_payload.entity_type.clone(),
@@ -681,7 +681,7 @@ impl LLMConsolidationEngine {
                 idx, rel.from_entity, rel.to_entity, rel.relationship_type
             );
 
-            let relationship = llmspell_graph::types::Relationship {
+            let relationship = llmspell_graph::Relationship {
                 id: uuid::Uuid::new_v4().to_string(),
                 from_entity: rel.from_entity.clone(),
                 to_entity: rel.to_entity.clone(),
@@ -710,7 +710,7 @@ mod tests {
     use chrono::Utc;
     use llmspell_core::error::LLMSpellError;
     use llmspell_core::types::AgentOutput;
-    use llmspell_graph::types::{Entity, TemporalQuery};
+    use llmspell_graph::{Entity, TemporalQuery};
     use llmspell_providers::ProviderCapabilities;
     use std::collections::HashMap;
 
@@ -790,7 +790,7 @@ mod tests {
 
         async fn add_relationship(
             &self,
-            _relationship: llmspell_graph::types::Relationship,
+            _relationship: llmspell_graph::Relationship,
         ) -> llmspell_graph::error::Result<String> {
             Ok("mock-rel-id".to_string())
         }
@@ -806,7 +806,7 @@ mod tests {
         async fn get_relationships(
             &self,
             _entity_id: &str,
-        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::types::Relationship>> {
+        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::Relationship>> {
             Ok(vec![])
         }
 

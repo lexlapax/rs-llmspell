@@ -6,7 +6,7 @@ use thiserror::Error;
 use tracing::{debug, info};
 
 use crate::embeddings::{CacheConfig, EmbeddingCache, EmbeddingFactory, EmbeddingProviderConfig};
-use llmspell_storage::vector_storage::VectorStorage;
+use llmspell_storage::VectorStorage;
 
 use super::{
     config::{IngestionConfig, RAGConfig, RerankingConfig, RetrievalConfig, TimeoutConfig},

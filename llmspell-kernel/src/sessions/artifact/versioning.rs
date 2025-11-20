@@ -4,7 +4,7 @@
 use super::types::{ArtifactId, ArtifactVersion, ContentHash};
 use crate::sessions::{Result, SessionError, SessionId};
 use chrono::Utc;
-use llmspell_storage::traits::StorageBackend;
+use llmspell_storage::StorageBackend;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

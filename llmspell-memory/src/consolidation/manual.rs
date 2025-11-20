@@ -6,7 +6,7 @@ use std::time::Instant;
 use async_trait::async_trait;
 use llmspell_graph::extraction::RegexExtractor;
 use llmspell_graph::traits::KnowledgeGraph;
-use llmspell_graph::types::{Entity, Relationship};
+use llmspell_graph::{Entity, Relationship};
 use tracing::{debug, info};
 
 use super::ConsolidationEngine;

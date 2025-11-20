@@ -2,11 +2,12 @@
 //! ABOUTME: Full KnowledgeGraph trait implementation with bi-temporal support
 
 use super::backend::PostgresBackend;
-use super::error::{PostgresError, Result};
+use super::error::PostgresError;
+use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use llmspell_core::types::storage::{Entity, Relationship, TemporalQuery};
 use llmspell_graph::traits::KnowledgeGraph;
-use llmspell_graph::types::{Entity, Relationship, TemporalQuery};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -147,7 +148,7 @@ impl PostgresGraphStorage {
     /// ```rust,no_run
     /// # use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig};
     /// # use llmspell_storage::backends::postgres::graph::PostgresGraphStorage;
-    /// # use llmspell_graph::types::TemporalQuery;
+    /// # use llmspell_core::types::storage::TemporalQuery;
     /// # use std::sync::Arc;
     /// # use chrono::Utc;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -472,16 +473,16 @@ impl KnowledgeGraph for PostgresGraphStorage {
     /// - `event_time` → `valid_time_start`
     /// - `ingestion_time` → `transaction_time_start`
     /// - Both `*_end` times set to 'infinity' (current version)
-    async fn add_entity(&self, entity: Entity) -> llmspell_graph::error::Result<String> {
+    async fn add_entity(&self, entity: Entity) -> Result<String> {
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            llmspell_graph::error::GraphError::Storage(
-                "Tenant context not set - call set_tenant_context() first".to_string(),
-            )
+            anyhow::anyhow!("Tenant context not set - call set_tenant_context() first".to_string(),)
         })?;
 
-        let client = self.backend.get_client().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
-        })?;
+        let client = self
+            .backend
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get client: {}", e)))?;
 
         let entity_id = Uuid::new_v4();
 
@@ -508,7 +509,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
             )
             .await
             .map_err(|e| {
-                llmspell_graph::error::GraphError::Storage(format!("Failed to insert entity: {}", e))
+                anyhow::anyhow!(format!("Failed to insert entity: {}", e))
             })?;
 
         Ok(entity_id.to_string())
@@ -525,33 +526,27 @@ impl KnowledgeGraph for PostgresGraphStorage {
         &self,
         id: &str,
         changes: HashMap<String, serde_json::Value>,
-    ) -> llmspell_graph::error::Result<()> {
-        let entity_id = Uuid::parse_str(id).map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Invalid entity ID (not a UUID): {}",
-                e
-            ))
-        })?;
+    ) -> Result<()> {
+        let entity_id = Uuid::parse_str(id)
+            .map_err(|e| anyhow::anyhow!(format!("Invalid entity ID (not a UUID): {}", e)))?;
 
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            llmspell_graph::error::GraphError::Storage(
-                "Tenant context not set - call set_tenant_context() first".to_string(),
-            )
+            anyhow::anyhow!("Tenant context not set - call set_tenant_context() first".to_string(),)
         })?;
 
-        let mut client = self.backend.get_client().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
-        })?;
+        let mut client = self
+            .backend
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get client: {}", e)))?;
 
         let now = Utc::now();
 
         // Start transaction for atomic update
-        let tx = client.transaction().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Failed to start transaction: {}",
-                e
-            ))
-        })?;
+        let tx = client
+            .transaction()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to start transaction: {}", e)))?;
 
         // Get current version of entity
         let row = tx
@@ -565,12 +560,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
                 &[&entity_id, &tenant_id],
             )
             .await
-            .map_err(|e| {
-                llmspell_graph::error::GraphError::EntityNotFound(format!(
-                    "Entity {} not found: {}",
-                    id, e
-                ))
-            })?;
+            .map_err(|e| anyhow::anyhow!(format!("Entity {} not found: {}", id, e)))?;
 
         let entity_type: String = row.get("entity_type");
         let name: String = row.get("name");
@@ -595,12 +585,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
             &[&now, &entity_id, &tenant_id],
         )
         .await
-        .map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Failed to end current version: {}",
-                e
-            ))
-        })?;
+        .map_err(|e| anyhow::anyhow!(format!("Failed to end current version: {}", e)))?;
 
         // Insert new version with updated properties
         tx.execute(
@@ -617,19 +602,11 @@ impl KnowledgeGraph for PostgresGraphStorage {
             ],
         )
         .await
-        .map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Failed to insert new version: {}",
-                e
-            ))
-        })?;
+        .map_err(|e| anyhow::anyhow!(format!("Failed to insert new version: {}", e)))?;
 
-        tx.commit().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Failed to commit transaction: {}",
-                e
-            ))
-        })?;
+        tx.commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to commit transaction: {}", e)))?;
 
         Ok(())
     }
@@ -637,23 +614,19 @@ impl KnowledgeGraph for PostgresGraphStorage {
     /// Get the current version of an entity
     ///
     /// Returns the entity with `valid_time_end = infinity` and `transaction_time_end = infinity`
-    async fn get_entity(&self, id: &str) -> llmspell_graph::error::Result<Entity> {
-        let entity_id = Uuid::parse_str(id).map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Invalid entity ID (not a UUID): {}",
-                e
-            ))
-        })?;
+    async fn get_entity(&self, id: &str) -> Result<Entity> {
+        let entity_id = Uuid::parse_str(id)
+            .map_err(|e| anyhow::anyhow!(format!("Invalid entity ID (not a UUID): {}", e)))?;
 
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            llmspell_graph::error::GraphError::Storage(
-                "Tenant context not set - call set_tenant_context() first".to_string(),
-            )
+            anyhow::anyhow!("Tenant context not set - call set_tenant_context() first".to_string(),)
         })?;
 
-        let client = self.backend.get_client().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
-        })?;
+        let client = self
+            .backend
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get client: {}", e)))?;
 
         let row = client
             .query_opt(
@@ -667,32 +640,25 @@ impl KnowledgeGraph for PostgresGraphStorage {
             )
             .await
             .map_err(|e| {
-                llmspell_graph::error::GraphError::Storage(format!("Query failed: {}", e))
+                anyhow::anyhow!(format!("Query failed: {}", e))
             })?;
 
-        let row = row.ok_or_else(|| {
-            llmspell_graph::error::GraphError::EntityNotFound(format!("Entity {} not found", id))
-        })?;
+        let row = row.ok_or_else(|| anyhow::anyhow!(format!("Entity {} not found", id)))?;
 
-        Self::entity_from_row(row).map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!("Failed to parse entity: {}", e))
-        })
+        Self::entity_from_row(row)
+            .map_err(|e| anyhow::anyhow!(format!("Failed to parse entity: {}", e)))
     }
 
     /// Get entity as it was known at a specific event time
     ///
     /// Delegates to the existing get_entity_at method (Phase 13b.5.2)
-    async fn get_entity_at(
-        &self,
-        id: &str,
-        event_time: DateTime<Utc>,
-    ) -> llmspell_graph::error::Result<Entity> {
+    async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Entity> {
         let transaction_time = Utc::now(); // Query current knowledge
         self.get_entity_at(id, event_time, transaction_time)
             .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(format!("{:?}", e)))?
+            .map_err(|e| anyhow::anyhow!(format!("{:?}", e)))?
             .ok_or_else(|| {
-                llmspell_graph::error::GraphError::EntityNotFound(format!(
+                anyhow::anyhow!(format!(
                     "Entity {} not found at event_time {}",
                     id, event_time
                 ))
@@ -702,33 +668,22 @@ impl KnowledgeGraph for PostgresGraphStorage {
     /// Add a relationship between two entities
     ///
     /// Creates relationship with bi-temporal tracking similar to entities
-    async fn add_relationship(
-        &self,
-        relationship: Relationship,
-    ) -> llmspell_graph::error::Result<String> {
+    async fn add_relationship(&self, relationship: Relationship) -> Result<String> {
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            llmspell_graph::error::GraphError::Storage(
-                "Tenant context not set - call set_tenant_context() first".to_string(),
-            )
+            anyhow::anyhow!("Tenant context not set - call set_tenant_context() first".to_string(),)
         })?;
 
-        let client = self.backend.get_client().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
-        })?;
+        let client = self
+            .backend
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get client: {}", e)))?;
 
         let relationship_id = Uuid::new_v4();
-        let from_entity = Uuid::parse_str(&relationship.from_entity).map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Invalid from_entity ID (not a UUID): {}",
-                e
-            ))
-        })?;
-        let to_entity = Uuid::parse_str(&relationship.to_entity).map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Invalid to_entity ID (not a UUID): {}",
-                e
-            ))
-        })?;
+        let from_entity = Uuid::parse_str(&relationship.from_entity)
+            .map_err(|e| anyhow::anyhow!(format!("Invalid from_entity ID (not a UUID): {}", e)))?;
+        let to_entity = Uuid::parse_str(&relationship.to_entity)
+            .map_err(|e| anyhow::anyhow!(format!("Invalid to_entity ID (not a UUID): {}", e)))?;
 
         // Map event_time to valid_time_start
         let valid_time_start = relationship.event_time.unwrap_or_else(Utc::now);
@@ -754,7 +709,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
             )
             .await
             .map_err(|e| {
-                llmspell_graph::error::GraphError::Storage(format!("Failed to insert relationship: {}", e))
+                anyhow::anyhow!(format!("Failed to insert relationship: {}", e))
             })?;
 
         Ok(relationship_id.to_string())
@@ -764,16 +719,12 @@ impl KnowledgeGraph for PostgresGraphStorage {
     ///
     /// Delegates to the recursive CTE implementation (Phase 13b.5.3)
     /// Uses max_depth=4 and current time as defaults
-    async fn get_related(
-        &self,
-        entity_id: &str,
-        relationship_type: &str,
-    ) -> llmspell_graph::error::Result<Vec<Entity>> {
+    async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>> {
         let now = Utc::now();
         let results = self
             .get_related(entity_id, Some(relationship_type), 4, now)
             .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(format!("{:?}", e)))?;
+            .map_err(|e| anyhow::anyhow!(format!("{:?}", e)))?;
 
         // Extract just the entities (discard depth and path)
         Ok(results
@@ -785,27 +736,20 @@ impl KnowledgeGraph for PostgresGraphStorage {
     /// Get all relationships for an entity
     ///
     /// Returns both outgoing (from this entity) and incoming (to this entity) relationships.
-    async fn get_relationships(
-        &self,
-        entity_id: &str,
-    ) -> llmspell_graph::error::Result<Vec<Relationship>> {
+    async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>> {
         // Parse entity_id as UUID
-        let uuid = Uuid::parse_str(entity_id).map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Invalid entity ID (not a UUID): {}",
-                e
-            ))
-        })?;
+        let uuid = Uuid::parse_str(entity_id)
+            .map_err(|e| anyhow::anyhow!(format!("Invalid entity ID (not a UUID): {}", e)))?;
 
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            llmspell_graph::error::GraphError::Storage(
-                "Tenant context not set - call set_tenant_context() first".to_string(),
-            )
+            anyhow::anyhow!("Tenant context not set - call set_tenant_context() first".to_string(),)
         })?;
 
-        let client = self.backend.get_client().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
-        })?;
+        let client = self
+            .backend
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get client: {}", e)))?;
 
         let now = Utc::now();
 
@@ -821,12 +765,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
                 &[&uuid, &tenant_id, &now],
             )
             .await
-            .map_err(|e| {
-                llmspell_graph::error::GraphError::Storage(format!(
-                    "Failed to query relationships: {}",
-                    e
-                ))
-            })?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to query relationships: {}", e)))?;
 
         let mut relationships = Vec::new();
         for row in rows {
@@ -855,38 +794,30 @@ impl KnowledgeGraph for PostgresGraphStorage {
     /// Execute a temporal query on the graph
     ///
     /// Delegates to the existing query_temporal method (Phase 13b.5.2)
-    async fn query_temporal(
-        &self,
-        query: TemporalQuery,
-    ) -> llmspell_graph::error::Result<Vec<Entity>> {
+    async fn query_temporal(&self, query: TemporalQuery) -> Result<Vec<Entity>> {
         self.query_temporal(&query)
             .await
-            .map_err(|e| llmspell_graph::error::GraphError::Storage(format!("{:?}", e)))
+            .map_err(|e| anyhow::anyhow!(format!("{:?}", e)))
     }
 
     /// Delete all entities and relationships with ingestion time before the given timestamp
     ///
     /// Implements data retention by removing historical versions
-    async fn delete_before(
-        &self,
-        timestamp: DateTime<Utc>,
-    ) -> llmspell_graph::error::Result<usize> {
+    async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize> {
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            llmspell_graph::error::GraphError::Storage(
-                "Tenant context not set - call set_tenant_context() first".to_string(),
-            )
+            anyhow::anyhow!("Tenant context not set - call set_tenant_context() first".to_string(),)
         })?;
 
-        let mut client = self.backend.get_client().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
-        })?;
+        let mut client = self
+            .backend
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get client: {}", e)))?;
 
-        let tx = client.transaction().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Failed to start transaction: {}",
-                e
-            ))
-        })?;
+        let tx = client
+            .transaction()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to start transaction: {}", e)))?;
 
         // Delete old relationship versions (preserve current versions)
         let rel_count = tx
@@ -898,12 +829,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
                 &[&tenant_id, &timestamp],
             )
             .await
-            .map_err(|e| {
-                llmspell_graph::error::GraphError::Storage(format!(
-                    "Failed to delete relationships: {}",
-                    e
-                ))
-            })?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to delete relationships: {}", e)))?;
 
         // Delete old entity versions (preserve current versions)
         let entity_count = tx
@@ -915,19 +841,11 @@ impl KnowledgeGraph for PostgresGraphStorage {
                 &[&tenant_id, &timestamp],
             )
             .await
-            .map_err(|e| {
-                llmspell_graph::error::GraphError::Storage(format!(
-                    "Failed to delete entities: {}",
-                    e
-                ))
-            })?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to delete entities: {}", e)))?;
 
-        tx.commit().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Failed to commit transaction: {}",
-                e
-            ))
-        })?;
+        tx.commit()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to commit transaction: {}", e)))?;
 
         Ok((entity_count + rel_count) as usize)
     }
@@ -961,24 +879,20 @@ impl KnowledgeGraph for PostgresGraphStorage {
         relationship_type: Option<&str>,
         max_depth: usize,
         at_time: Option<DateTime<Utc>>,
-    ) -> llmspell_graph::error::Result<Vec<(Entity, usize, String)>> {
+    ) -> Result<Vec<(Entity, usize, String)>> {
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            llmspell_graph::error::GraphError::Storage(
-                "Tenant context not set - call set_tenant_context() first".to_string(),
-            )
+            anyhow::anyhow!("Tenant context not set - call set_tenant_context() first".to_string(),)
         })?;
 
-        let client = self.backend.get_client().await.map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
-        })?;
+        let client = self
+            .backend
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!(format!("Failed to get client: {}", e)))?;
 
         // Parse entity_id as UUID
-        let start_uuid = Uuid::parse_str(start_entity).map_err(|e| {
-            llmspell_graph::error::GraphError::Storage(format!(
-                "Invalid entity ID (not a UUID): {}",
-                e
-            ))
-        })?;
+        let start_uuid = Uuid::parse_str(start_entity)
+            .map_err(|e| anyhow::anyhow!(format!("Invalid entity ID (not a UUID): {}", e)))?;
 
         let capped_depth = (max_depth.min(10)) as i32; // Cap at 10 hops
         let query_time = at_time.unwrap_or_else(Utc::now);
@@ -1054,12 +968,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
         let rows = client
             .query(&sql, &[&start_uuid, &tenant_id, &query_time, &capped_depth])
             .await
-            .map_err(|e| {
-                llmspell_graph::error::GraphError::Storage(format!(
-                    "Failed to execute traversal query: {}",
-                    e
-                ))
-            })?;
+            .map_err(|e| anyhow::anyhow!(format!("Failed to execute traversal query: {}", e)))?;
 
         let mut results = Vec::new();
 

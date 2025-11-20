@@ -522,7 +522,7 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use llmspell_graph::traits::KnowledgeGraph;
-    use llmspell_graph::types::{Entity, Relationship, TemporalQuery};
+    use llmspell_graph::{Entity, Relationship, TemporalQuery};
     use llmspell_providers::{ProviderCapabilities, ProviderInstance};
     use std::collections::HashMap;
     use std::pin::Pin;
@@ -652,7 +652,7 @@ mod tests {
         async fn get_relationships(
             &self,
             _entity_id: &str,
-        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::types::Relationship>> {
+        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::Relationship>> {
             Ok(vec![])
         }
 

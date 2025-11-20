@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use llmspell_core::state::StateScope;
-use llmspell_storage::vector_storage::VectorStorage;
+use llmspell_storage::VectorStorage;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::time::{timeout, Duration};
@@ -319,7 +319,7 @@ impl RAGPipeline {
                 .await
                 .map_err(|e| RAGPipelineError::Storage { source: e })?;
             // Convert to scoped stats format
-            llmspell_storage::vector_storage::ScopedStats {
+            llmspell_storage::ScopedStats {
                 scope: llmspell_core::state::StateScope::Global,
                 vector_count: stats.total_vectors,
                 storage_bytes: stats.storage_bytes,

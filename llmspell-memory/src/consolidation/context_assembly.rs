@@ -7,7 +7,7 @@ use crate::error::{MemoryError, Result};
 use crate::types::EpisodicEntry;
 
 use llmspell_graph::traits::KnowledgeGraph;
-use llmspell_graph::types::{Entity, TemporalQuery};
+use llmspell_graph::{Entity, TemporalQuery};
 use std::sync::Arc;
 use tracing::{debug, trace};
 
@@ -213,7 +213,7 @@ mod tests {
 
         async fn add_relationship(
             &self,
-            _relationship: llmspell_graph::types::Relationship,
+            _relationship: llmspell_graph::Relationship,
         ) -> llmspell_graph::error::Result<String> {
             Ok("mock-rel-id".to_string())
         }
@@ -229,7 +229,7 @@ mod tests {
         async fn get_relationships(
             &self,
             _entity_id: &str,
-        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::types::Relationship>> {
+        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::Relationship>> {
             Ok(vec![])
         }
 

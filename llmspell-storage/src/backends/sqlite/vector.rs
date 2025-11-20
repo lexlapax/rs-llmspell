@@ -21,11 +21,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
+use llmspell_core::state::StateScope;
 use llmspell_core::traits::storage::VectorStorage;
 use llmspell_core::types::storage::{
     DistanceMetric, ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult,
 };
-use llmspell_core::state::StateScope;
 
 use super::backend::SqliteBackend;
 use vectorlite_rs::{DistanceMetric as VectorliteMetric, HnswIndex};

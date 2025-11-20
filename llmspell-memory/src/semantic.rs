@@ -24,7 +24,7 @@ use crate::error::{MemoryError, Result};
 use crate::traits::SemanticMemory;
 
 // Re-export graph types as canonical types
-pub use llmspell_graph::types::{Entity, Relationship};
+pub use llmspell_graph::{Entity, Relationship};
 
 /// Semantic memory implementation using knowledge graph backend
 ///
@@ -131,7 +131,7 @@ impl SemanticMemory for GraphSemanticMemory {
                 );
                 Ok(Some(entity))
             }
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
+            Err(e) if e.to_string().contains("Entity not found") => {
                 debug!("Entity not found: {}", id);
                 Ok(None)
             }
@@ -145,7 +145,7 @@ impl SemanticMemory for GraphSemanticMemory {
     async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Option<Entity>> {
         match self.graph.get_entity_at(id, event_time).await {
             Ok(entity) => Ok(Some(entity)),
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => Ok(None),
+            Err(e) if e.to_string().contains("Entity not found") => Ok(None),
             Err(e) => Err(MemoryError::Storage(e.to_string())),
         }
     }
@@ -181,8 +181,7 @@ impl SemanticMemory for GraphSemanticMemory {
     async fn query_by_type(&self, entity_type: &str) -> Result<Vec<Entity>> {
         debug!("Querying entities by type: entity_type={}", entity_type);
 
-        let query =
-            llmspell_graph::types::TemporalQuery::new().with_entity_type(entity_type.to_string());
+        let query = llmspell_graph::TemporalQuery::new().with_entity_type(entity_type.to_string());
 
         let entities = self.graph.query_temporal(query).await.map_err(|e| {
             error!("Failed to query entities by type {}: {}", entity_type, e);

@@ -8,7 +8,7 @@ use super::versioning::VersionManager;
 use crate::sessions::{Result, SessionError, SessionId};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use llmspell_storage::traits::StorageBackend;
+use llmspell_storage::StorageBackend;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

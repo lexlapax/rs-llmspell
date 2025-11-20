@@ -86,7 +86,7 @@ impl DecisionValidator {
                     "Decision {idx}: Cannot ADD entity {entity_id} - already exists in knowledge graph"
                 )))
             }
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
+            Err(e) if e.to_string().contains("Entity not found") => {
                 // Entity doesn't exist, ADD is valid
                 debug!("Decision {}: ADD validation passed for {}", idx, entity_id);
 
@@ -125,7 +125,7 @@ impl DecisionValidator {
                 );
                 Ok(())
             }
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
+            Err(e) if e.to_string().contains("Entity not found") => {
                 warn!(
                     "Decision {}: Entity {} does not exist, cannot UPDATE",
                     idx, entity_id
@@ -157,7 +157,7 @@ impl DecisionValidator {
                 );
                 Ok(())
             }
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
+            Err(e) if e.to_string().contains("Entity not found") => {
                 warn!(
                     "Decision {}: Entity {} does not exist, cannot DELETE",
                     idx, entity_id
@@ -207,11 +207,9 @@ impl DecisionValidator {
     ) -> Result<()> {
         match self.knowledge_graph.get_entity(entity_id).await {
             Ok(_) => Ok(()),
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
-                Err(MemoryError::InvalidInput(format!(
-                    "Relationship {idx}: {entity_type} entity {entity_id} does not exist"
-                )))
-            }
+            Err(e) if e.to_string().contains("Entity not found") => Err(MemoryError::InvalidInput(
+                format!("Relationship {idx}: {entity_type} entity {entity_id} does not exist"),
+            )),
             Err(e) => Err(MemoryError::KnowledgeGraph(format!(
                 "Relationship {idx}: Failed to validate {entity_type} entity {entity_id}: {e}"
             ))),
@@ -225,7 +223,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use chrono::Utc;
-    use llmspell_graph::types::{Entity, TemporalQuery};
+    use llmspell_graph::{Entity, TemporalQuery};
     use std::collections::HashMap;
 
     // Mock knowledge graph for testing
@@ -284,7 +282,7 @@ mod tests {
 
         async fn add_relationship(
             &self,
-            _relationship: llmspell_graph::types::Relationship,
+            _relationship: llmspell_graph::Relationship,
         ) -> llmspell_graph::error::Result<String> {
             Ok("mock-rel-id".to_string())
         }
@@ -300,7 +298,7 @@ mod tests {
         async fn get_relationships(
             &self,
             _entity_id: &str,
-        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::types::Relationship>> {
+        ) -> llmspell_graph::error::Result<Vec<llmspell_graph::Relationship>> {
             Ok(vec![])
         }
 

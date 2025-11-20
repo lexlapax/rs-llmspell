@@ -25,7 +25,7 @@
 //! assert!(relationships.iter().any(|r| r.relationship_type == "is_a"));
 //! ```
 
-use crate::types::{Entity, Relationship};
+use llmspell_core::types::storage::{Entity, Relationship};
 use llmspell_utils::text::stopwords::is_stopword;
 use regex::Regex;
 use serde_json::json;
