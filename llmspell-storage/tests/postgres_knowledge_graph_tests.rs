@@ -11,7 +11,7 @@
 
 use chrono::{Duration, Utc};
 use llmspell_graph::traits::KnowledgeGraph;
-use llmspell_graph::types::{Entity, Relationship};
+use llmspell_graph::{Entity, Relationship};
 use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig, PostgresGraphStorage};
 use serde_json::json;
 use std::collections::HashMap;

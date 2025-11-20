@@ -254,7 +254,7 @@ impl TenantScoped for PostgresBackend {
 // =============================================================================
 
 #[async_trait::async_trait]
-impl crate::traits::StorageBackend for PostgresBackend {
+impl crate::StorageBackend for PostgresBackend {
     async fn get(&self, key: &str) -> anyhow::Result<Option<Vec<u8>>> {
         // Route based on key pattern (4-way routing)
         if key.starts_with("agent:") {
@@ -455,12 +455,12 @@ impl crate::traits::StorageBackend for PostgresBackend {
         Ok(())
     }
 
-    fn backend_type(&self) -> crate::traits::StorageBackendType {
-        crate::traits::StorageBackendType::Postgres
+    fn backend_type(&self) -> crate::StorageBackendType {
+        crate::StorageBackendType::Postgres
     }
 
-    fn characteristics(&self) -> crate::traits::StorageCharacteristics {
-        crate::traits::StorageCharacteristics {
+    fn characteristics(&self) -> crate::StorageCharacteristics {
+        crate::StorageCharacteristics {
             persistent: true,
             transactional: true,
             supports_prefix_scan: true,

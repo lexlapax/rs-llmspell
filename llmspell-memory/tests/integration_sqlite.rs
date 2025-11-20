@@ -3,7 +3,7 @@
 //! Tests the full memory system integration: episodic + semantic + procedural via libsql
 
 use llmspell_graph::extraction::RegexExtractor;
-use llmspell_graph::types::{Entity, Relationship};
+use llmspell_graph::{Entity, Relationship};
 use llmspell_memory::consolidation::ManualConsolidationEngine;
 use llmspell_memory::episodic::InMemoryEpisodicMemory;
 use llmspell_memory::manager::DefaultMemoryManager;

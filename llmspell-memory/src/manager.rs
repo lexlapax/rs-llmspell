@@ -11,8 +11,9 @@ use crate::consolidation::{ConsolidationEngine, NoopConsolidationEngine};
 use crate::error::Result;
 use crate::procedural::InMemoryPatternTracker;
 use crate::semantic::GraphSemanticMemory;
-use crate::traits::{EpisodicMemory, MemoryManager, ProceduralMemory, SemanticMemory};
+use crate::traits::{EpisodicMemory, MemoryManager, SemanticMemory};
 use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
+use llmspell_core::traits::storage::ProceduralMemory;
 
 #[cfg(test)]
 use crate::episodic::InMemoryEpisodicMemory;

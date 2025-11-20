@@ -60,7 +60,7 @@
 mod postgres_benchmarks {
     use chrono::{Duration, Utc};
     use criterion::{black_box, BenchmarkId, Criterion};
-    use llmspell_graph::types::TemporalQuery;
+    use llmspell_graph::TemporalQuery;
     use llmspell_storage::backends::postgres::{
         PostgresBackend, PostgresConfig, PostgresGraphStorage,
     };

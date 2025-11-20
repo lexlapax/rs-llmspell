@@ -4979,11 +4979,18 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 - **Error Unification**: This sub-task effectively unified error handling across the entire storage/graph subsystem
 - **Next Step**: Sub-Task 13c.3.1.3 (Update llmspell-memory trait structure)
 
-#### Sub-Task 13c.3.1.3: Update llmspell-memory trait structure**
-  - [ ] Delete `src/traits/procedural.rs` (ProceduralMemory moved to llmspell-core)
-  - [ ] Keep domain traits (EpisodicMemory, SemanticMemory stay in llmspell-memory)
-  - [ ] Update imports in domain trait implementations
-  - [ ] **Validation**: `cargo check -p llmspell-memory`
+#### Sub-Task 13c.3.1.3: Update llmspell-memory trait structure** ✅
+  - [x] Delete `src/traits/procedural.rs` (ProceduralMemory moved to llmspell-core)
+  - [x] Keep domain traits (EpisodicMemory, SemanticMemory stay in llmspell-memory)
+  - [x] Update imports in domain trait implementations
+  - [x] **Validation**: `cargo check -p llmspell-memory` (PASSED - 32 tests)
+
+  **Insights**:
+  - Continued error unification: ProceduralMemory trait uses anyhow::Result
+  - Updated implementations: procedural.rs changed from MemoryError to anyhow::Result
+  - Mock objects: Updated 4 test files with MockKnowledgeGraph implementations
+  - Integration test: Fixed llmspell_graph::types import (now re-exported at root)
+  - Pattern: Domain traits (Episodic/Semantic) stay in memory, storage traits in core
 
 
 #### Sub-Task 13c.3.1.4: llmspell-kernel (12 files)**
