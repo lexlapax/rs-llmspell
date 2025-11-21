@@ -34,7 +34,9 @@ __pycache__/
 .pytest_cache
 *.dylib
 hnsw_indices
-
+node_modules/
+.next/
+next-env.d.ts
 sessions/
 .cargo/config.toml
 *.db
