@@ -5481,6 +5481,33 @@ add vtable dispatch overhead and larger memory footprints vs. direct implementat
 
     **Key Finding**: InMemory semantic backend fix revealed **significant performance improvements** in many areas! Memory footprint regressions from refactor.txt (Phase 13c.3.1.15) were actually caused by the semantic backend configuration issue, not the trait refactor itself.
 
+**Phase 2 Re-Evaluation** (after Task 2.1 - commit 3f87f3ea):
+
+Ran `sqlite_vector_bench` to check if vector storage regressions remain:
+
+**✅ Resolved (memory operations):**
+- consolidation: 10-18% improvement
+- semantic_query: 4-18% improvement
+- memory_footprint: 6-40% improvement
+
+**❌ Still Regressed (vector storage):**
+- insert/100: **+26% regression** (1.58ms)
+- insert/1000: **+28% regression** (1.44ms)
+- insert/10000: **+35% regression** (1.57ms)
+- search/100: **+9% regression** (896µs)
+- search/1000: **+24% regression** (1.10ms)
+
+**✅ Improved (large ops):**
+- search/10000: **-16% improvement** (1.18ms)
+- batch_insert/10: **-9% improvement** (12.2ms)
+- batch_insert/100: **-4% improvement** (119ms)
+
+**Conclusion**: Tasks 2.2-2.5 ARE STILL NEEDED! Pattern confirms:
+- Small ops regressed = Arc cloning + transaction overhead
+- Large ops improved = Better batch transaction handling
+
+**Next**: Proceed with Task 2.2 (Arc cloning audit) as highest priority.
+
   - [ ] **Task 2.2: Arc cloning audit and elimination** (2-3 hours) - HIGHEST IMPACT:
     **Files**: `llmspell-storage/src/backends/sqlite/*.rs`, `llmspell-memory/src/*.rs`
     **Steps**:
