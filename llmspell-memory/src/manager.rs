@@ -383,7 +383,8 @@ impl DefaultMemoryManager {
             }
             SemanticBackendType::Sqlite => {
                 // Auto-create in-memory SQLite backend if not provided
-                let sqlite_backend = if let Some(backend) = config.semantic_sqlite_backend.as_ref() {
+                let sqlite_backend = if let Some(backend) = config.semantic_sqlite_backend.as_ref()
+                {
                     debug!("Using provided SQLite semantic backend (user-configured storage)");
                     Arc::clone(backend)
                 } else {
