@@ -7723,3 +7723,54 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 **Last Updated**: November 2025
 **Status**: Ready for Implementation
 **Next Phase**: Phase 14 (MCP Tool Integration)
+
+---
+
+### PostgreSQL Test Infrastructure Fix (2025-11-21)
+
+**Issue**: PostgreSQL integration tests failing on Linux with connection pool errors
+**Root Cause**: Password mismatch between test expectations and init script
+
+**Analysis**:
+- Tests expect: `postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev`
+- Init script created: `llmspell_app` user with password `llmspell_dev_pass`
+- Error: `Pool("Failed to get connection from pool: Error occurred while creating a new object: db error")`
+
+**Fix**: Updated `docker/postgres/init-scripts/01-extensions.sql:40`
+```sql
+-- Before:
+CREATE ROLE llmspell_app WITH LOGIN PASSWORD 'llmspell_dev_pass';
+
+-- After:
+CREATE ROLE llmspell_app WITH LOGIN PASSWORD 'llmspell_app_pass';
+```
+
+**Setup Instructions** (for Linux environments):
+```bash
+# 1. Start PostgreSQL with Docker Compose
+cd docker/postgres
+docker compose down -v  # Remove old database (if exists)
+docker compose up -d    # Start with corrected password
+
+# 2. Verify health
+docker compose ps       # Should show "healthy" status
+
+# 3. Run PostgreSQL tests
+cargo test --package llmspell-storage --test postgres_api_keys_migration_tests
+
+# 4. Run full test suite
+cargo test --workspace --all-features
+```
+
+**Infrastructure Available**:
+- ✅ Docker Compose: `docker/postgres/docker-compose.yml`
+- ✅ Init Scripts: `docker/postgres/init-scripts/01-extensions.sql`
+- ✅ Documentation: `docker/postgres/README.md`
+- ✅ Extensions: VectorChord 0.5.3, pgvector 0.8.1, pgcrypto, uuid-ossp
+- ✅ Users: `llmspell` (admin), `llmspell_app` (RLS-enforced)
+
+**Key Learnings**:
+- PostgreSQL integration tests require matching credentials across init scripts and test constants
+- Docker Compose infrastructure was already complete - only password mismatch prevented tests from running
+- Always verify connection string credentials match actual database user setup
+
