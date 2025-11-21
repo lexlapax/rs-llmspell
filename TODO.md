@@ -5462,66 +5462,329 @@ add vtable dispatch overhead and larger memory footprints vs. direct implementat
 
 **Phase 2: Targeted Optimizations** (6-8 hours - REVISED based on Phase 1)
 
-  - [ ] **Fix memory_operations benchmark** (1 hour):
-    - Add InMemory semantic backend option to avoid SQLite dependency in tests
-    - OR: Initialize semantic_sqlite_backend in `for_testing()` config
-    - Re-run full benchmark suite to get complete baseline data
-    - Validate all benchmarks complete without panic
+  - [x] **Task 2.1: Fix memory_operations benchmark panic** (45 min - COMPLETE):
+    **Commit**: f468519f "13c.3.1.16 Task 2.1 - Fix memory_operations benchmark panic"
+    **Files Changed**:
+    - `llmspell-memory/src/config.rs`: Added SemanticBackendType::InMemory variant
+    - `llmspell-memory/src/manager.rs`: Made with_config() async, handle InMemory case
+    - `llmspell-memory/benches/memory_operations.rs`: Updated to await async with_config()
 
-  - [ ] **Priority 1: Arc cloning audit** (2-3 hours) - HIGHEST IMPACT:
-    **Target**: Eliminate unnecessary Arc clones in hot paths
-    - Search codebase for `Arc::clone` or `.clone()` on Arc<SqliteBackend>
-    - Check if insert/search methods clone Arc per-call vs. per-batch
-    - Hypothesis: Each small operation clones Arc → +26-36% overhead
-    - **Action**: Pass `&self` references instead of cloning Arc in loops
-    - Expected impact: 15-25% improvement (most of regression)
-    - Validate: `cargo bench --bench sqlite_vector_bench -- insert`
+    **Results** (memory_fixed.txt):
+    - ✅ **Original panic FIXED**: InMemory backend test passes successfully
+    - ✅ **consolidation/100_entries**: 10-18% IMPROVEMENT
+    - ✅ **semantic_query/5**: 4.6-9.9% IMPROVEMENT
+    - ✅ **semantic_query/10**: 12-18% IMPROVEMENT
+    - ✅ **memory_footprint_idle**: 34-40% IMPROVEMENT
+    - ✅ **memory_footprint_loaded_1k**: 22-29% IMPROVEMENT
+    - ✅ **memory_footprint_loaded_10k**: 6-10% IMPROVEMENT
+    - ❌ **HNSW backend test**: Still fails (episodic SQLite backend config issue - separate task needed)
 
-  - [ ] **Priority 2: Transaction boundary optimization** (2-3 hours) - HIGH IMPACT:
-    **Target**: Match batch operation transaction efficiency for small ops
-    - Batch operations improved -4-9% = better transaction handling ✅
-    - Small operations regressed +26-36% = worse transaction handling ❌
-    - **Investigation**: Check if refactor changed transaction BEGIN/COMMIT patterns
-    - **Action**: Wrap single insert/search in same transaction pattern as batch
-    - Expected impact: 10-20% improvement
-    - Validate: `cargo bench --bench sqlite_vector_bench -- insert/100 search/100`
+    **Key Finding**: InMemory semantic backend fix revealed **significant performance improvements** in many areas! Memory footprint regressions from refactor.txt (Phase 13c.3.1.15) were actually caused by the semantic backend configuration issue, not the trait refactor itself.
 
-  - [ ] **Priority 3: Memory allocation reduction** (1-2 hours) - MEDIUM IMPACT:
-    **Target**: Reduce +36-59% memory footprint growth
-    - Pre-allocate result Vec<VectorResult> with capacity in search methods
-    - Check if trait refactor added Box allocations for return values
-    - Audit: Count allocations before/after refactor using instruments/heaptrack
-    - **Action**: Use Vec::with_capacity, avoid intermediate Vec clones
-    - Expected impact: 5-15% improvement in memory footprint
-    - Validate: `cargo bench --bench memory_operations -- memory_footprint`
+  - [ ] **Task 2.2: Arc cloning audit and elimination** (2-3 hours) - HIGHEST IMPACT:
+    **Files**: `llmspell-storage/src/backends/sqlite/*.rs`, `llmspell-memory/src/*.rs`
+    **Steps**:
+    1. Search for Arc clones in hot paths:
+       ```bash
+       rg "Arc::clone|\.clone\(\)" llmspell-storage/src/backends/sqlite/ -A 3 -B 3 > arc_clones.txt
+       rg "Arc::clone|\.clone\(\)" llmspell-memory/src/ -A 3 -B 3 >> arc_clones.txt
+       ```
+    2. **Priority targets** (check these first):
+       - `llmspell-storage/src/backends/sqlite/vector.rs` insert() method (line ~440)
+       - `llmspell-storage/src/backends/sqlite/vector.rs` search() method (line ~545)
+       - `llmspell-storage/src/backends/sqlite/graph.rs` add_entity()/add_relationship()
+       - `llmspell-memory/src/episodic.rs` add()/search() methods
+    3. **Pattern to find**: Look for loops that clone Arc<SqliteBackend>:
+       ```rust
+       // BAD - clones Arc per iteration
+       for entry in entries {
+           let backend = Arc::clone(&self.backend);
+           backend.insert(entry).await?;
+       }
 
-  - [ ] **Priority 4: Inline hot path methods** (1 hour) - LOW-MEDIUM IMPACT:
-    **Target**: Reduce async + trait dispatch overhead
-    - Add `#[inline]` to small trait delegation methods (<10 lines)
-    - Focus on methods called in loops (insert, search, add_entry)
-    - Expected impact: 2-5% improvement (marginal, but easy win)
-    - Validate: Re-run all benchmarks after inlining
+       // GOOD - reuse reference
+       for entry in entries {
+           self.backend.insert(entry).await?;
+       }
+       ```
+    4. **Action**: Replace Arc::clone with borrowing `&self.backend` in:
+       - Inner loops (for each vector/entity)
+       - Async blocks that capture backend
+       - Method calls that don't need ownership
+    5. **Measure before/after**:
+       ```bash
+       cargo bench --bench sqlite_vector_bench -- insert/100 2>&1 | head -20 > pre_arc_fix.txt
+       # Apply fixes
+       cargo bench --bench sqlite_vector_bench -- insert/100 2>&1 | head -20 > post_arc_fix.txt
+       diff pre_arc_fix.txt post_arc_fix.txt
+       ```
+    6. **Success criteria**: insert/100 improves by 15-25% (1.58ms → 1.25-1.35ms)
+    7. **Commit**: "Optimize: Eliminate Arc clones in insert/search hot paths"
 
-**Phase 3: Validation & Iteration** (2-3 hours - REVISED)
+  - [ ] **Task 2.3: Transaction boundary optimization** (2-3 hours) - HIGH IMPACT:
+    **Files**: `llmspell-storage/src/backends/sqlite/vector.rs` (1188 lines)
+    **Steps**:
+    1. **Investigate**: Compare transaction handling in batch vs. single ops:
+       ```bash
+       # Check batch insert transaction pattern (GOOD - improved -4-9%)
+       rg "batch_insert" llmspell-storage/src/backends/sqlite/vector.rs -A 30 > batch_pattern.txt
 
-  - [ ] **Re-benchmark after Phase 2 optimizations**:
-    - Run full benchmark suite (memory_operations + sqlite_vector_bench)
-    - Compare: baseline → refactor (current) → optimized (after Phase 2)
-    - Create results table to track progress toward <5% goal
-    - Expected combined impact from Phase 2: 20-40% improvement
-    - **Decision point**: If still >5% regression, proceed to deeper optimizations below
+       # Check single insert transaction pattern (BAD - regressed +26-36%)
+       rg "async fn insert\(" llmspell-storage/src/backends/sqlite/vector.rs -A 50 > single_pattern.txt
 
-  - [ ] **If needed: Deep optimization** (only if Phase 2 insufficient):
-    - Enum dispatch for known backends (breaks plugin extensibility)
-    - Static dispatch with generics (major architecture change)
-    - Connection pool configuration tuning (libsql settings)
-    - **Trade-off analysis**: Performance gain vs. architecture simplicity
+       # Compare transaction scopes
+       diff batch_pattern.txt single_pattern.txt
+       ```
+    2. **Hypothesis**: Batch ops wrap entire operation in one transaction, single ops create transaction per-call
+    3. **Find transaction BEGIN/COMMIT**:
+       ```bash
+       rg "BEGIN|COMMIT|transaction" llmspell-storage/src/backends/sqlite/vector.rs -n
+       ```
+    4. **Action**: Wrap single insert in explicit transaction like batch:
+       ```rust
+       async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>> {
+           // BEFORE: implicit transaction per INSERT
+           // AFTER: explicit transaction for all INSERTs
+           let conn = self.pool.get().await?;
+           conn.execute("BEGIN IMMEDIATE", []).await?;
 
-  - [ ] **Add CI performance regression guards**:
-    - Save baseline: `cargo bench -- --save-baseline refactor_optimized`
-    - Add CI check: Fail if >5% regression on insert/search operations
-    - Document acceptable performance ranges in CONTRIBUTING.md
-    - Prevent future regressions from trait changes
+           let mut ids = Vec::with_capacity(vectors.len());
+           for entry in vectors {
+               // ... existing insert logic
+               ids.push(id);
+           }
+
+           conn.execute("COMMIT", []).await?;
+           Ok(ids)
+       }
+       ```
+    5. **Test insert/100 before/after**:
+       ```bash
+       cargo bench --bench sqlite_vector_bench -- insert/100 > tx_before.txt
+       # Apply fix
+       cargo bench --bench sqlite_vector_bench -- insert/100 > tx_after.txt
+       ```
+    6. **Success criteria**: insert/100 improves by 10-20% additional (after Arc fix)
+    7. **Commit**: "Optimize: Wrap single vector inserts in explicit transaction"
+
+  - [ ] **Task 2.4: Memory allocation reduction** (1-2 hours) - MEDIUM IMPACT:
+    **Files**: `llmspell-storage/src/backends/sqlite/vector.rs`, `llmspell-memory/src/*.rs`
+    **Steps**:
+    1. **Audit result allocation patterns**:
+       ```bash
+       rg "Vec::new\(\)|vec!\[\]" llmspell-storage/src/backends/sqlite/vector.rs -n > allocs.txt
+       rg "Vec<VectorResult>|Vec<SearchResult>" llmspell-storage/src/backends/sqlite/vector.rs -A 5 >> allocs.txt
+       ```
+    2. **Priority**: search() method result vectors (called frequently)
+    3. **Pattern to fix**:
+       ```rust
+       // BEFORE: default capacity, grows dynamically
+       let mut results = Vec::new();
+       for row in rows {
+           results.push(parse_result(row)?);
+       }
+
+       // AFTER: pre-allocate with known capacity
+       let mut results = Vec::with_capacity(limit); // 'limit' from query
+       for row in rows {
+           results.push(parse_result(row)?);
+       }
+       ```
+    4. **Apply to**:
+       - search() line ~550: `let mut results = Vec::with_capacity(query.limit);`
+       - search_scoped() line ~560: same
+       - Any methods building Vec<T> where size is known/bounded
+    5. **Check for unnecessary clones**:
+       ```bash
+       rg "\.clone\(\)|\.to_vec\(\)" llmspell-storage/src/backends/sqlite/vector.rs -n
+       ```
+    6. **Measure memory footprint**:
+       ```bash
+       cargo bench --bench memory_operations -- memory_footprint > mem_before.txt
+       # Apply fixes
+       cargo bench --bench memory_operations -- memory_footprint > mem_after.txt
+       diff mem_before.txt mem_after.txt
+       ```
+    7. **Success criteria**: memory_footprint improves by 5-15% (14.3ms → 12.1-13.6ms)
+    8. **Commit**: "Optimize: Pre-allocate result vectors, reduce clones"
+
+  - [ ] **Task 2.5: Inline hot path trait methods** (30-60 min) - LOW-MEDIUM IMPACT:
+    **Files**: `llmspell-core/src/traits/storage/*.rs`
+    **Steps**:
+    1. **Identify small trait methods (<10 lines)**:
+       ```bash
+       # List all trait methods with line counts
+       rg "async fn \w+\(" llmspell-core/src/traits/storage/ -A 10 | grep -E "^--$|async fn"
+       ```
+    2. **Add #[inline] to delegating methods**:
+       - VectorStorage::insert (if it just delegates)
+       - VectorStorage::search
+       - KnowledgeGraph::add_entity
+       - Any method that's <10 lines and called in loops
+    3. **Pattern**:
+       ```rust
+       pub trait VectorStorage: Send + Sync {
+           #[inline]  // NEW: inline small hot methods
+           async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>>;
+
+           #[inline]
+           async fn search(&self, query: &VectorQuery) -> Result<Vec<VectorResult>>;
+       }
+       ```
+    4. **Apply to all 4 storage traits** (vector.rs, graph.rs, procedural.rs, backend.rs)
+    5. **Measure combined effect**:
+       ```bash
+       cargo bench --bench sqlite_vector_bench > inline_after.txt
+       cargo bench --bench memory_operations >> inline_after.txt
+       ```
+    6. **Success criteria**: 2-5% improvement across all benchmarks
+    7. **Commit**: "Optimize: Add #[inline] to hot path trait methods"
+
+  - [ ] **Task 2.6: Validate Phase 2 cumulative improvements**:
+    **Steps**:
+    1. Run full benchmark suite with all optimizations:
+       ```bash
+       cargo bench --bench memory_operations 2>&1 | tee phase2_optimized_memory.txt
+       cargo bench --bench sqlite_vector_bench 2>&1 | tee phase2_optimized_vector.txt
+       ```
+    2. Extract key metrics and compare to baseline:
+       ```bash
+       grep "insert/100" phase2_optimized_vector.txt > phase2_summary.txt
+       grep "search/100" phase2_optimized_vector.txt >> phase2_summary.txt
+       grep "semantic_query" phase2_optimized_memory.txt >> phase2_summary.txt
+       ```
+    3. **Expected results** (cumulative from all fixes):
+       - insert/100: 1.58ms → 1.10-1.30ms (20-30% improvement, within 5% of baseline 1.25ms)
+       - search/100: 895µs → 780-850µs (5-13% improvement, within 5% of baseline 821µs)
+       - semantic_query/10: 979µs → 840-880µs (10-14% improvement, near baseline 835µs)
+    4. **Decision point**:
+       - If all <5% from baseline: ✅ Proceed to Phase 3 validation
+       - If still >5% regression: Proceed to Task 2.7 (deeper optimization)
+
+  - [ ] **Task 2.7: [CONDITIONAL] Deep optimization if needed** (3-4 hours):
+    **Only if Task 2.6 shows >5% remaining regression**
+    **Options** (in order of least to most disruptive):
+    1. **Connection pool tuning**:
+       - Increase libsql pool size/timeout settings
+       - Test with different pool configurations
+    2. **Enum dispatch for core backends**:
+       - Replace Box<dyn VectorStorage> with enum VectorBackend { Sqlite(...), InMemory(...) }
+       - Breaks plugin extensibility, keep as last resort
+    3. **Static dispatch with generics**:
+       - Major architecture change, only if critical
+    **Trade-off**: Document why <5% goal unreachable without breaking extensibility
+
+**Phase 3: Validation & Documentation** (2-3 hours - REVISED)
+
+  - [ ] **Task 3.1: Final benchmark comparison** (30-60 min):
+    **Steps**:
+    1. Ensure Phase 2 optimizations are complete and committed
+    2. Run complete benchmark suite:
+       ```bash
+       cargo bench --bench memory_operations 2>&1 | tee final_memory_operations.txt
+       cargo bench --bench sqlite_vector_bench 2>&1 | tee final_vector_bench.txt
+       ```
+    3. Extract key metrics:
+       ```bash
+       # Create comparison table
+       cat > benchmark_comparison.md << 'EOF'
+       | Operation | Pre-Refactor | Post-Refactor | Optimized | Change | Status |
+       |-----------|--------------|---------------|-----------|--------|--------|
+       | insert/100 | 1.25ms | 1.58ms (+26%) | ??? | ??? | ??? |
+       | search/100 | 821µs | 895µs (+9%) | ??? | ??? | ??? |
+       | search/1000 | 885µs | 1.10ms (+24%) | ??? | ??? | ??? |
+       | semantic_query/10 | 835µs | 979µs (+17%) | ??? | ??? | ??? |
+       | memory_footprint_idle | 9.0ms | 14.3ms (+59%) | ??? | ??? | ??? |
+       EOF
+
+       # Fill in optimized numbers from benchmark output
+       grep "insert/100 " final_vector_bench.txt
+       grep "search/100 " final_vector_bench.txt
+       grep "semantic_query/10" final_memory_operations.txt
+       # Update table manually
+       ```
+    4. **Acceptance criteria**:
+       - ✅ GREEN: All operations <5% from pre-refactor baseline
+       - ⚠️ YELLOW: Most operations <10%, justifiable trade-offs documented
+       - ❌ RED: >10% regression, deeper optimization or revert needed
+
+  - [ ] **Task 3.2: Document findings in TODO.md** (30 min):
+    **File**: TODO.md Sub-Task 13c.3.1.16
+    **Steps**:
+    1. Add Phase 2 completion section:
+       - List which optimizations were applied (Tasks 2.1-2.5)
+       - Document actual vs. expected improvements
+       - Note any surprises or unexpected results
+    2. Update Key Learnings section with:
+       - Arc cloning impact (actual measurement)
+       - Transaction boundary impact (actual measurement)
+       - Whether <5% goal was achieved
+    3. **If <5% achieved**: Mark 13c.3.1.16 as ✅ COMPLETE
+    4. **If 5-10% remaining**: Document trade-off decision and rationale
+    5. **If >10% remaining**: Document why and next steps (Task 2.7 or revert consideration)
+
+  - [ ] **Task 3.3: Add CI performance regression guards** (1 hour):
+    **File**: `.github/workflows/benchmark.yml` (create if doesn't exist)
+    **Steps**:
+    1. Save optimized baseline:
+       ```bash
+       cargo bench --bench sqlite_vector_bench -- --save-baseline refactor_optimized
+       cp target/criterion/*/refactor_optimized/*.json benchmarks/baselines/
+       ```
+    2. Create benchmark CI workflow:
+       ```yaml
+       name: Performance Benchmarks
+       on: [pull_request]
+       jobs:
+         benchmark:
+           runs-on: ubuntu-latest
+           steps:
+             - uses: actions/checkout@v3
+             - name: Run benchmarks
+               run: |
+                 cargo bench --bench sqlite_vector_bench -- --baseline refactor_optimized
+                 # Parse results and fail if >5% regression
+       ```
+    3. Document acceptable ranges in CONTRIBUTING.md:
+       ```markdown
+       ## Performance Standards
+
+       Critical operations must remain within 5% of baseline:
+       - Vector insert/100: <1.31ms (1.25ms baseline + 5%)
+       - Vector search/100: <862µs (821µs baseline + 5%)
+
+       PRs with >5% regression require justification and maintainer approval.
+       ```
+    4. **Commit**: "Add CI performance regression guards"
+
+  - [ ] **Task 3.4: Update technical documentation** (30-60 min):
+    **File**: `docs/technical/storage-architecture.md`
+    **Steps**:
+    1. Add "Performance Characteristics" section:
+       - Document trait indirection costs (2-5ns vtable dispatch)
+       - Document async overhead (already present, trait adds minimal extra)
+       - Best practices for trait implementers
+    2. Add optimization guidelines:
+       ```markdown
+       ### Performance Best Practices
+
+       **Trait Implementation**:
+       - Use `#[inline]` for methods <10 lines called in hot paths
+       - Avoid Arc::clone in loops - borrow &self instead
+       - Wrap single operations in explicit transactions like batch ops
+       - Pre-allocate Vec::with_capacity when result size is known
+
+       **Trade-offs**:
+       - Trait objects enable extensibility but add 2-5ns per call
+       - Acceptable for database operations (microsecond scale)
+       - Consider enum dispatch for non-extensible core backends
+
+       **Measured Impact** (Phase 13c trait refactor):
+       - Small operations: +0-5% overhead (after optimization)
+       - Large operations: -16% improvement (better batching)
+       - Memory footprint: +5-10% (trait object metadata)
+       ```
+    3. **Commit**: "Document storage architecture performance characteristics"
 
 **Phase 4: Validation & Documentation** (2-4 hours)
   - [ ] Re-run full benchmark suite:

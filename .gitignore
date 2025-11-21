@@ -43,3 +43,8 @@ sessions/
 
 # Benchmark datasets
 benchmarks/graph-dataset/*.json
+
+# Benchmark outputs
+memory_fixed.txt
+refactor.txt
+refactor_vector.txt
