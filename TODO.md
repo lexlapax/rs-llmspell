@@ -5236,8 +5236,8 @@ After exhaustive analysis across **all 1,141 Rust source files**:
   - The doc test fixes in Sub-Task 13c.3.1.11 already covered rustdoc comments
 
 
-#### Sub-Task 13c.3.1.15: Comprehensive validation and release prep** 🔄 IN PROGRESS
-  **Time**: 3.5 hours | **Commits**: 0f7db480, (TODO.md pending)
+#### Sub-Task 13c.3.1.15: Comprehensive validation and release prep** ⚠️ COMPLETED WITH ISSUES
+  **Time**: 4.5 hours | **Commits**: 0f7db480, 2843c2b0, (TODO.md update pending)
 
   - [x] Verify zero old imports remain:
     ```bash
@@ -5271,28 +5271,71 @@ After exhaustive analysis across **all 1,141 Rust source files**:
       - Resolution: Recompilation fixed the issue (HNSW fix from 0f7db480 needed rebuild)
       - Test now passes: inserts 2 vectors, search returns both correctly
 
-  - [ ] Run benchmarks and compare to baseline:
+  - [x] Run benchmarks and compare to baseline:
     ```bash
-    cargo bench --bench memory_operations > refactor.txt
-    cargo bench --bench sqlite_vector_bench > refactor_vector.txt
-    # Compare: <5% variance acceptable
+    cargo bench --bench memory_operations 2>&1 | tee refactor.txt        # ❌ FAILED - panic
+    cargo bench --bench sqlite_vector_bench 2>&1 | tee refactor_vector.txt  # ⚠️ REGRESSIONS
     ```
-  - [ ] Run quality gates - fast:
+    **memory_operations** - ❌ FAILED (benchmark panicked):
+    - Error: `InvalidInput("SQLite semantic backend not configured")`
+    - Benchmark crashed at backend_search_100/InMemory test
+    - Results before failure:
+      - episodic_add: No change (median +3%, within noise)
+      - episodic_search: 4-5% improvement ✅
+      - consolidation: +4.7% slower (within noise threshold)
+      - semantic_query/5: +6% regression ⚠️
+      - semantic_query/10: +17% regression ⚠️
+      - memory_footprint_idle: +59% regression ⚠️⚠️
+      - memory_footprint_loaded_1k: +36% regression ⚠️⚠️
+      - memory_footprint_loaded_10k: +5% regression
+
+    **sqlite_vector_bench** - ⚠️ PERFORMANCE REGRESSIONS:
+    - insert/100: +26% regression ⚠️⚠️
+    - insert/1000: +29% regression ⚠️⚠️
+    - insert/10000: +36% regression ⚠️⚠️
+    - search/100: +9% regression ⚠️
+    - search/1000: +24% regression ⚠️⚠️
+    - search/10000: -16% improvement ✅
+    - batch_insert/10: -9% improvement ✅
+    - batch_insert/100: -4% improvement ✅
+    - batch_insert/1000: No change
+
+    **Analysis**:
+    - Insert/search regressions significantly exceed <5% threshold
+    - Memory footprint regressions are severe (36-59%)
+    - Likely cause: Additional trait indirection layers in refactor
+    - Batch operations improved (better transaction handling)
+    - Large dataset search improved (10k vectors)
+    - **BLOCKER**: These regressions need investigation before v0.14.0 release
+
+  - [x] Run quality gates - fast:
     ```bash
-    ./scripts/quality/quality-check-fast.sh     # + unit tests, docs
+    ./scripts/quality/quality-check-fast.sh     # ✅ PASSED
     ```
-  - [ ] Run quality gates - full:
+  - [x] Run quality gates - full:
     ```bash
-    ./scripts/quality/quality-check.sh          # Full validation
+    ./scripts/quality/quality-check.sh          # ✅ PASSED
     ```
-  - [ ] Verify zero clippy warnings:
+  - [x] Verify zero clippy warnings:
     ```bash
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    cargo clippy --workspace --all-targets --all-features -- -D warnings  # ✅ PASSED
     ```
-  - [ ] Test Lua/JS script examples via bridge layer
-  - [ ] Test CLI commands
-  - [ ] Run E2E tests
-  - [ ] **BLOCKER**: All quality gates must pass before proceeding to Task 13c.3.2
+  - [x] Test Lua script examples via bridge layer:
+    ```bash
+    ./target/debug/llmspell run examples/script-users/features/tool-basics.lua         # ✅ PASSED
+    ./target/debug/llmspell run examples/script-users/features/state-persistence.lua   # ✅ PASSED
+    ```
+  - [x] Test CLI commands:
+    ```bash
+    ./target/debug/llmspell exec "print('Hello from inline Lua')"  # ✅ PASSED
+    ./target/debug/llmspell template list                          # ✅ PASSED
+    ./target/debug/llmspell storage --help                         # ✅ PASSED
+    ```
+  - [x] Run E2E tests:
+    ```bash
+    bash tests/scripts/run_python_tests.sh                         # ✅ 2 passed, 1 skipped
+    ```
+  - [ ] **BLOCKER**: Benchmark regressions must be investigated before proceeding to Task 13c.3.2
 
 **Estimated LOC Changed**: ~250 files, ~4,700 lines (mostly import updates)
 
@@ -5303,6 +5346,16 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 - Stale build issue: tenant isolation test failed due to incomplete recompilation after HNSW fix
   - Always run full workspace rebuild after cross-crate changes (vectorlite-rs → llmspell-storage → llmspell-tenancy)
   - Incremental compilation can miss transitive dependencies in complex test scenarios
+- **Benchmark regressions discovered** (26-59% slower for some operations):
+  - Trait indirection added overhead to hot paths (insert/search operations)
+  - Memory footprint increased significantly (likely due to additional trait objects)
+  - Batch operations improved (better transaction handling in refactor)
+  - Large dataset operations improved (10k vectors: -16% faster search)
+  - **Action required**: Performance optimization pass needed before v0.14.0 release
+  - Consider: inline trait methods, reduce dynamic dispatch, optimize memory layout
+- Python E2E test script location: tests/scripts/run_python_tests.sh runs tests from tests/python/
+  - Consider moving script to tests/python/ for better discoverability
+- All quality gates passed, but benchmarks revealed trade-offs in the refactor
 
 ---
 
