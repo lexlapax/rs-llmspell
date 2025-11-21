@@ -185,7 +185,7 @@ impl DefaultMemoryManager {
     /// # async fn example() -> llmspell_memory::Result<()> {
     /// // Testing configuration (InMemory backend, no embeddings)
     /// let test_config = MemoryConfig::for_testing();
-    /// let test_manager = DefaultMemoryManager::with_config(&test_config)?;
+    /// let test_manager = DefaultMemoryManager::with_config(&test_config).await?;
     ///
     /// // Production configuration (HNSW backend with embeddings)
     /// # use llmspell_memory::embeddings::EmbeddingService;
@@ -203,7 +203,7 @@ impl DefaultMemoryManager {
     /// # let provider: Arc<dyn EmbeddingProvider> = Arc::new(MockProvider);
     /// let service = Arc::new(EmbeddingService::new(provider));
     /// let prod_config = MemoryConfig::for_production(service);
-    /// let prod_manager = DefaultMemoryManager::with_config(&prod_config)?;
+    /// let prod_manager = DefaultMemoryManager::with_config(&prod_config).await?;
     /// # Ok(())
     /// # }
     /// ```
