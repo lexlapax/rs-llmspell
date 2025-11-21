@@ -28,6 +28,7 @@ use std::collections::HashMap;
 ///
 /// ```no_run
 /// # use llmspell_core::traits::storage::StorageBackend;
+/// # use std::collections::HashMap;
 /// # async fn example(backend: impl StorageBackend) -> anyhow::Result<()> {
 /// // Store and retrieve data
 /// backend.set("user:123", b"Alice".to_vec()).await?;

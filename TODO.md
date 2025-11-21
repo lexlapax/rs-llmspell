@@ -5863,6 +5863,23 @@ If optimizations prove insufficient (<5% goal unreachable without major rewrites
   - macOS: Temp directories have more restrictive permissions
   - Solution: Explicitly disable permission inheritance checks when testing with temp directories
 
+**Doc Test Fix** (StorageBackend trait):
+- **Issue**: Doc test in `llmspell-core/src/traits/storage/backend.rs:29` failed to compile
+  - Error: `use of undeclared type HashMap` at line 38 (in doc test)
+  - Test used `HashMap::new()` in batch operations example but didn't import it
+- **Root Cause**: Doc tests are compiled independently - imports must be explicit
+  - Hidden imports (lines with `#` prefix) are compiled but not shown in docs
+  - The example already had `# use llmspell_core::traits::storage::StorageBackend;`
+  - But was missing `# use std::collections::HashMap;`
+- **Fix Applied**:
+  - Added `# use std::collections::HashMap;` at line 31
+  - File: `llmspell-core/src/traits/storage/backend.rs:31`
+- **Test Results**: ✅ Doc test now compiles and passes
+- **Key Learning**: Always verify doc test imports are complete
+  - Doc tests run in isolation with only explicitly imported items
+  - Use `cargo test --doc` to catch these issues before full workspace tests
+  - Hidden imports (`# use ...`) keep docs clean while ensuring compilation
+
 ---
 
 ### Task 13c.3.2: PostgreSQL/SQLite Export/Import Tool (Days 23-30) ⏹ PENDING
