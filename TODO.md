@@ -5673,41 +5673,7 @@ Phase 2 optimizations successfully eliminated ALL critical regressions from the 
     4. ✅ Documented trade-off: search/1000 +10.4% acceptable for extensibility benefits
     5. ✅ Referenced benchmark_comparison.md for detailed performance analysis
 
-  - [ ] **Task 3.3: Add CI performance regression guards** (1 hour):
-    **File**: `.github/workflows/benchmark.yml` (create if doesn't exist)
-    **Steps**:
-    1. Save optimized baseline:
-       ```bash
-       cargo bench --bench sqlite_vector_bench -- --save-baseline refactor_optimized
-       cp target/criterion/*/refactor_optimized/*.json benchmarks/baselines/
-       ```
-    2. Create benchmark CI workflow:
-       ```yaml
-       name: Performance Benchmarks
-       on: [pull_request]
-       jobs:
-         benchmark:
-           runs-on: ubuntu-latest
-           steps:
-             - uses: actions/checkout@v3
-             - name: Run benchmarks
-               run: |
-                 cargo bench --bench sqlite_vector_bench -- --baseline refactor_optimized
-                 # Parse results and fail if >5% regression
-       ```
-    3. Document acceptable ranges in CONTRIBUTING.md:
-       ```markdown
-       ## Performance Standards
-
-       Critical operations must remain within 5% of baseline:
-       - Vector insert/100: <1.31ms (1.25ms baseline + 5%)
-       - Vector search/100: <862µs (821µs baseline + 5%)
-
-       PRs with >5% regression require justification and maintainer approval.
-       ```
-    4. **Commit**: "Add CI performance regression guards"
-
-  - [ ] **Task 3.4: Update technical documentation** (30-60 min):
+  - [ ] **Task 3.3: Update technical documentation** (30-60 min):
     **File**: `docs/technical/storage-architecture.md`
     **Steps**:
     1. Add "Performance Characteristics" section:
