@@ -5560,27 +5560,28 @@ Ran `sqlite_vector_bench` to check if vector storage regressions remain:
     **Intended Goal**: If Tasks 2.2-2.6 failed to achieve <5% goal, pursue deeper optimizations (pool tuning, enum dispatch, or static dispatch).
     **Why Not Needed**: Task 2.2 exceeded <5% goal on first attempt. No need for architectural trade-offs that would sacrifice trait-based extensibility.
 
-  - [ ] **Task 2.8: Fix HNSW backend benchmark test** (30-60 min):
-    **Issue**: `backend_search_100/HNSW` test panics at line 327 of memory_operations.rs
-    **Error**: "SQLite backend requires sqlite_backend (provide SqliteBackend instance)"
-    **Root Cause**: `MemoryConfig::for_production()` sets episodic_backend=Sqlite but sqlite_backend=None
+  - [x] **Task 2.8: Fix HNSW backend benchmark test** (45 min - COMPLETE):
+    **Commit**: d6f65935 "13c.3.1.16 Task 2.8 - Fix HNSW backend benchmark test"
+    **Files Changed**:
+    - `llmspell-memory/src/config.rs:155-200`
+    - `llmspell-memory/src/episodic/backend.rs:137-181`
+    - `llmspell-memory/src/manager.rs:384-403`
 
-    **Options**:
-    1. **Option A - Fix MemoryConfig** (similar to Task 2.1 semantic fix):
-       - Add InMemory variant to EpisodicBackendType (already exists)
-       - Make `for_production()` use InMemory episodic OR auto-create SQLite backend
-       - This matches Task 2.1's approach for semantic backend
+    **Root Cause**: `MemoryConfig::for_production()` sets `episodic_backend=Sqlite` and `semantic_backend=Sqlite` but provides `sqlite_backend=None` and `semantic_sqlite_backend=None`, causing panic: "SQLite backend requires sqlite_backend (provide SqliteBackend instance)"
 
-    2. **Option B - Fix benchmark** (simpler, less invasive):
-       - Update benchmark to create SQLite backend explicitly before calling with_config()
-       - Keep `for_production()` as-is (requires user to provide backend)
-       - This is more explicit and matches "production" expectations
+    **Solution Applied** (Option A - Auto-create backends):
+    - Modified `EpisodicBackend::create_sqlite_backend()` to auto-create in-memory SqliteBackend when `config.sqlite_backend` is None
+    - Modified `DefaultMemoryManager::create_semantic_memory()` for `SemanticBackendType::Sqlite` case to auto-create in-memory SqliteBackend when `config.semantic_sqlite_backend` is None
+    - Updated `MemoryConfig::for_production()` documentation to clarify auto-creation behavior
+    - Matches Task 2.1 pattern for consistency
 
-    **Recommended**: **Option A** for consistency with Task 2.1
-    **Files**: `llmspell-memory/src/config.rs`, possibly `llmspell-memory/src/episodic/backend.rs`
-    **Validate**: `cargo bench --bench memory_operations 2>&1 | tee hnsw_fixed.txt`
-    **Success**: HNSW backend test runs to completion, provides HNSW vs InMemory comparison data
-    **Commit**: "Fix HNSW backend benchmark - Handle episodic SQLite config"
+    **Results** (hnsw_fixed.txt):
+    - ✅ **backend_search_100/HNSW**: 1.11ms (was panic) - **FIXED!**
+    - ✅ **backend_search_1000/HNSW**: 1.39ms (was panic) - **FIXED!**
+    - ✅ **backend_search_10000/HNSW**: Passes successfully
+    - ✅ **All HNSW backend benchmarks**: Run to completion with HNSW vs InMemory comparison data
+
+    **Impact**: Benchmark suite now runs fully without panics. Auto-created backends use in-memory SQLite with HNSW vector search enabled, providing production-quality performance testing.
 
 **Phase 3: Validation & Documentation** (2-3 hours - REVISED)
 
