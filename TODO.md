@@ -5237,7 +5237,7 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 
 
 #### Sub-Task 13c.3.1.15: Comprehensive validation and release prep** 🔄 IN PROGRESS
-  **Time**: 3.5 hours | **Commits**: 0f7db480, (TODO.md pending)
+  **Time**: 5 hours | **Commits**: 0f7db480, 2843c2b0
 
   - [x] Verify zero old imports remain:
     ```bash
@@ -5245,6 +5245,18 @@ After exhaustive analysis across **all 1,141 Rust source files**:
     rg "use llmspell_graph::KnowledgeGraph" llmspell-*/src/                    # 0 matches ✅
     rg "use llmspell_memory::ProceduralMemory" llmspell-*/src/                 # 0 matches ✅
     ```
+  - [x] **Verify zero old trait definitions remain** (2025-11-21):
+    - llmspell-storage: ✅ NO old storage backend traits
+      - `StorageSerialize`, `MigrationSource`, `MigrationTarget` are utility/helper traits (OK)
+      - All storage backend traits imported from `llmspell_core`
+    - llmspell-graph: ✅ Old `KnowledgeGraph` trait deleted in commit 63de60d3
+      - `traits/mod.rs` re-exports from `llmspell_core` (backward compat)
+      - `GraphBackend` is internal backend abstraction (NOT storage trait, OK)
+    - llmspell-memory: ✅ Domain-level application traits (NOT storage backend traits)
+      - `MemoryManager`, `SemanticMemory`, `EpisodicMemory`, `ConsolidationEngine`
+      - These are application-level APIs, different from storage-level traits
+    - **Conclusion**: All old storage backend traits successfully migrated to `llmspell-core` ✅
+
   - [x] Run quality gates - minimal:
     ```bash
     ./scripts/quality/quality-check-minimal.sh  # ✅ PASSED
@@ -5270,24 +5282,33 @@ After exhaustive analysis across **all 1,141 Rust source files**:
       - Test expects 2 vectors returned from search, was getting only 1
       - Resolution: Recompilation fixed the issue (HNSW fix from 0f7db480 needed rebuild)
       - Test now passes: inserts 2 vectors, search returns both correctly
+    - Fixed clippy warnings (llmspell-storage/src/backends/sqlite/graph.rs)
+      - Removed unnecessary `.to_string()` in format args (lines 282, 356)
+      - Linux clippy more strict than macOS
 
+  - [x] Run quality gates - fast:
+    ```bash
+    ./scripts/quality/quality-check-fast.sh     # ✅ PASSED (all checks)
+    # - Code formatting ✅
+    # - Clippy lints ✅
+    # - Workspace build ✅
+    # - All unit tests ✅
+    # - Documentation build ✅
+    ```
+  - [x] Verify zero clippy warnings with strict flags:
+    ```bash
+    cargo clippy --workspace --all-targets --all-features -- -D warnings  # ✅ PASSED (6m 48s, exit 0)
+    ```
+  - [ ] Run quality gates - full (🔄 IN PROGRESS - test suite failed):
+    ```bash
+    ./scripts/quality/quality-check.sh          # ❌ FAILED at test suite stage
+    # Investigating test failures...
+    ```
   - [ ] Run benchmarks and compare to baseline:
     ```bash
     cargo bench --bench memory_operations > refactor.txt
     cargo bench --bench sqlite_vector_bench > refactor_vector.txt
     # Compare: <5% variance acceptable
-    ```
-  - [ ] Run quality gates - fast:
-    ```bash
-    ./scripts/quality/quality-check-fast.sh     # + unit tests, docs
-    ```
-  - [ ] Run quality gates - full:
-    ```bash
-    ./scripts/quality/quality-check.sh          # Full validation
-    ```
-  - [ ] Verify zero clippy warnings:
-    ```bash
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
     ```
   - [ ] Test Lua/JS script examples via bridge layer
   - [ ] Test CLI commands
@@ -5303,6 +5324,9 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 - Stale build issue: tenant isolation test failed due to incomplete recompilation after HNSW fix
   - Always run full workspace rebuild after cross-crate changes (vectorlite-rs → llmspell-storage → llmspell-tenancy)
   - Incremental compilation can miss transitive dependencies in complex test scenarios
+- Cross-platform clippy strictness: Linux detected to_string_in_format_args warnings that macOS missed
+- Old trait migration verification: All storage backend traits successfully removed from original crates
+  - Only utility/helper traits and domain-level application traits remain (as intended)
 
 ---
 
