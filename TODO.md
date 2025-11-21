@@ -5159,19 +5159,29 @@ After exhaustive analysis across **all 1,141 Rust source files**:
   - llmspell-testing: 98 tests ✓
   - Other crates: 100+ additional tests ✓
 
-#### Sub-Task 13c.3.1.12: Update technical documentation (15 files, ~30 code examples)**
-  - [ ] `docs/technical/current-architecture.md`:
-    - [ ] Update 10+ code examples with new imports
-    - [ ] Update architecture diagrams showing trait locations
-  - [ ] `docs/technical/master-architecture-vision.md`:
-    - [ ] Update 20+ code examples (CRITICAL - master vision doc)
-  - [ ] `docs/technical/postgresql-guide.md`:
-    - [ ] Update 8+ PostgreSQL backend examples
-  - [ ] `docs/technical/sqlite-vector-storage-architecture.md`:
-    - [ ] Update 12+ SQLite backend examples
-  - [ ] `docs/technical/rag-system-guide.md`:
-    - [ ] Update 6+ RAG examples with VectorStorage imports
-  - [ ] Update 10 other technical docs
+- [x] **Sub-Task 13c.3.1.12: Update technical documentation** ✅ COMPLETE (2025-11-20)
+  - [x] Surveyed all 19 technical documentation files
+  - [x] Fixed postgresql-guide.md: Updated StorageBackend import to llmspell-core
+  - [x] Verified remaining files: No trait imports from old location
+
+  **Survey Results**:
+  - 19 technical docs checked (current-architecture, master-architecture-vision, postgresql-guide, sqlite-vector-storage-architecture, rag-system-guide, kernel-architecture, and 13 others)
+  - 6 files contain `use` statements (kernel, master-arch, platform, rag, template, postgres)
+  - Only 1 file needed updating: `postgresql-guide.md` (line 299)
+  - Other docs reference traits in prose/type signatures without explicit imports
+  - Pattern: Docs describe architecture conceptually, not executable code examples
+
+  **Change Made**:
+  ```rust
+  // Before:
+  use llmspell_storage::{PostgresBackend, PostgresConfig, StorageBackend};
+
+  // After:
+  use llmspell_storage::{PostgresBackend, PostgresConfig};
+  use llmspell_core::traits::storage::StorageBackend;
+  ```
+
+  **Key Insight**: Most technical docs don't have executable code examples with imports - they use pseudocode or type signatures inline. Only production-oriented guides (like postgresql-guide.md) have full import statements.
 
 #### Sub-Task 13c.3.1.13: Update developer guide + crate READMEs (19 files, ~60 code examples)**
   - [ ] `docs/developer-guide/03-extending-components.md`:
