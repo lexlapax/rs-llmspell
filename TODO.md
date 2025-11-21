@@ -5336,6 +5336,7 @@ After exhaustive analysis across **all 1,141 Rust source files**:
     bash tests/scripts/run_python_tests.sh                         # ✅ 2 passed, 1 skipped
     ```
   - [ ] **BLOCKER**: Benchmark regressions must be investigated before proceeding to Task 13c.3.2
+  - [ ] **Next**: Sub-Task 13c.3.1.16 addresses performance regressions
 
 **Estimated LOC Changed**: ~250 files, ~4,700 lines (mostly import updates)
 
@@ -5356,6 +5357,203 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 - Python E2E test script location: tests/scripts/run_python_tests.sh runs tests from tests/python/
   - Consider moving script to tests/python/ for better discoverability
 - All quality gates passed, but benchmarks revealed trade-offs in the refactor
+
+---
+
+#### Sub-Task 13c.3.1.16: Performance optimization - Address trait refactor regressions** ⏹ PENDING
+  **Priority**: CRITICAL (BLOCKS v0.14.0 release)
+  **Time**: 2-3 days | **Commits**: TBD
+  **Dependencies**: Sub-Task 13c.3.1.15 ✅ (benchmarks identified regressions)
+
+**Problem Statement**:
+Trait refactor (13c.3.1.x) introduced 26-59% performance regressions in hot paths:
+- Vector insert: +26-36% slower (llmspell-storage SQLite backend)
+- Vector search (small datasets): +9-24% slower
+- Semantic query: +6-17% slower (llmspell-memory)
+- Memory footprint: +36-59% larger
+- memory_operations benchmark panic: "SQLite semantic backend not configured"
+
+Root cause: Additional trait indirection layers (VectorOps, GraphOps, ProceduralOps, StateOps)
+add vtable dispatch overhead and larger memory footprints vs. direct implementation calls.
+
+**Target**: Reduce regressions to <5% variance (acceptable threshold) while maintaining trait architecture benefits.
+
+**Phase 1: Investigation & Root Cause Analysis** (4-6 hours)
+  - [ ] Fix memory_operations benchmark panic:
+    - Investigate "SQLite semantic backend not configured" error
+    - Check benchmark setup in llmspell-memory/benches/memory_operations.rs:297
+    - Likely missing backend initialization in backend_search_100 test
+    - Fix configuration and re-run benchmark to get complete baseline
+
+  - [ ] Profile hot paths before/after refactor:
+    ```bash
+    # Generate flamegraphs for insert/search operations
+    cargo flamegraph --bench sqlite_vector_bench --features flamegraph -- --bench insert/100
+    cargo flamegraph --bench sqlite_vector_bench --features flamegraph -- --bench search/100
+    cargo flamegraph --bench memory_operations --features flamegraph -- --bench semantic_query/10
+
+    # Compare against pre-refactor baseline (if available in git history)
+    git show <pre-refactor-commit>:llmspell-storage/src/backends/sqlite/vector.rs > /tmp/old_vector.rs
+    # Manual code path comparison
+    ```
+
+  - [ ] Analyze trait method call patterns:
+    - Identify most-called trait methods in hot paths:
+      - `VectorOps::insert()` - called once per vector
+      - `VectorOps::search()` - called frequently in queries
+      - `GraphOps::add_entity()` / `add_relationship()` - graph writes
+      - `StateOps::save()` / `load()` - state persistence
+    - Count vtable dispatches per operation (use perf/instruments)
+    - Measure memory layout of trait objects vs. concrete types:
+      ```rust
+      println!("Size of Box<dyn VectorOps>: {}", std::mem::size_of::<Box<dyn VectorOps>>());
+      println!("Size of SqliteVectorBackend: {}", std::mem::size_of::<SqliteVectorBackend>());
+      ```
+
+  - [ ] Identify optimization opportunities:
+    - Methods that can be inlined (`#[inline]` or `#[inline(always)]`)
+    - Trait methods that are monomorphic (single implementation) → static dispatch
+    - Opportunities for batch operation APIs (reduce per-call overhead)
+    - Memory layout optimizations (Box vs. Arc vs. direct embedding)
+
+**Phase 2: Targeted Optimizations** (8-12 hours)
+  - [ ] **Vector insert optimization** (Target: <5% regression from baseline):
+    - Hot path: `VectorOps::insert()` → `SqliteVectorBackend::insert()`
+    - Current: 1.58ms (+26%) → Target: 1.25ms (baseline)
+    - Optimization strategies:
+      1. Add `#[inline]` to `VectorOps::insert()` trait method
+      2. Consider `#[inline(always)]` if small method (measure size)
+      3. Batch insert API: `insert_batch(&[Vector])` to amortize vtable overhead
+      4. Check if libsql connection pooling is optimal after refactor
+      5. Profile SQL query generation (any new allocations?)
+    - Validate: `cargo bench --bench sqlite_vector_bench -- insert`
+
+  - [ ] **Vector search optimization** (Target: <5% regression):
+    - Hot path: `VectorOps::search()` → HNSW index → MessagePack deserialization
+    - Current: 895µs (+9%) small, 1.10ms (+24%) medium → Target: 821µs, 885µs
+    - Optimization strategies:
+      1. Inline `VectorOps::search()` and `VectorOps::search_with_threshold()`
+      2. Check if MessagePack deserialization path changed (vectorlite-rs dependency)
+      3. Reduce allocations in result vector construction
+      4. Profile HNSW search_with_params() - any new overhead?
+      5. Consider caching frequently-used query vectors
+    - Validate: `cargo bench --bench sqlite_vector_bench -- search`
+
+  - [ ] **Semantic query optimization** (Target: <5% regression):
+    - Hot path: Memory system → VectorOps → embedding search → consolidation
+    - Current: 874µs (+6%), 979µs (+17%) → Target: 826µs, 835µs
+    - Optimization strategies:
+      1. Inline `SemanticMemory::query()` and trait delegation methods
+      2. Check if embedding vector cloning increased (pass by reference?)
+      3. Profile consolidation algorithm (any new allocations?)
+      4. Reduce trait object boxing in memory pipeline
+      5. Consider pre-allocating result vectors
+    - Validate: `cargo bench --bench memory_operations -- semantic_query`
+
+  - [ ] **Memory footprint optimization** (Target: <10% increase, currently +36-59%):
+    - Problem: Trait objects (Box<dyn Trait>) are larger than concrete types
+    - Current: 14.3ms idle (+59%), 15.7ms loaded (+36%) → Target: 9.0ms, 11.6ms
+    - Optimization strategies:
+      1. Audit Box<dyn VectorOps> vs Arc<dyn VectorOps> vs direct embedding
+      2. Use enum dispatch pattern for known backend types:
+         ```rust
+         enum VectorBackend {
+             Sqlite(SqliteVectorBackend),
+             InMemory(InMemoryVectorBackend),
+             // No vtable overhead, direct dispatch
+         }
+         ```
+      3. Reduce cloning of trait objects (use references where possible)
+      4. Check if any new Arc<Mutex<>> wrappers were added (double indirection)
+      5. Profile memory allocations during backend initialization
+    - Trade-off: Enum dispatch reduces extensibility vs. trait objects
+    - Decision: Use enum dispatch for core backends, keep traits for plugins
+    - Validate: `cargo bench --bench memory_operations -- memory_footprint`
+
+**Phase 3: Architectural Refinements** (4-6 hours)
+  - [ ] Evaluate hybrid dispatch strategy:
+    - Keep trait abstraction at API boundaries (llmspell-core public API)
+    - Use concrete types or enum dispatch internally (llmspell-storage internals)
+    - Example: `SqliteBackend` holds concrete `SqliteVectorBackend` instead of `Box<dyn VectorOps>`
+    - Refactor: Move trait boxing to higher-level APIs (Memory, Graph, etc.) not storage internals
+
+  - [ ] Implement batch operation APIs (reduce per-call overhead):
+    ```rust
+    // Add to VectorOps trait
+    fn insert_batch(&self, vectors: &[(String, Vec<f32>)]) -> Result<()> {
+        // Default implementation (can be overridden for optimization)
+        for (id, vec) in vectors {
+            self.insert(id, vec)?;
+        }
+        Ok(())
+    }
+
+    fn search_batch(&self, queries: &[&[f32]], k: usize) -> Result<Vec<Vec<SearchResult>>> {
+        // Optimize with single transaction
+    }
+    ```
+    - Benefits: Amortize vtable overhead, enable transaction batching
+    - Target: Batch insert should be 4-9% faster (already measured in benchmarks)
+
+  - [ ] Add performance regression tests to CI:
+    - Create baseline benchmark results file (refactor.baseline.txt)
+    - Add CI check: `cargo bench --bench sqlite_vector_bench -- --save-baseline refactor`
+    - Fail CI if >5% regression on critical operations
+    - Ensure future changes don't reintroduce regressions
+
+**Phase 4: Validation & Documentation** (2-4 hours)
+  - [ ] Re-run full benchmark suite:
+    ```bash
+    cargo bench --bench memory_operations 2>&1 | tee refactor_optimized.txt
+    cargo bench --bench sqlite_vector_bench 2>&1 | tee refactor_vector_optimized.txt
+    ```
+
+  - [ ] Compare results (baseline vs. refactor vs. optimized):
+    - Create comparison table:
+      | Operation | Baseline | Refactor | Optimized | Status |
+      |-----------|----------|----------|-----------|--------|
+      | insert/100 | 1.25ms | 1.58ms (+26%) | ??? | ??? |
+      | search/100 | 821µs | 895µs (+9%) | ??? | ??? |
+      | semantic_query/10 | 835µs | 979µs (+17%) | ??? | ??? |
+    - **Acceptance**: All <5% variance from baseline OR document trade-offs
+
+  - [ ] Document optimization decisions in technical docs:
+    - Update docs/technical/storage-architecture.md with performance section
+    - Document enum dispatch vs. trait object trade-offs
+    - Add inline recommendations for future trait methods
+    - Note: "Use `#[inline]` for trait methods <50 lines in hot paths"
+
+  - [ ] Update TODO.md with results and mark 13c.3.1.16 complete
+
+  - [ ] Run quality gates to ensure no regressions:
+    ```bash
+    ./scripts/quality/quality-check-fast.sh
+    cargo test --workspace --all-features  # Ensure 792 tests still pass
+    ```
+
+**Estimated LOC Changed**:
+- Benchmark fixes: ~50 lines (memory_operations.rs config)
+- Inline annotations: ~100 lines (trait method attributes)
+- Enum dispatch refactor: ~300-500 lines (if implemented)
+- Batch APIs: ~200 lines (trait definitions + implementations)
+- Documentation: ~200 lines
+**Total**: ~550-1050 lines
+
+**Success Criteria**:
+- [ ] memory_operations benchmark runs without panic
+- [ ] All critical operations <5% variance from pre-refactor baseline
+- [ ] Memory footprint <10% increase (acceptable for trait architecture)
+- [ ] 792 tests still passing
+- [ ] Documentation updated with optimization guidelines
+- [ ] **UNBLOCKED**: Can proceed to Task 13c.3.2 (PostgreSQL/SQLite export/import)
+
+**Alternative: Accept Performance Trade-off**:
+If optimizations prove insufficient (<5% goal unreachable without major rewrites):
+- Document acceptable performance range (5-15% regression)
+- Justify trade-off: Architectural benefits (modularity, testability, extensibility) > performance cost
+- Set v0.14.0 release note: "Trait refactor improves architecture, 5-15% performance cost on small operations"
+- Plan v0.15.0 performance-focused release with deeper optimizations
+- **Decision point**: Consult with project maintainer on trade-off acceptance
 
 ---
 
