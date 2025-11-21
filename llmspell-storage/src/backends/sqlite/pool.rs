@@ -9,6 +9,7 @@ use super::{
 };
 use libsql::{Builder, Connection, Database};
 use std::sync::Arc;
+use tracing::warn;
 
 /// R2D2 connection manager for libsql
 ///
@@ -59,13 +60,13 @@ impl SqliteConnectionManager {
         // Set cache size (performance optimization - non-fatal)
         let cache_pragma = format!("PRAGMA cache_size = {}", self.config.cache_size);
         if let Err(e) = conn.query(&cache_pragma, ()).await {
-            tracing::warn!("Failed to set cache_size (non-fatal): {}", e);
+            warn!("Failed to set cache_size (non-fatal): {}", e);
         }
 
         // Set mmap size (performance optimization - non-fatal, may not be supported in all libsql contexts)
         let mmap_pragma = format!("PRAGMA mmap_size = {}", self.config.mmap_size);
         if let Err(e) = conn.query(&mmap_pragma, ()).await {
-            tracing::warn!("Failed to set mmap_size (non-fatal): {}", e);
+            warn!("Failed to set mmap_size (non-fatal): {}", e);
         }
 
         // Set busy timeout

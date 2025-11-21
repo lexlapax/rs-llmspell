@@ -424,13 +424,16 @@ mod tests {
 
         assert_eq!(index.len(), 3);
 
-        // Search
-        let query = vec![1.5; 384];
+        // Search with query closer to v1
+        let query = vec![1.2; 384];
         let results = index.search(&query, 2, 100)?;
 
         assert_eq!(results.len(), 2);
-        // Closest should be v2 (all 2.0), then v1 (all 1.0)
-        assert_eq!(results[0].0, 2);
+        // Closest should be v1 (all 1.0), then v2 (all 2.0)
+        // Distance to v1: sqrt(384 * (1.2-1.0)^2) = sqrt(384 * 0.04) = sqrt(15.36) ≈ 3.9
+        // Distance to v2: sqrt(384 * (1.2-2.0)^2) = sqrt(384 * 0.64) = sqrt(245.76) ≈ 15.7
+        assert_eq!(results[0].0, 1);
+        assert_eq!(results[1].0, 2);
 
         Ok(())
     }
