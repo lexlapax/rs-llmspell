@@ -25,6 +25,7 @@ chrono = { workspace = true } # Phase 13b.5.2: For bi-temporal timestamps
 tempfile = { workspace = true, optional = true }
 rand.workspace = true # Phase 13b.14: For checksum sampling
 lz4_flex.workspace = true # Phase 13c.2.7: For hook history compression
+base64 = "0.22" # Phase 13c.3.2.1: For export/import large object base64 encoding
 
 # PostgreSQL dependencies (Phase 13b.2 - optional)
 tokio-postgres = { workspace = true, optional = true }

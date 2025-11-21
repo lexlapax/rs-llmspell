@@ -108,6 +108,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 pub mod backends;
+pub mod export_import;
 pub mod migration;
 
 // Re-export core traits

@@ -40,6 +40,7 @@ next-env.d.ts
 sessions/
 .cargo/config.toml
 *.db
+*.so 
 
 # Benchmark datasets
 benchmarks/graph-dataset/*.json
