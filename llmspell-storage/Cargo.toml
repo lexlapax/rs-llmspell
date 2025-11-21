@@ -44,7 +44,7 @@ sha2 = "0.10"
 
 [features]
 default = []
-postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph"]
+postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph", "llmspell-core/postgres"]
 sqlite = ["libsql", "r2d2", "zerocopy", "vectorlite-rs", "llmspell-graph"]
 
 [dev-dependencies]

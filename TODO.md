@@ -5357,6 +5357,25 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 - Python E2E test script location: tests/scripts/run_python_tests.sh runs tests from tests/python/
   - Consider moving script to tests/python/ for better discoverability
 - All quality gates passed, but benchmarks revealed trade-offs in the refactor
+- **PostgreSQL Docker healthcheck bug discovered and fixed** (commit f1c1a83a follow-up):
+  - **Root Cause 1 - Stale Volume**: Running `docker compose down` (without `-v`) preserves old database volume
+    - PostgreSQL skips init scripts when data directory already exists: "Skipping initialization"
+    - Password changes in init scripts (01-extensions.sql) never applied to existing database
+    - **Fix**: Always use `docker compose down -v` to remove volume when schema/passwords change
+  - **Root Cause 2 - Healthcheck Database Mismatch**: `pg_isready -U llmspell` defaults to database named "llmspell"
+    - Application database is "llmspell_dev" (POSTGRES_DB in docker-compose.yml:6)
+    - Database "llmspell" doesn't exist → FATAL errors every 10s (healthcheck interval)
+    - Healthcheck still passed (server accepting connections), but logs cluttered with errors
+    - **Fix**: Changed healthcheck to `pg_isready -U llmspell -d postgres` (docker/postgres/docker-compose.yml:20)
+    - Using default "postgres" database is cleaner - healthcheck verifies server readiness, not app DB
+  - **Key Learning**: Docker PostgreSQL init scripts only run on empty data directory
+    - Init scripts mount: `./init-scripts:/docker-entrypoint-initdb.d`
+    - Always document volume removal in setup instructions for schema changes
+    - Consider adding health checks for application-specific databases if needed
+  - **Testing Impact**: Linux `cargo test --workspace` failures were due to password mismatch + stale volume
+    - Tests use connection string: `postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev`
+    - Old volume had different password → connection pool errors
+    - Fresh volume with updated init script → all tests pass
 
 ---
 

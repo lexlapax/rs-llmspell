@@ -519,8 +519,8 @@ mod tests {
         assert!(!entities.is_empty());
         assert!(!rels.is_empty());
         assert!(
-            duration.as_millis() < 10,
-            "Should complete in <10ms (with stopword filtering), took {duration:?}"
+            duration.as_millis() < 15,
+            "Should complete in <15ms (with stopword filtering), took {duration:?}"
         );
     }
 

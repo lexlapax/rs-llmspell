@@ -80,7 +80,7 @@ impl PostgresApiKeyStorage {
                 "INSERT INTO llmspell.api_keys
                  (key_id, tenant_id, service, encrypted_key, key_metadata, created_at, last_used_at,
                   expires_at, is_active, usage_count)
-                 VALUES ($1, $2, $3, llmspell.pgp_sym_encrypt($4::TEXT, $5::TEXT), $6::JSONB,
+                 VALUES ($1, $2, $3, pgp_sym_encrypt($4::TEXT, $5::TEXT), $6::JSONB,
                          $7, $8, $9, $10, $11)",
                 &[
                     &key_id,
@@ -109,7 +109,7 @@ impl PostgresApiKeyStorage {
 
         let row = client
             .query_opt(
-                "SELECT llmspell.pgp_sym_decrypt(encrypted_key, $2::TEXT) as decrypted_key
+                "SELECT pgp_sym_decrypt(encrypted_key, $2::TEXT) as decrypted_key
                  FROM llmspell.api_keys
                  WHERE key_id = $1 AND tenant_id = $3",
                 &[&key_id, &self.encryption_passphrase, &tenant_id],
