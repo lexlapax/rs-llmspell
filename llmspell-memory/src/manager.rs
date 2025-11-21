@@ -207,7 +207,7 @@ impl DefaultMemoryManager {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn with_config(config: &crate::config::MemoryConfig) -> Result<Self> {
+    pub async fn with_config(config: &crate::config::MemoryConfig) -> Result<Self> {
         use crate::episodic::EpisodicBackend;
 
         info!(
@@ -220,7 +220,7 @@ impl DefaultMemoryManager {
         info!("Episodic backend created: {}", episodic.backend_name());
 
         // Create other subsystems
-        let semantic = Self::create_semantic_memory(config)?;
+        let semantic = Self::create_semantic_memory(config).await?;
         let procedural = Self::create_procedural_memory();
 
         info!("DefaultMemoryManager initialized successfully with config");
@@ -352,11 +352,11 @@ impl DefaultMemoryManager {
             .with_backend(crate::config::EpisodicBackendType::InMemory)
             .with_embedding_service(embedding_service)
             .with_semantic_sqlite(Arc::clone(&sqlite_backend));
-        Self::with_config(&config)
+        Self::with_config(&config).await
     }
 
     /// Helper: Create semantic memory from configuration
-    fn create_semantic_memory(
+    async fn create_semantic_memory(
         config: &crate::config::MemoryConfig,
     ) -> Result<Arc<dyn SemanticMemory>> {
         use crate::config::SemanticBackendType;
@@ -367,6 +367,20 @@ impl DefaultMemoryManager {
         );
 
         let semantic = match config.semantic_backend {
+            SemanticBackendType::InMemory => {
+                debug!("Initializing in-memory SQLite semantic memory for testing");
+                let sqlite_backend = Arc::new(
+                    llmspell_storage::backends::sqlite::SqliteBackend::new(
+                        llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to create in-memory SQLite backend: {}", e);
+                        crate::error::MemoryError::Storage(e.to_string())
+                    })?,
+                );
+                GraphSemanticMemory::new_with_sqlite(sqlite_backend)
+            }
             SemanticBackendType::Sqlite => {
                 debug!("Initializing SQLite semantic memory");
                 let sqlite_backend = config.semantic_sqlite_backend.as_ref().ok_or_else(|| {
