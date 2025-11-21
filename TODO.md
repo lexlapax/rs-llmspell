@@ -5265,6 +5265,11 @@ After exhaustive analysis across **all 1,141 Rust source files**:
       - Root cause: Query [1.5] was equidistant from v1 [1.0] and v2 [2.0]
       - Solution: Changed query to [1.2] for unambiguous ordering
       - Now correctly asserts v1 (closest), then v2 (second closest)
+    - Diagnosed tenant isolation test failure (llmspell-tenancy)
+      - Root cause: Stale build - test was failing with "left: 1, right: 2"
+      - Test expects 2 vectors returned from search, was getting only 1
+      - Resolution: Recompilation fixed the issue (HNSW fix from 0f7db480 needed rebuild)
+      - Test now passes: inserts 2 vectors, search returns both correctly
 
   - [ ] Run benchmarks and compare to baseline:
     ```bash
@@ -5287,9 +5292,6 @@ After exhaustive analysis across **all 1,141 Rust source files**:
   - [ ] Test Lua/JS script examples via bridge layer
   - [ ] Test CLI commands
   - [ ] Run E2E tests
-  - [ ] Update CHANGELOG.md for v0.14.0
-  - [ ] Update version in all Cargo.toml files
-  - [ ] Create migration guide for downstream users (if any exist)
   - [ ] **BLOCKER**: All quality gates must pass before proceeding to Task 13c.3.2
 
 **Estimated LOC Changed**: ~250 files, ~4,700 lines (mostly import updates)
@@ -5298,6 +5300,9 @@ After exhaustive analysis across **all 1,141 Rust source files**:
 - Tracing pattern check caught direct `tracing::` prefix usage - enforce import-based patterns
 - HNSW test had mathematical error - equidistant points caused non-deterministic ordering
 - 792 tests passing confirms trait migration had zero functional regressions
+- Stale build issue: tenant isolation test failed due to incomplete recompilation after HNSW fix
+  - Always run full workspace rebuild after cross-crate changes (vectorlite-rs → llmspell-storage → llmspell-tenancy)
+  - Incremental compilation can miss transitive dependencies in complex test scenarios
 
 ---
 

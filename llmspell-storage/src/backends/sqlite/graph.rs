@@ -279,7 +279,7 @@ impl GraphBackend for SqliteGraphStorage {
             .next()
             .await
             .map_err(|e| anyhow::anyhow!(format!("Failed to get query result: {}", e)))?
-            .ok_or_else(|| anyhow::anyhow!("Entity not found: {}", id.to_string()))?;
+            .ok_or_else(|| anyhow::anyhow!("Entity not found: {}", id))?;
 
         let entity_id: String = row
             .get(0)
@@ -353,7 +353,7 @@ impl GraphBackend for SqliteGraphStorage {
             .next()
             .await
             .map_err(|e| anyhow::anyhow!(format!("Failed to get query result: {}", e)))?
-            .ok_or_else(|| anyhow::anyhow!("Entity not found: {}", id.to_string()))?;
+            .ok_or_else(|| anyhow::anyhow!("Entity not found: {}", id))?;
 
         let entity_id: String = row
             .get(0)
