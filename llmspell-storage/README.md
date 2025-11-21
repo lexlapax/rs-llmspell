@@ -23,7 +23,8 @@ Storage backends and persistence for rs-llmspell, including vector storage for R
 
 ### Key-Value Storage
 ```rust
-use llmspell_storage::{MemoryBackend, StorageBackend};
+use llmspell_storage::MemoryBackend;
+use llmspell_core::traits::storage::StorageBackend;
 use serde_json::json;
 
 let backend = MemoryBackend::new();
