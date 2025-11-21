@@ -32,7 +32,6 @@ tests/python/venv/
 *.pyc
 __pycache__/
 .pytest_cache
-*.dylib
 hnsw_indices
 node_modules/
 .next/
@@ -40,7 +39,13 @@ next-env.d.ts
 sessions/
 .cargo/config.toml
 *.db
+*.dylib
 *.so 
+*.dll
+*.exe
+*.pdb
+*.lib
+
 
 # Benchmark datasets
 benchmarks/graph-dataset/*.json
