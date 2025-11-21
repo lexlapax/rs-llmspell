@@ -5236,30 +5236,49 @@ After exhaustive analysis across **all 1,141 Rust source files**:
   - The doc test fixes in Sub-Task 13c.3.1.11 already covered rustdoc comments
 
 
-#### Sub-Task 13c.3.1.15: Comprehensive validation and release prep**
-  - [ ] Run full test suite:
+#### Sub-Task 13c.3.1.15: Comprehensive validation and release prep** 🔄 IN PROGRESS
+  **Time**: 3.5 hours | **Commits**: 0f7db480, (TODO.md pending)
+
+  - [x] Verify zero old imports remain:
     ```bash
-    cargo test --workspace --all-features
-    # Verify: 149+ tests passing
+    rg "use llmspell_storage::(VectorStorage|StorageBackend)" llmspell-*/src/  # 0 matches ✅
+    rg "use llmspell_graph::KnowledgeGraph" llmspell-*/src/                    # 0 matches ✅
+    rg "use llmspell_memory::ProceduralMemory" llmspell-*/src/                 # 0 matches ✅
     ```
+  - [x] Run quality gates - minimal:
+    ```bash
+    ./scripts/quality/quality-check-minimal.sh  # ✅ PASSED
+    # - Code formatting ✅
+    # - Clippy lints ✅
+    # - Code compiles ✅
+    # - Tracing patterns ✅ (after fixing pool.rs)
+    ```
+  - [x] Run full test suite:
+    ```bash
+    cargo test --workspace --all-features  # ✅ 792 tests passed, 0 failed
+    ```
+  - [x] **Quality fixes applied**:
+    - Fixed tracing pattern in llmspell-storage/src/backends/sqlite/pool.rs
+      - Added `use tracing::warn;` import
+      - Changed `tracing::warn!` → `warn!` (lines 63, 69)
+    - Fixed HNSW test in vectorlite-rs/src/hnsw.rs
+      - Root cause: Query [1.5] was equidistant from v1 [1.0] and v2 [2.0]
+      - Solution: Changed query to [1.2] for unambiguous ordering
+      - Now correctly asserts v1 (closest), then v2 (second closest)
+
   - [ ] Run benchmarks and compare to baseline:
     ```bash
     cargo bench --bench memory_operations > refactor.txt
     cargo bench --bench sqlite_vector_bench > refactor_vector.txt
     # Compare: <5% variance acceptable
     ```
-  - [ ] Run all quality gates:
+  - [ ] Run quality gates - fast:
     ```bash
-    ./scripts/quality/quality-check-minimal.sh  # Format, clippy, compile
     ./scripts/quality/quality-check-fast.sh     # + unit tests, docs
-    ./scripts/quality/quality-check.sh          # Full validation
     ```
-  - [ ] Verify zero old imports remain:
+  - [ ] Run quality gates - full:
     ```bash
-    rg "use llmspell_storage::(VectorStorage|StorageBackend)" llmspell-*/src/
-    rg "use llmspell_graph::KnowledgeGraph" llmspell-*/src/
-    rg "use llmspell_memory::ProceduralMemory" llmspell-*/src/
-    # Should show ZERO matches
+    ./scripts/quality/quality-check.sh          # Full validation
     ```
   - [ ] Verify zero clippy warnings:
     ```bash
@@ -5274,6 +5293,11 @@ After exhaustive analysis across **all 1,141 Rust source files**:
   - [ ] **BLOCKER**: All quality gates must pass before proceeding to Task 13c.3.2
 
 **Estimated LOC Changed**: ~250 files, ~4,700 lines (mostly import updates)
+
+**Key Learnings**:
+- Tracing pattern check caught direct `tracing::` prefix usage - enforce import-based patterns
+- HNSW test had mathematical error - equidistant points caused non-deterministic ordering
+- 792 tests passing confirms trait migration had zero functional regressions
 
 ---
 
