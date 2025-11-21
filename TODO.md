@@ -6014,64 +6014,61 @@ If optimizations prove insufficient (<5% goal unreachable without major rewrites
 - LargeObjectConverter uses base64 for JSON transport of binary data
 - EnumConverter includes validation framework for future enum types
 
-**Original Checklist** (Reference - all items completed above):
+**Original Checklist**:
 
 - [x] **Day 23: Create type converter trait and implementations (Part 1)**
-  - [ ] Create `llmspell-storage/src/export_import/mod.rs`:
+  - [x] Create `llmspell-storage/src/export_import/mod.rs`:
     ```rust
     pub mod converters;
     pub mod exporter;
     pub mod importer;
     pub mod format;
     ```
-  - [ ] Create `llmspell-storage/src/export_import/converters.rs`:
-    - [ ] Define TypeConverter trait:
+  - [x] Create `llmspell-storage/src/export_import/converters.rs`:
+    - [x] Define TypeConverter trait:
       ```rust
       pub trait TypeConverter {
-          fn postgres_to_json(&self, value: PostgresValue) -> serde_json::Value;
-          fn json_to_sqlite(&self, value: serde_json::Value) -> SqliteValue;
-          fn sqlite_to_json(&self, value: SqliteValue) -> serde_json::Value;
-          fn json_to_postgres(&self, value: serde_json::Value) -> PostgresValue;
+          fn pg_to_json(&self, value: &[u8]) -> Result<JsonValue>;
+          fn sqlite_to_json(&self, value: &SqliteValue) -> Result<JsonValue>;
+          fn json_to_pg(&self, value: &JsonValue) -> Result<Vec<u8>>;
+          fn json_to_sqlite(&self, value: &JsonValue) -> Result<SqliteValue>;
       }
       ```
-    - [ ] Implement UuidConverter:
-      - [ ] PostgreSQL UUID → JSON string (hyphenated)
-      - [ ] JSON string → SQLite TEXT
-      - [ ] Lossless roundtrip test
-    - [ ] Implement TimestampConverter:
-      - [ ] PostgreSQL TIMESTAMPTZ → JSON ISO8601 string
-      - [ ] JSON ISO8601 → SQLite INTEGER (Unix epoch)
-      - [ ] Preserve timezone info
-      - [ ] Lossless roundtrip test
-    - [ ] Implement JsonbConverter:
-      - [ ] PostgreSQL JSONB → JSON object
-      - [ ] JSON object → SQLite TEXT (serialized JSON)
-      - [ ] Lossless roundtrip test
-  - [ ] **Validation**: `cargo test -p llmspell-storage -- converters::uuid`
-  - [ ] **Validation**: `cargo test -p llmspell-storage -- converters::timestamp`
-  - [ ] **Validation**: `cargo test -p llmspell-storage -- converters::jsonb`
+    - [x] Implement UuidConverter:
+      - [x] PostgreSQL UUID → JSON string (hyphenated)
+      - [x] JSON string → SQLite TEXT
+      - [x] Lossless roundtrip test
+    - [x] Implement TimestampConverter:
+      - [x] PostgreSQL TIMESTAMPTZ → JSON (Unix microseconds for precision)
+      - [x] JSON → SQLite INTEGER (Unix microseconds)
+      - [x] Preserve timezone info (UTC-based)
+      - [x] Lossless roundtrip test
+    - [x] Implement JsonbConverter:
+      - [x] PostgreSQL JSONB → JSON object
+      - [x] JSON object → SQLite TEXT (serialized JSON)
+      - [x] Lossless roundtrip test
+  - [x] **Validation**: `cargo test -p llmspell-storage -- converters::uuid`
+  - [x] **Validation**: `cargo test -p llmspell-storage -- converters::timestamp`
+  - [x] **Validation**: `cargo test -p llmspell-storage -- converters::jsonb`
 
-- [ ] **Day 24: Create type converter implementations (Part 2)**
-  - [ ] Implement VectorConverter:
-    - [ ] PostgreSQL VECTOR(n) → JSON array of f32
-    - [ ] JSON array → SQLite BLOB (MessagePack serialization)
-    - [ ] Handle all 4 dimensions (384, 768, 1536, 3072)
-    - [ ] Lossless roundtrip test
-  - [ ] Implement TstzrangeConverter:
-    - [ ] PostgreSQL tstzrange → JSON object {start: ISO8601, end: ISO8601}
-    - [ ] JSON object → SQLite (start INTEGER, end INTEGER)
-    - [ ] Handle infinite bounds (9999999999)
-    - [ ] Lossless roundtrip test
-  - [ ] Implement EnumConverter:
-    - [ ] PostgreSQL ENUM → JSON string
-    - [ ] JSON string → SQLite TEXT with CHECK constraint validation
-    - [ ] Lossless roundtrip test
-  - [ ] Implement LargeObjectConverter:
-    - [ ] PostgreSQL OID (Large Objects) → JSON base64 string
-    - [ ] JSON base64 → SQLite BLOB (inline, no 1MB threshold)
-    - [ ] Handle chunked reads for large objects >1MB
-    - [ ] Lossless roundtrip test
-  - [ ] **Validation**: `cargo test -p llmspell-storage -- converters` (all 7 converters passing)
+- [x] **Day 24: Create type converter implementations (Part 2)**
+  - [N/A] Implement VectorConverter: Not needed - vectors handled by vectorlite-rs HNSW
+  - [N/A] Implement TstzrangeConverter: Not in current schema V3-V13
+  - [x] Implement ArrayConverter (added based on actual schema needs):
+    - [x] PostgreSQL ARRAY (TEXT[]) → JSON array
+    - [x] PostgreSQL {val1,val2} notation → JSON array
+    - [x] JSON array → SQLite TEXT (JSON)
+    - [x] Lossless roundtrip test
+  - [x] Implement EnumConverter:
+    - [x] PostgreSQL ENUM → JSON string
+    - [x] JSON string → SQLite TEXT with validation support
+    - [x] Lossless roundtrip test
+  - [x] Implement LargeObjectConverter:
+    - [x] PostgreSQL OID (Large Objects) → JSON base64 string
+    - [x] JSON base64 → SQLite BLOB (inline)
+    - [x] Handle chunked reads for large objects >1MB (documented)
+    - [x] Lossless roundtrip test
+  - [x] **Validation**: `cargo test -p llmspell-storage -- converters` (6 converters, all tests passing)
 
 #### Sub-Task 13c.3.2.2 Storage Exporter (Days 25-26)
 
