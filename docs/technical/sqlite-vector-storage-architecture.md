@@ -199,6 +199,96 @@ let conn = self.backend.get_connection().await?;  // OK
 - **HNSW (vectorlite-rs)**: O(log N) search, ~5-10ms for 10K-100K vectors
 - **Expected**: **3-100x faster** depending on dataset size
 
+### Trait Refactor Performance Impact
+
+**Phase 13c.3.1.x trait centralization** (Nov 2024) showed that proper connection and transaction management dominates performance, not vtable dispatch overhead.
+
+#### Measured Overhead (Post-Optimization)
+
+| Operation | Baseline | After Trait Refactor | Overhead | Status |
+|-----------|----------|---------------------|----------|--------|
+| insert/100 | 1.25ms | 1.24ms | **-0.8%** | ✅ GREEN |
+| search/100 | 821µs | 850µs | **+3.5%** | ✅ GREEN |
+| search/1000 | 885µs | 977µs | **+10.4%** | ⚠️ YELLOW |
+| batch_insert/10 | 12.2ms | 2.2ms | **-82%** | ✅ GREEN |
+| batch_insert/100 | 119ms | 13.8ms | **-88%** | ✅ GREEN |
+
+**Key Findings**:
+- Trait indirection overhead: **<5% for small operations** (within noise)
+- Connection/transaction management: **15-88% impact** when optimized
+- Async trait dispatch: Minimal overhead compared to database I/O
+- Batch operations: **5-9x faster** due to explicit transaction handling
+
+#### Optimization Best Practices
+
+**For VectorStorage Trait Implementers**:
+
+1. **Connection Management** (CRITICAL):
+   ```rust
+   // ❌ BAD: Get connection inside loop
+   for entry in entries {
+       let conn = self.backend.get_connection().await?;
+       conn.execute("INSERT ...", params).await?;
+   }
+
+   // ✅ GOOD: Single connection + explicit transaction
+   let conn = self.backend.get_connection().await?;
+   conn.execute("BEGIN IMMEDIATE", ()).await?;
+   for entry in entries {
+       conn.execute("INSERT ...", params).await?;
+   }
+   conn.execute("COMMIT", ()).await?;
+   ```
+
+2. **Transaction Boundaries** (CRITICAL):
+   - Use explicit `BEGIN IMMEDIATE`/`COMMIT` for batch operations
+   - Single operations benefit from explicit transactions (15-17% faster)
+   - libsql doesn't auto-wrap writes—always be explicit
+
+3. **Arc Cloning** (MINOR):
+   - Arc cloning overhead is negligible compared to I/O
+   - Prefer borrowing `&self` but don't over-optimize Arc usage
+   - Profile database I/O before optimizing memory allocations
+
+4. **Inline Hints** (MARGINAL):
+   - `#[inline]` on small trait methods (<10 lines) may help
+   - Measure before applying—impact typically <1%
+   - Focus on connection/transaction optimization first
+
+#### Trade-offs Documented
+
+**search/1000 (+10.4% regression)**:
+- **Cause**: Async trait overhead accumulates on larger result sets (1000 items)
+- **Justification**: Acceptable for maintaining trait-based extensibility
+- **Mitigation**: Users can bypass trait with direct SqliteBackend usage for performance-critical paths
+- **Alternative**: Enum dispatch would eliminate overhead but breaks extensibility
+
+**When to Use Direct Backend**:
+```rust
+// Trait-based (extensible, 10% overhead on large operations)
+let results = vector_storage.search_scoped(query, scope, 1000).await?;
+
+// Direct backend (non-extensible, maximum performance)
+let conn = sqlite_backend.get_connection().await?;
+conn.execute("BEGIN IMMEDIATE", ()).await?;
+let rows = conn.query("SELECT ...", params).await?;
+conn.execute("COMMIT", ()).await?;
+// Manual result parsing...
+```
+
+#### Performance Validation
+
+See `benchmark_comparison.md` for full performance analysis from Phase 13c.3.1.16 optimization work.
+
+**Benchmarks**:
+- `benches/sqlite_vector_bench.rs`: Vector storage operations
+- `benches/memory_operations.rs`: Semantic backend operations
+
+**Baseline Preservation**:
+- Run benchmarks before trait API changes
+- Document any >5% regressions with justification
+- Connection/transaction patterns matter more than trait design
+
 ## Configuration
 
 ### HNSW Parameters
