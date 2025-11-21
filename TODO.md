@@ -5674,6 +5674,28 @@ add vtable dispatch overhead and larger memory footprints vs. direct implementat
        - Major architecture change, only if critical
     **Trade-off**: Document why <5% goal unreachable without breaking extensibility
 
+  - [ ] **Task 2.8: Fix HNSW backend benchmark test** (30-60 min):
+    **Issue**: `backend_search_100/HNSW` test panics at line 327 of memory_operations.rs
+    **Error**: "SQLite backend requires sqlite_backend (provide SqliteBackend instance)"
+    **Root Cause**: `MemoryConfig::for_production()` sets episodic_backend=Sqlite but sqlite_backend=None
+
+    **Options**:
+    1. **Option A - Fix MemoryConfig** (similar to Task 2.1 semantic fix):
+       - Add InMemory variant to EpisodicBackendType (already exists)
+       - Make `for_production()` use InMemory episodic OR auto-create SQLite backend
+       - This matches Task 2.1's approach for semantic backend
+
+    2. **Option B - Fix benchmark** (simpler, less invasive):
+       - Update benchmark to create SQLite backend explicitly before calling with_config()
+       - Keep `for_production()` as-is (requires user to provide backend)
+       - This is more explicit and matches "production" expectations
+
+    **Recommended**: **Option A** for consistency with Task 2.1
+    **Files**: `llmspell-memory/src/config.rs`, possibly `llmspell-memory/src/episodic/backend.rs`
+    **Validate**: `cargo bench --bench memory_operations 2>&1 | tee hnsw_fixed.txt`
+    **Success**: HNSW backend test runs to completion, provides HNSW vs InMemory comparison data
+    **Commit**: "Fix HNSW backend benchmark - Handle episodic SQLite config"
+
 **Phase 3: Validation & Documentation** (2-3 hours - REVISED)
 
   - [ ] **Task 3.1: Final benchmark comparison** (30-60 min):
