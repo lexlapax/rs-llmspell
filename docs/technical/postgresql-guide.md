@@ -296,7 +296,8 @@ effective_io_concurrency = 200 # SSD parallel I/O
 **Basic Usage**:
 
 ```rust
-use llmspell_storage::{PostgresBackend, PostgresConfig, StorageBackend};
+use llmspell_storage::{PostgresBackend, PostgresConfig};
+use llmspell_core::traits::storage::StorageBackend;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
