@@ -5847,6 +5847,22 @@ If optimizations prove insufficient (<5% goal unreachable without major rewrites
 - Plan v0.15.0 performance-focused release with deeper optimizations
 - **Decision point**: Consult with project maintainer on trade-off acceptance
 
+**Platform-Specific Test Fix** (Linux):
+- **Issue**: `test_chroot_jail_bypass_attacks` failed on Linux but passed on macOS
+- **Root Cause**: Linux temp directories (`/tmp/.tmpXXXXXX`) have world-writable parent directories
+  - macOS temp directories don't have this permission structure
+  - Test's default config enabled `check_permission_inheritance: true` which rejected Linux temp paths
+- **Fix Applied** (Commit: b309b0b5):
+  - Disabled `check_permission_inheritance: false` for temp directory testing
+  - Disabled `cross_platform_validation: false` for temp directory testing
+  - Matches pattern used in other working jail tests (`test_chroot_jail_enforcement`)
+- **File**: `llmspell-utils/tests/path_security_penetration_test.rs:302-303`
+- **Test Results**: ✅ All 15 path security penetration tests passing
+- **Key Learning**: Security tests using temp directories must account for platform-specific permission models
+  - Linux: `/tmp` is typically mode 1777 (sticky bit + world-writable)
+  - macOS: Temp directories have more restrictive permissions
+  - Solution: Explicitly disable permission inheritance checks when testing with temp directories
+
 ---
 
 ### Task 13c.3.2: PostgreSQL/SQLite Export/Import Tool (Days 23-30) ⏹ PENDING
