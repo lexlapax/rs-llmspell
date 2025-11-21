@@ -1,0 +1,190 @@
+   Compiling llmspell-events v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-events)
+   Compiling llmspell-memory v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-memory)
+   Compiling llmspell-hooks v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-hooks)
+   Compiling llmspell-tenancy v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-tenancy)
+   Compiling llmspell-kernel v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-kernel)
+   Compiling llmspell-tools v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-tools)
+   Compiling llmspell-rag v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-rag)
+   Compiling llmspell-workflows v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-workflows)
+   Compiling llmspell-context v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-context)
+   Compiling llmspell-agents v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents)
+   Compiling llmspell-templates v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-templates)
+   Compiling llmspell-bridge v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-bridge)
+   Compiling llmspell-testing v0.13.1 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-testing)
+    Finished `bench` profile [optimized] target(s) in 4m 34s
+     Running benches/memory_operations.rs (target/release/deps/memory_operations-4e3fae4eb169e353)
+Benchmarking episodic_add/single_entry
+Benchmarking episodic_add/single_entry: Warming up for 3.0000 s
+Benchmarking episodic_add/single_entry: Collecting 100 samples in estimated 5.0075 s (2.1M iterations)
+Benchmarking episodic_add/single_entry: Analyzing
+episodic_add/single_entry
+                        time:   [2.2809 µs 2.6717 µs 3.4736 µs]
+                        thrpt:  [287.88 Kelem/s 374.30 Kelem/s 438.42 Kelem/s]
+                 change:
+                        time:   [-22.238% -5.3748% +14.828%] (p = 0.68 > 0.05)
+                        thrpt:  [-12.914% +5.6800% +28.597%]
+                        No change in performance detected.
+Found 10 outliers among 100 measurements (10.00%)
+  3 (3.00%) high mild
+  7 (7.00%) high severe
+
+Benchmarking episodic_search/5
+Benchmarking episodic_search/5: Warming up for 3.0000 s
+Benchmarking episodic_search/5: Collecting 100 samples in estimated 7.3978 s (15k iterations)
+Benchmarking episodic_search/5: Analyzing
+episodic_search/5       time:   [487.09 µs 489.27 µs 491.40 µs]
+                        change: [-0.5448% +0.0473% +0.6473%] (p = 0.87 > 0.05)
+                        No change in performance detected.
+Benchmarking episodic_search/10
+Benchmarking episodic_search/10: Warming up for 3.0000 s
+Benchmarking episodic_search/10: Collecting 100 samples in estimated 7.4582 s (15k iterations)
+Benchmarking episodic_search/10: Analyzing
+episodic_search/10      time:   [482.49 µs 484.29 µs 486.21 µs]
+                        change: [-0.2392% +0.2933% +0.8494%] (p = 0.29 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Benchmarking episodic_search/20
+Benchmarking episodic_search/20: Warming up for 3.0000 s
+Benchmarking episodic_search/20: Collecting 100 samples in estimated 7.4994 s (15k iterations)
+Benchmarking episodic_search/20: Analyzing
+episodic_search/20      time:   [486.86 µs 488.74 µs 490.55 µs]
+                        change: [+0.0373% +0.5764% +1.0989%] (p = 0.03 < 0.05)
+                        Change within noise threshold.
+Benchmarking episodic_search/50
+Benchmarking episodic_search/50: Warming up for 3.0000 s
+Benchmarking episodic_search/50: Collecting 100 samples in estimated 7.4412 s (15k iterations)
+Benchmarking episodic_search/50: Analyzing
+episodic_search/50      time:   [492.24 µs 493.42 µs 494.66 µs]
+                        change: [-5.9849% -1.9948% +0.4592%] (p = 0.36 > 0.05)
+                        No change in performance detected.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) low mild
+  1 (1.00%) high mild
+
+Benchmarking consolidation/100_entries
+Benchmarking consolidation/100_entries: Warming up for 3.0000 s
+Benchmarking consolidation/100_entries: Collecting 10 samples in estimated 5.0066 s (495 iterations)
+Benchmarking consolidation/100_entries: Analyzing
+consolidation/100_entries
+                        time:   [38.612 µs 39.179 µs 39.525 µs]
+                        thrpt:  [2.5301 Melem/s 2.5524 Melem/s 2.5899 Melem/s]
+                 change:
+                        time:   [+7.2468% +9.2926% +11.624%] (p = 0.00 < 0.05)
+                        thrpt:  [-10.413% -8.5025% -6.7571%]
+                        Performance has regressed.
+Found 3 outliers among 10 measurements (30.00%)
+  2 (20.00%) low mild
+  1 (10.00%) high severe
+
+Benchmarking semantic_query/5
+Benchmarking semantic_query/5: Warming up for 3.0000 s
+Benchmarking semantic_query/5: Collecting 100 samples in estimated 8.3500 s (10k iterations)
+Benchmarking semantic_query/5: Analyzing
+semantic_query/5        time:   [718.11 µs 727.79 µs 739.31 µs]
+                        change: [-10.642% -8.7284% -6.9221%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking semantic_query/10
+Benchmarking semantic_query/10: Warming up for 3.0000 s
+Benchmarking semantic_query/10: Collecting 100 samples in estimated 8.2007 s (10k iterations)
+Benchmarking semantic_query/10: Analyzing
+semantic_query/10       time:   [719.62 µs 732.18 µs 749.55 µs]
+                        change: [-11.647% -10.230% -8.8024%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking semantic_query/20
+Benchmarking semantic_query/20: Warming up for 3.0000 s
+Benchmarking semantic_query/20: Collecting 100 samples in estimated 7.4845 s (10k iterations)
+Benchmarking semantic_query/20: Analyzing
+semantic_query/20       time:   [753.50 µs 761.79 µs 770.37 µs]
+                        change: [-4.7044% -3.1492% -1.5692%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking memory_footprint_idle
+Benchmarking memory_footprint_idle: Warming up for 3.0000 s
+Benchmarking memory_footprint_idle: Collecting 100 samples in estimated 5.2651 s (500 iterations)
+Benchmarking memory_footprint_idle: Analyzing
+memory_footprint_idle   time:   [9.7533 ms 10.214 ms 10.741 ms]
+                        change: [+8.3012% +14.027% +20.857%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 13 outliers among 100 measurements (13.00%)
+  10 (10.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking memory_footprint_loaded_1k
+Benchmarking memory_footprint_loaded_1k: Warming up for 3.0000 s
+Benchmarking memory_footprint_loaded_1k: Collecting 100 samples in estimated 6.6350 s (400 iterations)
+Benchmarking memory_footprint_loaded_1k: Analyzing
+memory_footprint_loaded_1k
+                        time:   [15.984 ms 17.494 ms 19.240 ms]
+                        change: [+36.564% +49.896% +64.779%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking memory_footprint_loaded_10k
+Benchmarking memory_footprint_loaded_10k: Warming up for 3.0000 s
+Benchmarking memory_footprint_loaded_10k: Collecting 100 samples in estimated 9.3158 s (200 iterations)
+Benchmarking memory_footprint_loaded_10k: Analyzing
+memory_footprint_loaded_10k
+                        time:   [45.914 ms 46.961 ms 48.352 ms]
+                        change: [+37.263% +41.370% +45.632%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking backend_search_100/InMemory
+Benchmarking backend_search_100/InMemory: Warming up for 3.0000 s
+Benchmarking backend_search_100/InMemory: Collecting 20 samples in estimated 5.0010 s (118k iterations)
+Benchmarking backend_search_100/InMemory: Analyzing
+backend_search_100/InMemory
+                        time:   [42.724 µs 42.854 µs 42.961 µs]
+                        change: [+0.8421% +1.4315% +2.0452%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high mild
+Benchmarking backend_search_100/HNSW
+Benchmarking backend_search_100/HNSW: Warming up for 3.0000 s
+Benchmarking backend_search_100/HNSW: Collecting 20 samples in estimated 5.0942 s (4200 iterations)
+Benchmarking backend_search_100/HNSW: Analyzing
+backend_search_100/HNSW time:   [1.0911 ms 1.1181 ms 1.1459 ms]
+Found 2 outliers among 20 measurements (10.00%)
+  1 (5.00%) low mild
+  1 (5.00%) high severe
+
+Benchmarking backend_search_1000/InMemory
+Benchmarking backend_search_1000/InMemory: Warming up for 3.0000 s
+Benchmarking backend_search_1000/InMemory: Collecting 20 samples in estimated 5.0888 s (10k iterations)
+Benchmarking backend_search_1000/InMemory: Analyzing
+backend_search_1000/InMemory
+                        time:   [500.50 µs 504.17 µs 507.45 µs]
+Found 2 outliers among 20 measurements (10.00%)
+  2 (10.00%) high mild
+Benchmarking backend_search_1000/HNSW
+Benchmarking backend_search_1000/HNSW: Warming up for 3.0000 s
+Benchmarking backend_search_1000/HNSW: Collecting 20 samples in estimated 5.2362 s (3990 iterations)
+Benchmarking backend_search_1000/HNSW: Analyzing
+backend_search_1000/HNSW
+                        time:   [1.2825 ms 1.3883 ms 1.5883 ms]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+
+Benchmarking backend_search_10000/InMemory
+Benchmarking backend_search_10000/InMemory: Warming up for 3.0000 s
+Benchmarking backend_search_10000/InMemory: Collecting 20 samples in estimated 5.0119 s (630 iterations)
+Benchmarking backend_search_10000/InMemory: Analyzing
+backend_search_10000/InMemory
+                        time:   [7.8934 ms 7.9361 ms 7.9848 ms]
+Benchmarking backend_search_10000/HNSW
+Benchmarking backend_search_10000/HNSW: Warming up for 3.0000 s

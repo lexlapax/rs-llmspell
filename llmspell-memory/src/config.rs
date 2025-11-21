@@ -152,9 +152,13 @@ impl MemoryConfig {
         }
     }
 
-    /// Production configuration (Sqlite, requires embedding service)
+    /// Production configuration (Sqlite with auto-created backends, requires embedding service)
     ///
     /// Suitable for production deployments with real embeddings and vector search.
+    /// Uses `Sqlite` backend types which auto-create in-memory `SQLite` backends with HNSW vector search
+    /// when no explicit backend is provided.
+    ///
+    /// For explicit `SQLite` file persistence, use `with_sqlite_backend()` and `with_semantic_sqlite()`.
     ///
     /// # Arguments
     ///

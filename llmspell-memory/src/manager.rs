@@ -382,14 +382,24 @@ impl DefaultMemoryManager {
                 GraphSemanticMemory::new_with_sqlite(sqlite_backend)
             }
             SemanticBackendType::Sqlite => {
-                debug!("Initializing SQLite semantic memory");
-                let sqlite_backend = config.semantic_sqlite_backend.as_ref().ok_or_else(|| {
-                    error!("SQLite semantic backend requested but not configured");
-                    crate::error::MemoryError::InvalidInput(
-                        "SQLite semantic backend not configured".to_string(),
+                // Auto-create in-memory SQLite backend if not provided
+                let sqlite_backend = if let Some(backend) = config.semantic_sqlite_backend.as_ref() {
+                    debug!("Using provided SQLite semantic backend (user-configured storage)");
+                    Arc::clone(backend)
+                } else {
+                    debug!("Auto-creating in-memory SQLite semantic backend (bi-temporal graph storage)");
+                    let backend = llmspell_storage::backends::sqlite::SqliteBackend::new(
+                        llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
                     )
-                })?;
-                GraphSemanticMemory::new_with_sqlite(Arc::clone(sqlite_backend))
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to create in-memory SQLite semantic backend: {}", e);
+                        crate::error::MemoryError::Storage(e.to_string())
+                    })?;
+
+                    Arc::new(backend)
+                };
+                GraphSemanticMemory::new_with_sqlite(sqlite_backend)
             }
             #[cfg(feature = "postgres")]
             SemanticBackendType::PostgreSQL => {

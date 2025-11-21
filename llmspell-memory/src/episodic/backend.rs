@@ -136,8 +136,6 @@ impl EpisodicBackend {
 
     /// Create `SQLite` backend from configuration
     fn create_sqlite_backend(config: &MemoryConfig) -> Result<Self> {
-        info!("Creating SQLite episodic backend (production mode, persistent local storage)");
-
         let service = config.embedding_service.as_ref().ok_or_else(|| {
             MemoryError::InvalidInput(
                 "SQLite backend requires embedding service (use MemoryConfig::for_production)"
@@ -145,15 +143,27 @@ impl EpisodicBackend {
             )
         })?;
 
-        let sqlite_backend = config.sqlite_backend.as_ref().ok_or_else(|| {
-            MemoryError::InvalidInput(
-                "SQLite backend requires sqlite_backend (provide SqliteBackend instance)"
-                    .to_string(),
-            )
-        })?;
+        // Auto-create in-memory SQLite backend if not provided
+        let sqlite_backend = if let Some(backend) = config.sqlite_backend.as_ref() {
+            info!("Using provided SQLite episodic backend (user-configured storage)");
+            Arc::clone(backend)
+        } else {
+            info!("Auto-creating in-memory SQLite episodic backend (HNSW vector search enabled)");
+            let backend = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    llmspell_storage::backends::sqlite::SqliteBackend::new(
+                        llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+                    )
+                    .await
+                })
+            })
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+
+            Arc::new(backend)
+        };
 
         info!(
-            "SQLite backend using embedding service: {}, dimensions: {}",
+            "SQLite episodic backend using embedding service: {}, dimensions: {}",
             service.provider_name(),
             service.dimensions()
         );
@@ -163,7 +173,7 @@ impl EpisodicBackend {
         // We use block_on here since from_config is synchronous
         let sqlite_memory = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                SqliteEpisodicMemory::new(Arc::clone(sqlite_backend), Arc::clone(service)).await
+                SqliteEpisodicMemory::new(sqlite_backend, Arc::clone(service)).await
             })
         })?;
 
