@@ -1,0 +1,36 @@
+    Finished `bench` profile [optimized] target(s) in 0.28s
+     Running benches/sqlite_vector_bench.rs (target/release/deps/sqlite_vector_bench-c435baca89366be2)
+Benchmarking search/100
+Benchmarking search/100: Warming up for 3.0000 s
+Benchmarking search/100: Collecting 100 samples in estimated 8.6260 s (10k iterations)
+Benchmarking search/100: Analyzing
+search/100              time:   [843.60 µs 849.76 µs 856.59 µs]
+                        change: [-5.4944% -2.7951% -0.3209%] (p = 0.04 < 0.05)
+                        Change within noise threshold.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search/1000
+Benchmarking search/1000: Warming up for 3.0000 s
+Benchmarking search/1000: Collecting 100 samples in estimated 9.9024 s (10k iterations)
+Benchmarking search/1000: Analyzing
+search/1000             time:   [964.51 µs 976.94 µs 996.61 µs]
+                        change: [-22.866% -16.420% -11.047%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking search/10000
+Benchmarking search/10000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.5s, enable flat sampling, or reduce sample count to 60.
+Benchmarking search/10000: Collecting 100 samples in estimated 6.4535 s (5050 iterations)
+Benchmarking search/10000: Analyzing
+search/10000            time:   [1.2432 ms 1.2536 ms 1.2636 ms]
+                        change: [+3.4340% +5.4502% +7.6458%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high severe
+

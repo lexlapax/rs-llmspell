@@ -437,9 +437,16 @@ impl VectorStorage for SqliteVectorStorage {
     async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>> {
         let mut ids = Vec::with_capacity(vectors.len());
 
+        // Get connection once for the entire batch
+        let conn = self.backend.get_connection().await?;
+
+        // Wrap in transaction for atomicity and performance
+        conn.execute("BEGIN IMMEDIATE", ()).await?;
+
         for entry in vectors {
             // Validate dimension
             if entry.embedding.len() != self.dimension {
+                let _ = conn.execute("ROLLBACK", ()).await;
                 anyhow::bail!(
                     "Vector dimension mismatch: expected {}, got {}",
                     self.dimension,
@@ -454,7 +461,6 @@ impl VectorStorage for SqliteVectorStorage {
             };
 
             let namespace = Self::scope_to_namespace(&entry.scope);
-            let conn = self.backend.get_connection().await?;
 
             // Convert embedding to bytes (JSON format for compatibility with vec0)
             let embedding_json = serde_json::to_vec(&entry.embedding)?;
@@ -537,6 +543,9 @@ impl VectorStorage for SqliteVectorStorage {
 
             ids.push(id);
         }
+
+        // Commit transaction
+        conn.execute("COMMIT", ()).await?;
 
         Ok(ids)
     }

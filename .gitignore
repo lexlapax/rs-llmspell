@@ -48,3 +48,4 @@ benchmarks/graph-dataset/*.json
 memory_fixed.txt
 refactor.txt
 refactor_vector.txt
+task22_*.txt
