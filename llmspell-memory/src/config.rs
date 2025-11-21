@@ -36,12 +36,12 @@ pub enum EpisodicBackendType {
 ///
 /// # Backend Characteristics
 ///
-/// - **`InMemory`**: Testing/development with in-memory SQLite (no persistence)
+/// - **`InMemory`**: Testing/development with in-memory `SQLite` (no persistence)
 /// - **`Sqlite`**: Default bi-temporal graph database with embedded storage (via `SqliteGraphStorage`)
 /// - **`PostgreSQL`**: Production-ready with `PostgreSQL` bi-temporal graph tables, multi-tenant `RLS`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SemanticBackendType {
-    /// In-memory SQLite for testing/development (no persistence required)
+    /// In-memory `SQLite` for testing/development (no persistence required)
     InMemory,
 
     /// `SQLite` bi-temporal graph database (default, for development and production)
