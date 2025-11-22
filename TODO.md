@@ -6208,10 +6208,11 @@ Task 13c.2.2: DELETE ENTIRE TASK (marked SUPERSEDED, now obsolete)
 ---
 ## Phase 13c.4: Profile System Enhancement (Days 1-2)
 
-**Goal**: Create 3 real-world profiles (postgres, ollama-production, memory-development)
-**Timeline**: 2 days (16 hours total)
-**Critical Dependencies**: Phase 13b (PostgreSQL) ✅
+**Goal**: Create 3 storage-focused profiles (postgres, sqlite-production, phase13-showcase)
+**Timeline**: 2 days (10 hours total: 4h + 3h + 3h)
+**Critical Dependencies**: Phase 13b (PostgreSQL) ✅, Phase 13c.2 (SQLite unified storage) ✅
 **Priority**: CRITICAL (unblocks Phase 13b validation + production use)
+**Strategic Focus**: Storage backend as primary differentiator (PostgreSQL vs SQLite), not LLM provider choice
 
 ### Task 13c.4.1: PostgreSQL Profile Creation ⏹ PENDING
 **Priority**: CRITICAL
@@ -6279,132 +6280,265 @@ Task 13c.2.2: DELETE ENTIRE TASK (marked SUPERSEDED, now obsolete)
 
 ---
 
-### Task 13c.4.2: Ollama Production Profile Creation ⏹ PENDING
+### Task 13c.4.2: SQLite Production Profile Creation ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 3 hours
-**Assignee**: Providers Team
+**Assignee**: Storage Team
 **Status**: ⏹ PENDING
+**Rationale**: Storage backend (SQLite embedded) is primary differentiator, not LLM provider choice
 
-**Description**: Create `ollama-production.toml` for real-world local LLM deployment with embeddings, chat, caching.
+**Description**: Create `sqlite-production.toml` for embedded production deployment with SQLite backend, local LLMs, and privacy-first architecture. Supports any local provider (Ollama, Candle, etc.) - provider-agnostic.
+
+**Strategic Context** (Phase 13c.2):
+- Phase 13c.2 unified storage to **SQLite** (embedded) + **PostgreSQL** (cloud)
+- SQLite is production-ready with libsql, WAL mode, vectorlite-rs HNSW
+- Primary deployment decision: Embedded (SQLite) vs Cloud (PostgreSQL), NOT provider choice
+- This profile enables: air-gapped, GDPR/HIPAA, edge, offline, single-server deployments
 
 **Acceptance Criteria**:
-- [ ] ollama-production.toml created
-- [ ] Chat model configured (llama3.2:3b)
-- [ ] Embeddings model configured (nomic-embed-text)
-- [ ] Memory backend uses local HNSW
-- [ ] Profile works without cloud API keys
-- [ ] Profile validated with ollama
+- [ ] sqlite-production.toml created in llmspell-config/builtins/
+- [ ] SQLite backend configured with production settings (WAL, cache, max_connections)
+- [ ] Local LLM provider configured (Ollama default, but supports Candle)
+- [ ] Local embeddings configured (no cloud API dependencies)
+- [ ] Memory system enabled with local consolidation LLM
+- [ ] RAG enabled with local embeddings and vectorlite-rs HNSW
+- [ ] Zero cloud API dependencies (fully offline capable)
+- [ ] Profile validated with Ollama
 
 **Implementation Steps**:
-1. Create `llmspell-config/builtins/ollama-production.toml` (see design doc lines 932-1012)
+1. Create `llmspell-config/builtins/sqlite-production.toml` (~80 lines)
 
-2. Key configuration:
+2. Key configuration sections:
    ```toml
+   # SQLite Production Profile
+   # Embedded production deployment with privacy-first architecture
+   # Zero cloud dependencies, works offline, GDPR/HIPAA compliant
+
+   [storage]
+   backend = "sqlite"
+
+   [storage.sqlite]
+   path = "/var/lib/llmspell/data/llmspell.db"
+   max_connections = 10
+   enable_wal = true
+   cache_size_mb = 256
+
+   [providers]
+   default_provider = "ollama"  # Can also use "candle" for embedded inference
+
    [providers.ollama]
    provider_type = "ollama"
    base_url = "http://localhost:11434"
-   default_model = "llama3.2:3b"
+   default_model = "llama3.1:8b"  # Production-grade model
 
-   [providers.ollama_embeddings]
+   # Local embeddings (no cloud API)
+   [providers.local_embeddings]
+   provider_type = "ollama"
    default_model = "nomic-embed-text"
 
-   [memory]
-   episodic_backend = "hnsw"
-   embedding_provider = "ollama_embeddings"
+   [runtime.memory]
+   enabled = true
+
+   [runtime.memory.consolidation]
+   provider_name = "ollama"  # Use local LLM for consolidation
+   batch_size = 10
 
    [rag]
-   embedding_provider = "ollama_embeddings"
-   vector_backend = "hnsw"
+   enabled = true
+   embedding.default_provider = "local_embeddings"
+   vector_backend = "sqlite_hnsw"  # vectorlite-rs HNSW
+   multi_tenant = false
+
+   [runtime]
+   log_level = "info"
    ```
 
 3. Test locally:
    ```bash
-   # Ensure ollama running
+   # Ensure Ollama running with required models
    ollama serve &
-   ollama pull llama3.2:3b
+   ollama pull llama3.1:8b
    ollama pull nomic-embed-text
 
-   # Test profile
-   cargo run -- -p ollama-production run examples/script-users/getting-started/02-first-agent.lua
+   # Test profile loading
+   cargo run -- -p sqlite-production info
+
+   # Test RAG with local embeddings
+   cargo run -- -p sqlite-production run examples/script-users/rag/01-vector-search-basic.lua
+   ```
+
+4. Validate offline capability:
+   ```bash
+   # Disconnect network, ensure profile still works
+   cargo run -- -p sqlite-production exec 'print("Offline test successful")'
    ```
 
 **Definition of Done**:
-- [ ] ollama-production.toml exists
-- [ ] Zero cloud API dependencies
-- [ ] Works with ollama models
-- [ ] Memory + RAG use local embeddings
-- [ ] Production-ready comments/docs
+- [ ] sqlite-production.toml exists
+- [ ] SQLite backend configured for production
+- [ ] Zero cloud API dependencies (fully offline capable)
+- [ ] Works with Ollama (and documented for Candle alternative)
+- [ ] Memory + RAG use local embeddings only
+- [ ] Production-ready comments explaining privacy/offline benefits
+- [ ] Validated: can run completely offline
 
 **Files to Create**:
-- `llmspell-config/builtins/ollama-production.toml`
+- `llmspell-config/builtins/sqlite-production.toml`
+
+**Use Cases**:
+- Air-gapped/offline deployments
+- Privacy-sensitive applications (GDPR, HIPAA compliance)
+- Edge computing scenarios
+- Single-server production (no database infrastructure needed)
+- Development → production path without cloud dependencies
 
 ---
 
-### Task 13c.4.3: Memory Development Profile Creation ⏹ PENDING
+### Task 13c.4.3: Phase 13 Showcase Profile Creation ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 3 hours
-**Assignee**: Memory Team
+**Assignee**: Phase 13 Team
 **Status**: ⏹ PENDING
+**Rationale**: Existing memory.toml already provides memory debugging; need comprehensive Phase 13 feature demonstration
 
-**Description**: Create `memory-development.toml` for Phase 13 memory debugging with all backends enabled and debug logging.
+**Description**: Create `phase13-showcase.toml` to demonstrate ALL Phase 13 capabilities (Adaptive Memory + Temporal Graph + Context Engineering) with PostgreSQL production backend. This profile replaces `memory-development.toml` which was redundant with existing `memory.toml`.
+
+**Strategic Context** (Phase 13):
+- **Phase 13a**: Adaptive Memory (3-tier: episodic/semantic/procedural) ✅
+- **Phase 13b**: PostgreSQL backend (RLS, VectorChord, bi-temporal graph) ✅
+- **Phase 13c**: Storage consolidation (SQLite + PostgreSQL unified) ✅
+- **Gap**: No profile demonstrates ALL Phase 13 features together
+- Existing `memory.toml` (54 lines) already handles memory-only development
 
 **Acceptance Criteria**:
-- [ ] memory-development.toml created
-- [ ] All 3 memory backends configured (HNSW, SurrealDB, in-memory)
-- [ ] Debug logging enabled
-- [ ] Context assembly configured (hybrid strategy)
-- [ ] Telemetry and performance profiling enabled
-- [ ] Profile validated with examples
+- [ ] phase13-showcase.toml created in llmspell-config/builtins/
+- [ ] PostgreSQL backend configured (production-ready)
+- [ ] Adaptive Memory system enabled (episodic, semantic, procedural)
+- [ ] Temporal Knowledge Graph enabled (bi-temporal)
+- [ ] Context Engineering pipeline enabled
+- [ ] RAG integration with memory system
+- [ ] Debug logging for all Phase 13 subsystems
+- [ ] Profile validated with Phase 13 examples
 
 **Implementation Steps**:
-1. Create `llmspell-config/builtins/memory-development.toml` (see design doc lines 1049-1128)
+1. Create `llmspell-config/builtins/phase13-showcase.toml` (~100 lines)
 
-2. Key configuration:
+2. Key configuration sections:
    ```toml
-   [memory]
-   episodic_backend = "hnsw"
-   semantic_backend = "surrealdb"
-   procedural_backend = "in_memory"
-   debug_logging = true
-   telemetry = true
+   # Phase 13 Features Showcase Profile
+   # Demonstrates: Adaptive Memory + Temporal Graph + Context Engineering
+   # Production-ready with PostgreSQL backend
 
-   [memory.hnsw]
-   m = 16
-   ef_construction = 200
+   [storage]
+   backend = "postgres"
 
-   [memory.surrealdb]
+   [storage.postgres]
+   url = "postgresql://llmspell:password@localhost:5432/llmspell_dev"
+   pool_size = 20
+
+   [providers]
+   default_provider = "openai"
+
+   # Phase 13a: Adaptive Memory System
+   [runtime.memory]
+   enabled = true
+
+   [runtime.memory.episodic]
+   backend = "postgres_vector"  # vectorchord HNSW
+   max_entries = 10000
+
+   [runtime.memory.semantic]
+   backend = "postgres_graph"   # bi-temporal knowledge graph
+   enable_bi_temporal = true
+
+   [runtime.memory.procedural]
+   backend = "postgres"
+   max_patterns = 1000
+
+   [runtime.memory.consolidation]
+   provider_name = "openai"
+   batch_size = 10
+   max_concurrent = 3
+
+   [runtime.memory.daemon]
+   enabled = true
+   fast_interval_secs = 30
+   slow_interval_secs = 300
+
+   # Phase 13b: Temporal Knowledge Graph
+   [runtime.graph]
+   enabled = true
    bi_temporal = true
+   valid_time_tracking = true
+   transaction_time_tracking = true
 
-   [context]
+   # Phase 13: Context Engineering Pipeline
+   [runtime.context]
+   enabled = true
+   max_context_tokens = 100000
    default_strategy = "hybrid"
    parallel_retrieval = true
+
+   # RAG with episodic memory integration
+   [rag]
+   enabled = true
+   embedding.default_provider = "openai"
+   vector_backend = "postgres_vector"
+   multi_tenant = false
+   integrate_with_memory = true
 
    [runtime]
    log_level = "debug"
    trace_memory_operations = true
+   trace_graph_operations = true
+   trace_context_engineering = true
    ```
 
-3. Test with memory examples:
+3. Test with Phase 13 examples:
    ```bash
+   # Start PostgreSQL container
+   cd docker/postgres && docker compose up -d
+   export LLMSPELL_POSTGRES_URL="postgresql://llmspell:llmspell@localhost:5435/llmspell"
    export OPENAI_API_KEY="sk-..."
-   cargo run -- -p memory-development run examples/script-users/getting-started/05-memory-rag-advanced.lua
+
+   # Test profile loading
+   cargo run -- -p phase13-showcase info
+
+   # Test adaptive memory
+   cargo run -- -p phase13-showcase run examples/script-users/memory/01-basic-memory.lua
+
+   # Test knowledge graph
+   cargo run -- -p phase13-showcase run examples/script-users/graph/01-basic-graph.lua
+
+   # Test context engineering
+   cargo run -- -p phase13-showcase run examples/script-users/context/01-context-assembly.lua
    ```
 
 4. Verify debug output shows:
-   - HNSW index operations
-   - SurrealDB graph queries
+   - Memory consolidation events
+   - Graph temporal queries (valid_time + transaction_time)
    - Context assembly strategy selection
-   - Performance metrics
+   - Performance metrics for all subsystems
 
 **Definition of Done**:
-- [ ] memory-development.toml exists
-- [ ] All Phase 13 memory features enabled
-- [ ] Debug output comprehensive
-- [ ] Performance profiling working
-- [ ] Development-friendly comments
+- [ ] phase13-showcase.toml exists
+- [ ] ALL Phase 13 features enabled (Memory + Graph + Context)
+- [ ] PostgreSQL backend configured
+- [ ] Debug logging comprehensive across all subsystems
+- [ ] Works with docker/postgres container
+- [ ] Validated with Phase 13 examples
+- [ ] Production-ready comments explaining Phase 13 architecture
 
 **Files to Create**:
-- `llmspell-config/builtins/memory-development.toml`
+- `llmspell-config/builtins/phase13-showcase.toml`
+
+**Use Cases**:
+- Phase 13 feature demonstrations and validation
+- Production memory-augmented agent development
+- Knowledge graph application development
+- Long-running conversational systems with memory
+- Context engineering research and optimization
+- Phase 13 → Phase 14 transition testing
 
 ---
 
@@ -6414,12 +6548,13 @@ Task 13c.2.2: DELETE ENTIRE TASK (marked SUPERSEDED, now obsolete)
 **Assignee**: Documentation Team
 **Status**: ⏹ PENDING
 
-**Description**: Create `llmspell-config/builtins/README.md` with complete profile catalog and decision matrix.
+**Description**: Create `llmspell-config/builtins/README.md` with complete profile catalog and decision matrix reflecting Phase 13c.4 updates.
 
 **Acceptance Criteria**:
 - [ ] README.md exists in llmspell-config/builtins/
-- [ ] All 17 profiles documented
+- [ ] All 16 profiles documented (13 existing + 3 new: postgres, sqlite-production, phase13-showcase)
 - [ ] Decision matrix: when to use which profile
+- [ ] Storage backend decision guide (PostgreSQL vs SQLite)
 - [ ] Environment progression guide (dev → staging → prod)
 - [ ] Profile composition examples
 
@@ -6430,33 +6565,43 @@ Task 13c.2.2: DELETE ENTIRE TASK (marked SUPERSEDED, now obsolete)
    ```markdown
    # Builtin Profile Catalog
 
-   ## Quick Reference (17 Profiles)
+   ## Quick Reference (16 Profiles)
 
    | Profile | Use Case | Prerequisites | When to Use |
    |---------|----------|---------------|-------------|
    | minimal | Tools only | None | CLI testing |
    | development | Full dev | API keys | Feature dev |
-   | postgres | PostgreSQL | PG 18 + VectorChord | Production |
-   | ollama-production | Local LLM | Ollama + models | Production local |
-   | memory-development | Memory debug | OpenAI key | Phase 13 dev |
+   | postgres | PostgreSQL prod | PG 18 + VectorChord | Multi-tenant production |
+   | sqlite-production | Embedded prod | Ollama/Candle | Privacy/offline/edge |
+   | phase13-showcase | Phase 13 demo | PostgreSQL + OpenAI | Memory+Graph+Context |
+   | memory | Memory system | API keys | Memory development |
    | ... | ... | ... | ... |
 
    ## Decision Matrix
 
+   ### Storage Backend Choice (PRIMARY)
+   - Multi-tenant/cloud → postgres (PostgreSQL + RLS + VectorChord)
+   - Embedded/privacy/offline → sqlite-production (SQLite + local LLMs)
+
    ### Development
    - Quick testing → minimal
    - Feature development → development
-   - Memory features → memory-development
+   - Memory features → memory (existing)
    - RAG development → rag-development
+   - Phase 13 features → phase13-showcase
 
    ### Production
    - PostgreSQL backend → postgres
-   - Local LLM → ollama-production
-   - Cloud LLM → Custom config extending providers.toml
+   - SQLite embedded → sqlite-production
+   - Cloud LLM + PostgreSQL → Custom config extending postgres
+   - Local LLM + SQLite → sqlite-production (default)
 
    ## Environment Progression
 
    Development → Staging → Production
+   - Dev: development.toml or memory.toml
+   - Staging: postgres.toml or sqlite-production.toml with staging config
+   - Prod: postgres.toml or sqlite-production.toml with production hardening
    ```
 
 3. Add profile composition examples:
@@ -6466,14 +6611,21 @@ Task 13c.2.2: DELETE ENTIRE TASK (marked SUPERSEDED, now obsolete)
 
    [runtime]
    log_level = "warn"  # Override for production
+
+   # custom-privacy-prod.toml
+   extends = "sqlite-production"
+
+   [storage.sqlite]
+   path = "/secure/llmspell/data.db"  # Custom secure path
    ```
 
 **Definition of Done**:
 - [ ] README.md comprehensive
-- [ ] All 17 profiles listed
-- [ ] Decision matrix clear
+- [ ] All 16 profiles listed (13 + 3 new)
+- [ ] Decision matrix emphasizes storage backend choice
 - [ ] Composition examples provided
 - [ ] Links to full profile files
+- [ ] Phase 13c.4 new profiles clearly documented
 
 **Files to Create**:
 - `llmspell-config/builtins/README.md`
