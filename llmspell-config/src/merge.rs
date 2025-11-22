@@ -231,8 +231,7 @@ fn merge_consolidation(
     if source.max_concurrent != default_consolidation.max_concurrent {
         base.max_concurrent = source.max_concurrent;
     }
-    if source.active_session_threshold_secs != default_consolidation.active_session_threshold_secs
-    {
+    if source.active_session_threshold_secs != default_consolidation.active_session_threshold_secs {
         base.active_session_threshold_secs = source.active_session_threshold_secs;
     }
 }
@@ -367,10 +366,7 @@ fn merge_event_filter(base: &mut EventFilterConfig, source: EventFilterConfig) {
 }
 
 /// Merge event export configurations
-fn merge_event_export(
-    base: &mut crate::EventExportConfig,
-    source: crate::EventExportConfig,
-) {
+fn merge_event_export(base: &mut crate::EventExportConfig, source: crate::EventExportConfig) {
     let default_export = crate::EventExportConfig::default();
 
     if source.stdout != default_export.stdout {
@@ -485,10 +481,7 @@ fn merge_hnsw(base: &mut crate::rag::HNSWConfig, source: crate::rag::HNSWConfig)
 }
 
 /// Merge embedding configurations
-fn merge_embedding(
-    base: &mut crate::rag::EmbeddingConfig,
-    source: crate::rag::EmbeddingConfig,
-) {
+fn merge_embedding(base: &mut crate::rag::EmbeddingConfig, source: crate::rag::EmbeddingConfig) {
     let default_embedding = crate::rag::EmbeddingConfig::default();
 
     if source.default_provider != default_embedding.default_provider {
@@ -563,8 +556,10 @@ mod tests {
     #[test]
     fn test_merge_simple_fields() {
         let mut base = LLMSpellConfig::default();
-        let mut source = LLMSpellConfig::default();
-        source.default_engine = "javascript".to_string();
+        let source = LLMSpellConfig {
+            default_engine: "javascript".to_string(),
+            ..Default::default()
+        };
 
         merge_config(&mut base, source);
 
@@ -573,8 +568,10 @@ mod tests {
 
     #[test]
     fn test_merge_preserves_base_when_source_default() {
-        let mut base = LLMSpellConfig::default();
-        base.default_engine = "custom".to_string();
+        let mut base = LLMSpellConfig {
+            default_engine: "custom".to_string(),
+            ..Default::default()
+        };
 
         let source = LLMSpellConfig::default(); // default_engine = "lua"
 
@@ -612,12 +609,16 @@ mod tests {
 
     #[test]
     fn test_merge_option_fields() {
-        let mut base = LLMSpellConfig::default();
-        base.hooks = None;
+        let mut base = LLMSpellConfig {
+            hooks: None,
+            ..Default::default()
+        };
 
         let mut source = LLMSpellConfig::default();
-        let mut hook_config = HookConfig::default();
-        hook_config.enabled = true;
+        let hook_config = HookConfig {
+            enabled: true,
+            ..Default::default()
+        };
         source.hooks = Some(hook_config);
 
         merge_config(&mut base, source);
@@ -643,8 +644,10 @@ mod tests {
 
     #[test]
     fn test_merge_preserves_unset_fields() {
-        let mut base = LLMSpellConfig::default();
-        base.default_engine = "custom".to_string();
+        let mut base = LLMSpellConfig {
+            default_engine: "custom".to_string(),
+            ..Default::default()
+        };
         base.runtime.max_concurrent_scripts = 15;
 
         let mut source = LLMSpellConfig::default();

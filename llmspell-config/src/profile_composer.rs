@@ -283,7 +283,10 @@ mod tests {
 
         let profile_config: ProfileConfig = toml::from_str(toml).unwrap();
         assert_eq!(profile_config.profile.extends, vec!["bases/cli"]);
-        assert_eq!(profile_config.profile.name, Some("Test Profile".to_string()));
+        assert_eq!(
+            profile_config.profile.name,
+            Some("Test Profile".to_string())
+        );
         assert_eq!(profile_config.config.default_engine, "lua");
     }
 
@@ -343,7 +346,10 @@ mod tests {
 
         let profile_config: ProfileConfig = toml::from_str(toml).unwrap();
         assert_eq!(profile_config.profile.extends.len(), 2);
-        assert_eq!(profile_config.profile.name, Some("Complex Profile".to_string()));
+        assert_eq!(
+            profile_config.profile.name,
+            Some("Complex Profile".to_string())
+        );
         assert_eq!(profile_config.config.runtime.max_concurrent_scripts, 20);
     }
 
