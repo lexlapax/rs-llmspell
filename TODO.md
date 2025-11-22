@@ -7012,38 +7012,51 @@ cargo clippy --workspace --all-features  # 0 warnings
 
 ---
 
-### Task 13c.4.7: Create Preset Profiles (20 files) ⏹ PENDING
+### Task 13c.4.7: Create Preset Profiles (20 files) ⏹ IN PROGRESS
 **Priority**: HIGH
 **Estimated Time**: 1 day (8 hours)
 **Assignee**: Configuration Team
-**Status**: ⏹ PENDING
+**Status**: ⏹ IN PROGRESS
 
-**Description**: Create 20 named preset combinations (13 backward-compat + 7 new).
+**Description**: Create 20 named preset combinations with provider-specific production configs.
 
 **Directory**: llmspell-config/presets/
 
-**Backward Compatible Presets** (13 files):
-- minimal.toml → extends = ["bases/cli", "features/minimal", "envs/dev", "backends/memory"]
-- development.toml → extends = ["bases/cli", "features/llm", "envs/dev", "backends/memory"]
-- providers.toml
-- state.toml
-- sessions.toml
-- ollama.toml → extends = ["bases/cli", "features/llm-local", "envs/dev", "backends/memory"]
-- candle.toml
-- memory.toml → extends = ["bases/cli", "features/memory", "envs/dev", "backends/sqlite"]
-- rag-dev.toml → extends = ["bases/cli", "features/rag", "envs/dev", "backends/sqlite"]
-- rag-prod.toml → extends = ["bases/cli", "features/rag", "envs/prod", "backends/sqlite"]
-- rag-perf.toml → extends = ["bases/cli", "features/rag", "envs/perf", "backends/sqlite"]
-- default.toml → extends = ["minimal"]
+**REVISED PLAN**: Replace 3 generic presets with provider-specific production presets (Gemini, OpenAI, Claude) that include full Phase 13 storage stack (graph, RAG, memory, context engineering) with SQLite persistence.
 
-**New Combination Presets** (7 files):
-- postgres-prod.toml → extends = ["bases/cli", "features/full", "envs/prod", "backends/postgres"]
-- daemon-dev.toml → extends = ["bases/daemon", "features/rag", "envs/dev", "backends/sqlite"]
-- daemon-prod.toml → extends = ["bases/daemon", "features/memory", "envs/prod", "backends/postgres"]
-- rag-local-dev.toml → extends = ["bases/cli", "features/rag", "features/llm-local", "envs/dev", "backends/sqlite"]
-- full-local.toml → extends = ["bases/cli", "features/full", "features/llm-local", "envs/dev", "backends/sqlite"]
-- saas-production.toml → extends = ["bases/daemon", "features/memory", "envs/prod", "backends/postgres"] + RLS config
-- research.toml → extends = ["bases/cli", "features/full", "envs/dev", "backends/sqlite"] + trace logging
+**Backward Compatible Presets** (12 files):
+- minimal.toml → ["bases/cli", "features/minimal", "envs/dev", "backends/memory"]
+- development.toml → ["bases/cli", "features/llm", "envs/dev", "backends/memory"]
+- providers.toml → ["bases/cli", "features/llm", "envs/dev", "backends/memory"]
+- state.toml → ["bases/cli", "features/state", "envs/dev", "backends/sqlite"]
+- sessions.toml → ["bases/cli", "features/state", "envs/dev", "backends/memory"]
+- ollama.toml → ["bases/cli", "features/llm-local", "envs/dev", "backends/memory"]
+- candle.toml → ["bases/cli", "features/llm-local", "envs/dev", "backends/memory"]
+- memory.toml → ["bases/cli", "features/memory", "envs/dev", "backends/sqlite"]
+- rag-dev.toml → ["bases/cli", "features/rag", "envs/dev", "backends/sqlite"]
+- rag-prod.toml → ["bases/cli", "features/rag", "envs/prod", "backends/sqlite"]
+- rag-perf.toml → ["bases/cli", "features/rag", "envs/perf", "backends/sqlite"]
+- default.toml → extends ["minimal"]
+
+**New Combination Presets** (8 files):
+- postgres-prod.toml → ["bases/cli", "features/full", "envs/prod", "backends/postgres"]
+- daemon-dev.toml → ["bases/daemon", "features/rag", "envs/dev", "backends/sqlite"]
+- daemon-prod.toml → ["bases/daemon", "features/full", "envs/prod", "backends/postgres"]
+- **gemini-prod.toml** ⭐ → ["bases/cli", "features/full", "envs/prod", "backends/sqlite"] + Gemini defaults
+- **openai-prod.toml** ⭐ → ["bases/cli", "features/full", "envs/prod", "backends/sqlite"] + OpenAI defaults
+- **claude-prod.toml** ⭐ → ["bases/cli", "features/full", "envs/prod", "backends/sqlite"] + Claude defaults
+- full-local-ollama.toml → ["bases/cli", "features/full", "features/llm-local", "envs/dev", "backends/sqlite"]
+- research.toml → ["bases/cli", "features/full", "envs/dev", "backends/sqlite"] + trace logging
+
+**Additional Changes**:
+- Update features/llm.toml to add Gemini provider configuration
+
+**Full Phase 13 Stack** (included in features/full):
+- Graph storage (bi-temporal knowledge graph)
+- RAG (vector storage with HNSW)
+- Memory persistence (adaptive memory system)
+- Context engineering pipeline
+- State persistence with SQLite backend
 
 **Checkpoint**:
 ```bash
@@ -7052,11 +7065,13 @@ cargo clippy --workspace (zero warnings)
 ```
 
 **Definition of Done**:
+- [ ] features/llm.toml updated with Gemini provider
 - [ ] 20 preset files created (200+ lines total)
 - [ ] All presets load successfully
-- [ ] Backward compatibility verified (13 old names work)
+- [ ] Provider-specific presets have correct default_provider
+- [ ] Backward compatibility verified (12 old names work)
 - [ ] Zero clippy warnings
-- [ ] Commit: "13c.4.7 Create 20 preset profile combinations"
+- [ ] Commit: "13c.4.7 Create 20 preset profiles with provider-specific production configs"
 
 ---
 
