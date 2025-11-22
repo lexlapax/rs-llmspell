@@ -1,0 +1,7 @@
+# Full Features Layer
+# All capabilities enabled via layer composition
+
+[profile]
+name = "Full Features"
+description = "Complete feature set - LLM, state, RAG, and memory"
+extends = ["features/llm", "features/state", "features/rag", "features/memory"]

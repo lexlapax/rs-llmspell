@@ -1,0 +1,27 @@
+# Memory Feature Layer
+# Adaptive memory with LLM consolidation and daemon scheduling
+
+[profile]
+name = "Memory Features"
+description = "Episodic memory with semantic consolidation"
+
+# Memory configuration
+[runtime.memory]
+enabled = true
+
+# LLM consolidation configuration
+[runtime.memory.consolidation]
+batch_size = 5
+max_concurrent = 2
+active_session_threshold_secs = 300
+
+# Background daemon configuration
+[runtime.memory.daemon]
+enabled = true
+fast_interval_secs = 30
+normal_interval_secs = 300
+slow_interval_secs = 600
+queue_threshold_fast = 10
+queue_threshold_slow = 3
+shutdown_max_wait_secs = 30
+health_check_interval_secs = 60

@@ -1,0 +1,51 @@
+# RAG Feature Layer
+# Vector storage + HNSW search for retrieval-augmented generation
+
+[profile]
+name = "RAG Features"
+description = "Vector search capabilities with HNSW indexing"
+
+# RAG configuration
+[rag]
+enabled = true
+multi_tenant = false
+
+# Vector storage configuration
+[rag.vector_storage]
+dimensions = 384  # OpenAI text-embedding-3-small default
+backend = "hnsw"
+max_memory_mb = 1024
+
+# HNSW index configuration
+[rag.vector_storage.hnsw]
+m = 16
+ef_construction = 200
+ef_search = 50
+max_elements = 1000000
+metric = "cosine"
+allow_replace_deleted = true
+
+# Embedding provider configuration
+[rag.embedding]
+default_provider = "openai"
+cache_enabled = true
+cache_size = 10000
+cache_ttl_seconds = 3600
+batch_size = 100
+timeout_seconds = 60
+max_retries = 3
+
+# Document chunking configuration
+[rag.chunking]
+strategy = "semantic"
+max_chunk_size = 512
+chunk_overlap = 50
+min_chunk_size = 100
+
+# RAG cache configuration
+[rag.cache]
+search_cache_enabled = true
+search_cache_size = 1000
+search_cache_ttl_seconds = 300
+document_cache_enabled = true
+document_cache_size_mb = 100

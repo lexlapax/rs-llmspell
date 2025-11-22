@@ -1,0 +1,20 @@
+# State Persistence Feature Layer
+# Enable state persistence with SQLite backend
+
+[profile]
+name = "State Persistence Features"
+description = "SQLite state persistence with migrations and backups"
+
+# State persistence configuration
+[runtime.state_persistence]
+enabled = true
+backend_type = "sqlite"
+migration_enabled = true
+backup_enabled = true
+backup_on_migration = true
+
+[runtime.state_persistence.backup]
+compression_enabled = true
+compression_type = "gzip"
+compression_level = 6
+incremental_enabled = false

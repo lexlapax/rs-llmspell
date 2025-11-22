@@ -219,7 +219,15 @@ impl ProfileComposer {
             "bases/embedded" => include_str!("../layers/bases/embedded.toml"),
             "bases/testing" => include_str!("../layers/bases/testing.toml"),
 
-            // Feature layers (Task 13c.4.4) - TODO
+            // Feature layers (Task 13c.4.4)
+            "features/minimal" => include_str!("../layers/features/minimal.toml"),
+            "features/llm" => include_str!("../layers/features/llm.toml"),
+            "features/llm-local" => include_str!("../layers/features/llm-local.toml"),
+            "features/state" => include_str!("../layers/features/state.toml"),
+            "features/rag" => include_str!("../layers/features/rag.toml"),
+            "features/memory" => include_str!("../layers/features/memory.toml"),
+            "features/full" => include_str!("../layers/features/full.toml"),
+
             // Environment layers (Task 13c.4.5) - TODO
             // Backend layers (Task 13c.4.6) - TODO
             // Preset profiles (Task 13c.4.7) - TODO
@@ -231,7 +239,8 @@ impl ProfileComposer {
                     message: format!(
                         "Layer '{}' not found.\n\
                          Available base layers: bases/cli, bases/daemon, bases/embedded, bases/testing\n\
-                         Feature/env/backend/preset layers coming in Tasks 13c.4.4-13c.4.7",
+                         Available feature layers: features/minimal, features/llm, features/llm-local, features/state, features/rag, features/memory, features/full\n\
+                         Environment/backend/preset layers coming in Tasks 13c.4.5-13c.4.7",
                         layer_path
                     ),
                 })
@@ -568,6 +577,95 @@ mod tests {
             }
             _ => panic!("Expected LayerNotFound error"),
         }
+    }
+
+    // Feature layer tests (Task 13c.4.4)
+    #[test]
+    fn test_load_feature_minimal() {
+        let mut composer = ProfileComposer::new();
+        let _config = composer.load_layer("features/minimal").unwrap();
+
+        // Minimal layer loads successfully with baseline tool configuration
+        // No specific assertions needed - just verifying the layer deserializes correctly
+    }
+
+    #[test]
+    fn test_load_feature_llm() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("features/llm").unwrap();
+
+        assert_eq!(
+            config.providers.default_provider,
+            Some("openai".to_string())
+        );
+        assert!(config.providers.providers.contains_key("openai"));
+        assert!(config.providers.providers.contains_key("anthropic"));
+
+        let openai = config.providers.providers.get("openai").unwrap();
+        assert_eq!(openai.provider_type, "openai");
+        assert_eq!(openai.default_model, Some("gpt-4".to_string()));
+    }
+
+    #[test]
+    fn test_load_feature_state() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("features/state").unwrap();
+
+        assert!(config.runtime.state_persistence.enabled);
+        assert_eq!(config.runtime.state_persistence.backend_type, "sqlite");
+        assert!(config.runtime.state_persistence.migration_enabled);
+        assert!(config.runtime.state_persistence.backup_enabled);
+    }
+
+    #[test]
+    fn test_load_feature_rag() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("features/rag").unwrap();
+
+        assert!(config.rag.enabled);
+        assert_eq!(config.rag.vector_storage.dimensions, 384);
+        assert_eq!(config.rag.vector_storage.hnsw.m, 16);
+        assert_eq!(config.rag.vector_storage.hnsw.ef_construction, 200);
+        assert_eq!(config.rag.embedding.default_provider, "openai");
+    }
+
+    #[test]
+    fn test_load_feature_memory() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("features/memory").unwrap();
+
+        assert!(config.runtime.memory.enabled);
+        assert!(config.runtime.memory.daemon.enabled);
+        assert_eq!(config.runtime.memory.daemon.fast_interval_secs, 30);
+        assert_eq!(config.runtime.memory.consolidation.batch_size, 5);
+    }
+
+    #[test]
+    fn test_load_feature_full() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("features/full").unwrap();
+
+        // Full should extend llm, state, rag, memory
+        assert!(config.runtime.state_persistence.enabled);
+        assert!(config.rag.enabled);
+        assert!(config.runtime.memory.enabled);
+        assert!(config.providers.providers.contains_key("openai"));
+    }
+
+    #[test]
+    fn test_compose_base_with_features() {
+        let mut composer = ProfileComposer::new();
+        let config = composer
+            .load_multi(&["bases/cli", "features/rag"])
+            .unwrap();
+
+        // CLI base settings
+        assert_eq!(config.runtime.max_concurrent_scripts, 1);
+        assert!(config.runtime.enable_streaming);
+
+        // RAG feature settings
+        assert!(config.rag.enabled);
+        assert_eq!(config.rag.vector_storage.dimensions, 384);
     }
 
     // Note: Additional tests for circular extends detection, depth limits, and
