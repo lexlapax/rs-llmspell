@@ -7590,21 +7590,23 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.5.3: Getting-Started Streamlining ⏹ PENDING
+### Task 13c.5.3: Getting-Started Streamlining ✅ COMPLETE
 **Priority**: CRITICAL
 **Estimated Time**: 5 hours
+**Actual Time**: 3.5 hours
 **Assignee**: Examples Team Lead
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-22
 
 **Description**: Reduce getting-started from 8 → 5 examples by merging 05-first-rag + 06-episodic-memory + 07-context-assembly into 05-memory-rag-advanced.lua.
 
 **Acceptance Criteria**:
-- [ ] getting-started/ reduced 8 → 5 examples
-- [ ] New 05-memory-rag-advanced.lua created
-- [ ] Old 06, 07 removed
-- [ ] Estimated completion time <30 minutes (40% faster)
-- [ ] Linear progression clear (00 → 01 → 02 → 03 → 04 → 05)
-- [ ] All examples have standard headers
+- [x] getting-started/ reduced 8 → 5 examples
+- [x] New 05-memory-rag-advanced.lua created (680 lines)
+- [x] Old 05, 06, 07 removed (3 files, 967 lines total)
+- [x] Estimated completion time <30 minutes (40% faster)
+- [x] Linear progression clear (00 → 01 → 02 → 03 → 04 → 05)
+- [x] All examples have standard headers (Phase 13c.5.3 format)
 
 **Implementation Steps**:
 1. Create new `05-memory-rag-advanced.lua`:
@@ -7682,18 +7684,42 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 5. Add standard headers to all 5 examples
 
-**Definition of Done**:
-- [ ] 5 examples total (00, 01, 02, 03, 04, 05)
-- [ ] 05-memory-rag-advanced.lua comprehensive
-- [ ] Estimated runtime <30 minutes
-- [ ] Linear progression documented
-- [ ] All headers standardized
+**Completion Insights**:
+- **Files Modified**: 10 total (7 updated, 3 deleted, 1 created)
+  - Created: 05-memory-rag-advanced.lua (680 lines, 5 sections)
+  - Removed: 05-first-rag.lua (375 lines), 06-episodic-memory-basic.lua (307 lines), 07-context-assembly-basic.lua (285 lines)
+  - Updated: 00-04 example headers + README.md (6 files)
+- **Content Consolidation**: 967 lines → 680 lines (30% reduction, zero functionality lost)
+- **New Integrated Workflow**: Section 4 demonstrates RAG + Memory + Agent working together
+- **Standard Headers Applied**: All 5 examples now use Phase 13c.5.3 format:
+  - Phase field, Category field, Profile (recommended), Runtime estimates
+  - Version updated to v0.14.0 across all examples
+- **README Updated**:
+  - New 30-minute learning path (was 50+ minutes)
+  - Step 6 section with comprehensive description
+  - Total Time summary added to header
+- **Workspace Verification**: cargo check --workspace passes in 1m30s
+- **Git History Preserved**: Used git rm for deletions
+- **Commit**: 72dcd742 (761 insertions, 1021 deletions, net -260 lines)
 
-**Files to Create/Modify**:
-- Create: `examples/script-users/getting-started/05-memory-rag-advanced.lua`
-- Remove: `examples/script-users/getting-started/06-episodic-memory-basic.lua`
-- Remove: `examples/script-users/getting-started/07-context-assembly-basic.lua`
-- Update: `examples/script-users/getting-started/README.md`
+**Definition of Done**:
+- [x] 5 examples total (00, 01, 02, 03, 04, 05) ✅
+- [x] 05-memory-rag-advanced.lua comprehensive (5 sections) ✅
+- [x] Estimated runtime <30 minutes (documented) ✅
+- [x] Linear progression documented (README updated) ✅
+- [x] All headers standardized (Phase 13c.5.3 format) ✅
+
+**Files Created/Modified**:
+- Created: `examples/script-users/getting-started/05-memory-rag-advanced.lua` ✅
+- Removed: `examples/script-users/getting-started/05-first-rag.lua` ✅
+- Removed: `examples/script-users/getting-started/06-episodic-memory-basic.lua` ✅
+- Removed: `examples/script-users/getting-started/07-context-assembly-basic.lua` ✅
+- Updated: `examples/script-users/getting-started/README.md` ✅
+- Updated: `examples/script-users/getting-started/00-hello-world.lua` (header) ✅
+- Updated: `examples/script-users/getting-started/01-first-tool.lua` (header) ✅
+- Updated: `examples/script-users/getting-started/02-first-agent.lua` (header) ✅
+- Updated: `examples/script-users/getting-started/03-first-workflow.lua` (header) ✅
+- Updated: `examples/script-users/getting-started/04-handle-errors.lua` (header) ✅
 
 ---
 
