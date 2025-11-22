@@ -1,0 +1,5 @@
+# RAG Performance Preset
+[profile]
+name = "RAG Performance"
+description = "RAG tuned for maximum throughput"
+extends = ["bases/cli", "features/rag", "envs/perf", "backends/sqlite"]

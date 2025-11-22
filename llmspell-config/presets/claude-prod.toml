@@ -1,0 +1,9 @@
+# Claude Production Preset - Full Phase 13 stack with Claude/Anthropic
+[profile]
+name = "Claude Production"
+description = "Production CLI with Claude, full features (graph+RAG+memory+context), SQLite persistence"
+extends = ["bases/cli", "features/full", "envs/prod", "backends/sqlite"]
+
+# Anthropic/Claude as default provider
+[providers]
+default_provider = "anthropic"

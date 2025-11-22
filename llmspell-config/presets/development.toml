@@ -1,0 +1,5 @@
+# Development Preset - LLM providers for development
+[profile]
+name = "Development"
+description = "Development configuration with LLM providers"
+extends = ["bases/cli", "features/llm", "envs/dev", "backends/memory"]

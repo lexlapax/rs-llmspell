@@ -1,0 +1,9 @@
+# Gemini Production Preset - Full Phase 13 stack with Gemini
+[profile]
+name = "Gemini Production"
+description = "Production CLI with Gemini, full features (graph+RAG+memory+context), SQLite persistence"
+extends = ["bases/cli", "features/full", "envs/prod", "backends/sqlite"]
+
+# Gemini as default provider
+[providers]
+default_provider = "gemini"

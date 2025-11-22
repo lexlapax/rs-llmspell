@@ -1,0 +1,5 @@
+# Daemon Development Preset - Background service for development
+[profile]
+name = "Daemon Development"
+description = "Long-running daemon with RAG for development"
+extends = ["bases/daemon", "features/rag", "envs/dev", "backends/sqlite"]
