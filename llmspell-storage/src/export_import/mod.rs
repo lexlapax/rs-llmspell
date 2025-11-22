@@ -31,6 +31,9 @@ pub mod format;
 pub mod importer;
 
 pub use converters::{TypeConverter, TypeConverters};
-pub use exporter::StorageExporter;
+#[cfg(feature = "postgres")]
+pub use exporter::PostgresExporter;
+#[cfg(feature = "sqlite")]
+pub use exporter::SqliteExporter;
 pub use format::ExportFormat;
 pub use importer::StorageImporter;
