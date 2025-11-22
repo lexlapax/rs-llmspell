@@ -6206,429 +6206,716 @@ Task 13c.2.2: DELETE ENTIRE TASK (marked SUPERSEDED, now obsolete)
 - **Mitigation**: Documentation clearly states how to build vectorlite-rs
 
 ---
-## Phase 13c.4: Profile System Enhancement (Days 1-2)
+## Phase 13c.4: Profile System Rearchitecture (Days 1-9)
 
-**Goal**: Create 3 storage-focused profiles (postgres, sqlite-production, phase13-showcase)
-**Timeline**: 2 days (10 hours total: 4h + 3h + 3h)
-**Critical Dependencies**: Phase 13b (PostgreSQL) ✅, Phase 13c.2 (SQLite unified storage) ✅
-**Priority**: CRITICAL (unblocks Phase 13b validation + production use)
-**Strategic Focus**: Storage backend as primary differentiator (PostgreSQL vs SQLite), not LLM provider choice
+**Goal**: Complete profile system rewrite - 4-layer composition architecture (18 layers + 20 presets)
+**Timeline**: 9 days (72 hours total)
+**Critical Dependencies**: Phase 13c.2 (SQLite unified storage) ✅
+**Priority**: CRITICAL (foundation for flexible configuration)
+**Breaking Change**: YES - Replaces all 13 monolithic profiles with composable layers
 
-### Task 13c.4.1: PostgreSQL Profile Creation ⏹ PENDING
+**Architecture**: Base + Features + Environment + Backend composition
+**Pre-1.0 Strategy**: Breaking changes accepted, no migration code needed
+
+### Task 13c.4.1: Delete Old Profile System ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
-**Assignee**: Storage Team Lead
+**Estimated Time**: 2 hours
+**Assignee**: Configuration Team
 **Status**: ⏹ PENDING
 
-**Description**: Create `postgres.toml` builtin profile for Phase 13b PostgreSQL backend with VectorChord, RLS, bi-temporal graph.
+**Description**: Remove all 13 existing monolithic builtin profiles to prepare for layer-based architecture.
+
+**Rationale**: Clean slate approach - pre-1.0 allows breaking changes without migration burden.
 
 **Acceptance Criteria**:
-- [ ] postgres.toml created in llmspell-config/builtins/
-- [ ] Profile loads without errors
-- [ ] VectorChord vector backend configured
-- [ ] Row-Level Security (RLS) multi-tenancy enabled
-- [ ] Bi-temporal graph configuration present
-- [ ] Profile validated with PostgreSQL container
+- [ ] All 13 TOML files deleted from llmspell-config/builtins/
+- [ ] load_builtin_profile() match arms removed
+- [ ] Profile loading tests temporarily commented out
+- [ ] Zero clippy warnings after deletion
+- [ ] Codebase compiles (tests may fail - expected)
+
+**Files to DELETE**:
+- llmspell-config/builtins/minimal.toml (11 lines)
+- llmspell-config/builtins/default.toml (22 lines)
+- llmspell-config/builtins/development.toml (30 lines)
+- llmspell-config/builtins/providers.toml (31 lines)
+- llmspell-config/builtins/state.toml (19 lines)
+- llmspell-config/builtins/sessions.toml (32 lines)
+- llmspell-config/builtins/ollama.toml (21 lines)
+- llmspell-config/builtins/candle.toml (25 lines)
+- llmspell-config/builtins/memory.toml (54 lines)
+- llmspell-config/builtins/rag-development.toml (75 lines)
+- llmspell-config/builtins/rag-production.toml (91 lines)
+- llmspell-config/builtins/rag-performance.toml (69 lines)
+- Total: 480 lines deleted
+
+**Files to EDIT**:
+- llmspell-config/src/lib.rs:
+  - Remove load_builtin_profile() match arms (lines 1084-1126)
+  - Comment out 10 profile tests (lines 2140-2460)
+  - Add TODO comment: "Profile system rearchitecture in progress"
 
 **Implementation Steps**:
-1. Create `llmspell-config/builtins/postgres.toml` with full configuration (see design doc lines 824-898)
+1. Delete all 13 .toml files from llmspell-config/builtins/
+2. Edit llmspell-config/src/lib.rs - remove match arms
+3. Comment out tests with /* REARCHITECTURE */ markers
+4. Run: cargo clippy --workspace --all-features (expect zero warnings)
 
-2. Key sections:
-   ```toml
-   [storage.postgres]
-   connection_string_env = "LLMSPELL_POSTGRES_URL"
-   pool_size = 20
-
-   [storage.postgres.vector]
-   backend = "vectorchord"  # 5x faster than pgvector
-
-   [storage.postgres.multi_tenancy]
-   enabled = true
-   rls_enabled = true
-
-   [storage.postgres.graph]
-   backend = "native_ctes"
-   bi_temporal = true
-
-   [memory]
-   episodic_backend = "postgres_vector"
-   semantic_backend = "postgres_graph"
-   procedural_backend = "postgres"
-   ```
-
-3. Test profile loading:
-   ```bash
-   cargo run -- -p postgres info
-   ```
-
-4. Test with PostgreSQL container:
-   ```bash
-   cd docker/postgres && docker compose up -d
-   export LLMSPELL_POSTGRES_URL="postgresql://llmspell:llmspell@localhost:5435/llmspell"
-   cargo run -- -p postgres exec 'print("PostgreSQL profile loaded")'
-   ```
+**Checkpoint**:
+```bash
+cargo clippy --workspace --all-features 2>&1 | grep warning
+# Expected: No output (zero warnings)
+```
 
 **Definition of Done**:
-- [ ] postgres.toml exists and loads
-- [ ] All configuration sections present
-- [ ] Profile validated with docker/postgres
-- [ ] Phase 13b can use this profile immediately
-- [ ] Documentation comment headers complete
-
-**Files to Create**:
-- `llmspell-config/builtins/postgres.toml`
+- [ ] 13 profile files deleted
+- [ ] Match statement simplified (returns NotFound for all)
+- [ ] Tests commented out with clear markers
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.1 Delete old monolithic profile system"
 
 ---
 
-### Task 13c.4.2: SQLite Production Profile Creation ⏹ PENDING
+### Task 13c.4.2: Create Layer Architecture Foundation ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 1 day (8 hours)
+**Assignee**: Configuration Team
+**Status**: ⏹ PENDING
+
+**Description**: Implement ProfileComposer, layer resolution, and config merge logic for 4-layer composition.
+
+**Architecture Overview**:
+```rust
+Final Config = Base + Features + Environment + Backend
+
+ProfileComposer::load_multi(&["bases/cli", "features/rag", "envs/dev", "backends/sqlite"])
+  → LLMSpellConfig (merged)
+```
+
+**Acceptance Criteria**:
+- [ ] ProfileComposer struct created
+- [ ] Layer loading from embedded TOML works
+- [ ] Multi-layer composition succeeds
+- [ ] Deep merge logic implemented (50+ config fields)
+- [ ] Circular dependency detection works
+- [ ] Zero clippy warnings
+- [ ] Unit tests passing (15+ new tests)
+
+**Files to CREATE**:
+- llmspell-config/src/profile_composer.rs (300+ lines):
+  ```rust
+  /// Profile metadata with extends support
+  #[derive(Debug, Deserialize)]
+  struct ProfileMetadata {
+      #[serde(default)]
+      extends: Vec<String>,  // ["bases/cli", "features/rag"]
+  }
+
+  /// Wrapper for profile with metadata
+  #[derive(Debug, Deserialize)]
+  struct ProfileConfig {
+      #[serde(default)]
+      profile: ProfileMetadata,
+
+      #[serde(flatten)]
+      config: LLMSpellConfig,
+  }
+
+  /// Layer composition engine
+  pub struct ProfileComposer {
+      visited: HashSet<String>,
+  }
+
+  impl ProfileComposer {
+      /// Load single layer from embedded TOML
+      pub fn load_layer(&mut self, path: &str) -> Result<LLMSpellConfig>;
+
+      /// Load and merge multiple layers
+      pub fn load_multi(&mut self, paths: &[&str]) -> Result<LLMSpellConfig>;
+
+      /// Merge config B into config A (deep merge)
+      fn merge_configs(base: &mut LLMSpellConfig, override_cfg: LLMSpellConfig);
+  }
+  ```
+
+- llmspell-config/src/merge.rs (200+ lines):
+  ```rust
+  /// Deep merge strategy for LLMSpellConfig
+  pub fn merge_config(base: &mut LLMSpellConfig, override_cfg: LLMSpellConfig) {
+      // Merge providers (HashMap - insert/replace)
+      for (name, provider) in override_cfg.providers.providers {
+          base.providers.providers.insert(name, provider);
+      }
+
+      // Merge runtime (field-by-field conditional)
+      if override_cfg.runtime.log_level != base.runtime.log_level {
+          base.runtime.log_level = override_cfg.runtime.log_level;
+      }
+
+      // Merge RAG (deep struct merge)
+      if override_cfg.rag.enabled {
+          base.rag.enabled = true;
+      }
+      merge_rag_config(&mut base.rag, override_cfg.rag);
+
+      // ... 50+ more fields
+  }
+  ```
+
+**Files to EDIT**:
+- llmspell-config/src/lib.rs:
+  - Add: `mod profile_composer;`
+  - Add: `mod merge;`
+  - Update load_builtin_profile() to use ProfileComposer
+  - Add layer path resolution (bases/, features/, envs/, backends/, presets/)
+
+**Error Handling**:
+- ConfigError::CircularExtends { chain: Vec<String> }
+- ConfigError::LayerNotFound { path: String }
+- ConfigError::ExtendsChainTooDeep { depth: usize, max: usize }
+
+**Unit Tests** (llmspell-config/src/profile_composer_tests.rs):
+- test_load_single_layer
+- test_load_multi_layer_composition
+- test_circular_extends_detection
+- test_missing_layer_error
+- test_merge_providers_override
+- test_merge_runtime_conditional
+- test_merge_rag_deep_struct
+- test_extends_chain_depth_limit
+- ... (15+ tests total)
+
+**Checkpoint**:
+```bash
+cargo test -p llmspell-config --lib profile_composer
+cargo clippy -p llmspell-config (zero warnings)
+```
+
+**Definition of Done**:
+- [ ] ProfileComposer implemented
+- [ ] Merge logic complete (all 50+ config fields)
+- [ ] Error handling comprehensive
+- [ ] 15+ unit tests passing
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.2 Implement ProfileComposer and layer merge logic"
+
+---
+
+### Task 13c.4.3: Create Layer Files - Bases (4 files) ⏹ PENDING
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 4 hours
+**Assignee**: Configuration Team
+**Status**: ⏹ PENDING
+
+**Description**: Create 4 deployment mode base layers (cli, daemon, embedded, testing).
+
+**Directory**: llmspell-config/layers/bases/
+
+**Acceptance Criteria**:
+- [ ] 4 base TOML files created
+- [ ] Each base loads independently
+- [ ] CLI base works with existing examples
+- [ ] Zero clippy warnings
+
+**Files to CREATE**:
+
+1. **bases/cli.toml** (20 lines):
+```toml
+# CLI Base Layer
+# One-shot script execution
+
+[profile]
+name = "CLI Base"
+description = "Interactive command-line execution"
+
+[runtime]
+mode = "cli"
+startup_delay_ms = 0
+health_check_enabled = false
+
+[runtime.state]
+coordination = "single-process"
+shutdown_timeout_ms = 1000
+
+[runtime.logging]
+output = "stderr"
+format = "human"
+color = true
+```
+
+2. **bases/daemon.toml** (35 lines):
+```toml
+# Daemon Base Layer
+# Long-running service
+
+[profile]
+name = "Daemon Base"
+description = "Production daemon mode"
+
+[runtime]
+mode = "daemon"
+startup_delay_ms = 100
+health_check_enabled = true
+health_port = 8081
+
+[runtime.state]
+coordination = "multi-process"
+shutdown_timeout_ms = 30000
+graceful_shutdown = true
+
+[runtime.logging]
+output = "file"
+file_path = "/var/log/llmspell/daemon.log"
+format = "json"
+rotation_enabled = true
+rotation_max_size_mb = 100
+
+[runtime.metrics]
+enabled = true
+export_port = 9090
+```
+
+3. **bases/embedded.toml** (15 lines):
+```toml
+# Embedded Base Layer
+# Library/programmatic integration
+
+[profile]
+name = "Embedded Base"
+description = "Embedded library usage"
+
+[runtime]
+mode = "embedded"
+startup_delay_ms = 0
+health_check_enabled = false
+
+[runtime.logging]
+output = "callback"
+format = "structured"
+level = "warn"
+```
+
+4. **bases/testing.toml** (25 lines):
+```toml
+# Testing Base Layer
+# Reproducible test execution
+
+[profile]
+name = "Testing Base"
+description = "Deterministic testing mode"
+
+[runtime]
+mode = "testing"
+startup_delay_ms = 0
+health_check_enabled = false
+
+[runtime.state]
+coordination = "single-process"
+fixed_seed = 42
+deterministic = true
+
+[runtime.logging]
+output = "buffer"
+format = "human"
+level = "warn"
+
+[runtime.testing]
+mock_time = true
+disable_network = false
+```
+
+**Implementation Steps**:
+1. Create llmspell-config/layers/bases/ directory
+2. Create 4 TOML files with content above
+3. Update ProfileComposer to embed via include_str!()
+4. Test loading each base individually
+
+**Checkpoint**:
+```bash
+cargo test -p llmspell-config test_load_base_layers
+cargo clippy --workspace (zero warnings)
+```
+
+**Definition of Done**:
+- [ ] 4 base files created (95 lines total)
+- [ ] Each base loadable independently
+- [ ] Tests passing
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.3 Create 4 base deployment layers"
+
+---
+
+### Task 13c.4.4: Create Layer Files - Features (7 files) ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 1 day (8 hours)
+**Assignee**: Configuration Team
+**Status**: ⏹ PENDING
+
+**Description**: Create 7 feature capability layers (minimal, llm, llm-local, state, rag, memory, full).
+
+**Directory**: llmspell-config/layers/features/
+
+**Acceptance Criteria**:
+- [ ] 7 feature TOML files created
+- [ ] Each feature composable with bases/cli
+- [ ] full.toml uses extends to compose all features
+- [ ] Zero clippy warnings
+
+**Files to CREATE** (200+ lines total):
+
+1. **features/minimal.toml** (15 lines) - Tools + Agents only
+2. **features/llm.toml** (30 lines) - + OpenAI/Anthropic cloud providers
+3. **features/llm-local.toml** (25 lines) - + Ollama/Candle local providers
+4. **features/state.toml** (20 lines) - + State persistence
+5. **features/rag.toml** (60 lines) - + Vector storage, HNSW config
+6. **features/memory.toml** (50 lines) - + Episodic/semantic/procedural memory
+7. **features/full.toml** (10 lines) - extends = ["llm", "state", "rag", "memory"]
+
+**Detailed Content Examples**:
+
+**features/rag.toml** (60 lines):
+```toml
+# RAG Feature Layer
+# Vector storage + HNSW search
+
+[profile]
+name = "RAG Features"
+description = "Vector search capabilities"
+
+[rag]
+enabled = true
+multi_tenant = false
+
+[rag.vector_storage]
+dimensions = [384, 768, 1536, 3072]
+backend = "hnsw"
+max_memory_mb = 1024
+
+[rag.vector_storage.hnsw]
+m = 16
+ef_construction = 200
+ef_search = 50
+metric = "cosine"
+nb_layers = 4
+
+[rag.embedding]
+default_provider = "openai"
+default_model = "text-embedding-3-small"
+batch_size = 100
+
+[rag.search]
+default_k = 10
+threshold = 0.7
+parallel_queries = true
+```
+
+**features/full.toml** (10 lines):
+```toml
+# Full Features Layer
+# All capabilities enabled
+
+[profile]
+name = "Full Features"
+description = "Complete feature set"
+extends = ["llm", "state", "rag", "memory"]
+```
+
+**Implementation Steps**:
+1. Create llmspell-config/layers/features/ directory
+2. Create 7 TOML files (minimal → full progression)
+3. Update ProfileComposer include_str!() for features/*
+4. Test composition: bases/cli + features/rag
+
+**Checkpoint**:
+```bash
+cargo test -p llmspell-config test_compose_base_with_features
+cargo clippy --workspace (zero warnings)
+```
+
+**Definition of Done**:
+- [ ] 7 feature files created (210 lines total)
+- [ ] Composition with bases works
+- [ ] full.toml extends mechanism validated
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.4 Create 7 feature capability layers"
+
+---
+
+### Task 13c.4.5: Create Layer Files - Environments (4 files) ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: Configuration Team
+**Status**: ⏹ PENDING
+
+**Description**: Create 4 environment tuning layers (dev, staging, prod, perf).
+
+**Directory**: llmspell-config/layers/envs/
+
+**Files to CREATE** (95 lines total):
+
+1. **envs/dev.toml** (25 lines) - Debug logging, strict validation
+2. **envs/staging.toml** (20 lines) - Info logging, near-production
+3. **envs/prod.toml** (20 lines) - Warn logging, relaxed validation, optimized
+4. **envs/perf.toml** (30 lines) - Error logging, max throughput, large caches
+
+**Checkpoint**:
+```bash
+cargo test -p llmspell-config test_environment_layers
+cargo clippy --workspace (zero warnings)
+```
+
+**Definition of Done**:
+- [ ] 4 environment files created
+- [ ] 3-layer composition works (base+feature+env)
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.5 Create 4 environment tuning layers"
+
+---
+
+### Task 13c.4.6: Create Layer Files - Backends (3 files) ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 4 hours
 **Assignee**: Storage Team
 **Status**: ⏹ PENDING
-**Rationale**: Storage backend (SQLite embedded) is primary differentiator, not LLM provider choice
 
-**Description**: Create `sqlite-production.toml` for embedded production deployment with SQLite backend, local LLMs, and privacy-first architecture. Supports any local provider (Ollama, Candle, etc.) - provider-agnostic.
+**Description**: Create 3 storage backend layers (memory, sqlite, postgres).
 
-**Strategic Context** (Phase 13c.2):
-- Phase 13c.2 unified storage to **SQLite** (embedded) + **PostgreSQL** (cloud)
-- SQLite is production-ready with libsql, WAL mode, vectorlite-rs HNSW
-- Primary deployment decision: Embedded (SQLite) vs Cloud (PostgreSQL), NOT provider choice
-- This profile enables: air-gapped, GDPR/HIPAA, edge, offline, single-server deployments
+**Directory**: llmspell-config/layers/backends/
 
-**Acceptance Criteria**:
-- [ ] sqlite-production.toml created in llmspell-config/builtins/
-- [ ] SQLite backend configured with production settings (WAL, cache, max_connections)
-- [ ] Local LLM provider configured (Ollama default, but supports Candle)
-- [ ] Local embeddings configured (no cloud API dependencies)
-- [ ] Memory system enabled with local consolidation LLM
-- [ ] RAG enabled with local embeddings and vectorlite-rs HNSW
-- [ ] Zero cloud API dependencies (fully offline capable)
-- [ ] Profile validated with Ollama
+**Files to CREATE** (70 lines total):
 
-**Implementation Steps**:
-1. Create `llmspell-config/builtins/sqlite-production.toml` (~80 lines)
+1. **backends/memory.toml** (10 lines) - In-memory, no persistence
+2. **backends/sqlite.toml** (25 lines) - libsql, WAL, vectorlite-rs
+3. **backends/postgres.toml** (35 lines) - RLS, VectorChord, bi-temporal
 
-2. Key configuration sections:
-   ```toml
-   # SQLite Production Profile
-   # Embedded production deployment with privacy-first architecture
-   # Zero cloud dependencies, works offline, GDPR/HIPAA compliant
-
-   [storage]
-   backend = "sqlite"
-
-   [storage.sqlite]
-   path = "/var/lib/llmspell/data/llmspell.db"
-   max_connections = 10
-   enable_wal = true
-   cache_size_mb = 256
-
-   [providers]
-   default_provider = "ollama"  # Can also use "candle" for embedded inference
-
-   [providers.ollama]
-   provider_type = "ollama"
-   base_url = "http://localhost:11434"
-   default_model = "llama3.1:8b"  # Production-grade model
-
-   # Local embeddings (no cloud API)
-   [providers.local_embeddings]
-   provider_type = "ollama"
-   default_model = "nomic-embed-text"
-
-   [runtime.memory]
-   enabled = true
-
-   [runtime.memory.consolidation]
-   provider_name = "ollama"  # Use local LLM for consolidation
-   batch_size = 10
-
-   [rag]
-   enabled = true
-   embedding.default_provider = "local_embeddings"
-   vector_backend = "sqlite_hnsw"  # vectorlite-rs HNSW
-   multi_tenant = false
-
-   [runtime]
-   log_level = "info"
-   ```
-
-3. Test locally:
-   ```bash
-   # Ensure Ollama running with required models
-   ollama serve &
-   ollama pull llama3.1:8b
-   ollama pull nomic-embed-text
-
-   # Test profile loading
-   cargo run -- -p sqlite-production info
-
-   # Test RAG with local embeddings
-   cargo run -- -p sqlite-production run examples/script-users/rag/01-vector-search-basic.lua
-   ```
-
-4. Validate offline capability:
-   ```bash
-   # Disconnect network, ensure profile still works
-   cargo run -- -p sqlite-production exec 'print("Offline test successful")'
-   ```
+**Checkpoint**:
+```bash
+cargo test -p llmspell-config test_full_4layer_composition
+cargo clippy --workspace (zero warnings)
+```
 
 **Definition of Done**:
-- [ ] sqlite-production.toml exists
-- [ ] SQLite backend configured for production
-- [ ] Zero cloud API dependencies (fully offline capable)
-- [ ] Works with Ollama (and documented for Candle alternative)
-- [ ] Memory + RAG use local embeddings only
-- [ ] Production-ready comments explaining privacy/offline benefits
-- [ ] Validated: can run completely offline
-
-**Files to Create**:
-- `llmspell-config/builtins/sqlite-production.toml`
-
-**Use Cases**:
-- Air-gapped/offline deployments
-- Privacy-sensitive applications (GDPR, HIPAA compliance)
-- Edge computing scenarios
-- Single-server production (no database infrastructure needed)
-- Development → production path without cloud dependencies
+- [ ] 3 backend files created
+- [ ] Full 4-layer composition works
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.6 Create 3 storage backend layers"
 
 ---
 
-### Task 13c.4.3: Phase 13 Showcase Profile Creation ⏹ PENDING
+### Task 13c.4.7: Create Preset Profiles (20 files) ⏹ PENDING
 **Priority**: HIGH
-**Estimated Time**: 3 hours
-**Assignee**: Phase 13 Team
+**Estimated Time**: 1 day (8 hours)
+**Assignee**: Configuration Team
 **Status**: ⏹ PENDING
-**Rationale**: Existing memory.toml already provides memory debugging; need comprehensive Phase 13 feature demonstration
 
-**Description**: Create `phase13-showcase.toml` to demonstrate ALL Phase 13 capabilities (Adaptive Memory + Temporal Graph + Context Engineering) with PostgreSQL production backend. This profile replaces `memory-development.toml` which was redundant with existing `memory.toml`.
+**Description**: Create 20 named preset combinations (13 backward-compat + 7 new).
 
-**Strategic Context** (Phase 13):
-- **Phase 13a**: Adaptive Memory (3-tier: episodic/semantic/procedural) ✅
-- **Phase 13b**: PostgreSQL backend (RLS, VectorChord, bi-temporal graph) ✅
-- **Phase 13c**: Storage consolidation (SQLite + PostgreSQL unified) ✅
-- **Gap**: No profile demonstrates ALL Phase 13 features together
-- Existing `memory.toml` (54 lines) already handles memory-only development
+**Directory**: llmspell-config/presets/
 
-**Acceptance Criteria**:
-- [ ] phase13-showcase.toml created in llmspell-config/builtins/
-- [ ] PostgreSQL backend configured (production-ready)
-- [ ] Adaptive Memory system enabled (episodic, semantic, procedural)
-- [ ] Temporal Knowledge Graph enabled (bi-temporal)
-- [ ] Context Engineering pipeline enabled
-- [ ] RAG integration with memory system
-- [ ] Debug logging for all Phase 13 subsystems
-- [ ] Profile validated with Phase 13 examples
+**Backward Compatible Presets** (13 files):
+- minimal.toml → extends = ["bases/cli", "features/minimal", "envs/dev", "backends/memory"]
+- development.toml → extends = ["bases/cli", "features/llm", "envs/dev", "backends/memory"]
+- providers.toml
+- state.toml
+- sessions.toml
+- ollama.toml → extends = ["bases/cli", "features/llm-local", "envs/dev", "backends/memory"]
+- candle.toml
+- memory.toml → extends = ["bases/cli", "features/memory", "envs/dev", "backends/sqlite"]
+- rag-dev.toml → extends = ["bases/cli", "features/rag", "envs/dev", "backends/sqlite"]
+- rag-prod.toml → extends = ["bases/cli", "features/rag", "envs/prod", "backends/sqlite"]
+- rag-perf.toml → extends = ["bases/cli", "features/rag", "envs/perf", "backends/sqlite"]
+- default.toml → extends = ["minimal"]
 
-**Implementation Steps**:
-1. Create `llmspell-config/builtins/phase13-showcase.toml` (~100 lines)
+**New Combination Presets** (7 files):
+- postgres-prod.toml → extends = ["bases/cli", "features/full", "envs/prod", "backends/postgres"]
+- daemon-dev.toml → extends = ["bases/daemon", "features/rag", "envs/dev", "backends/sqlite"]
+- daemon-prod.toml → extends = ["bases/daemon", "features/memory", "envs/prod", "backends/postgres"]
+- rag-local-dev.toml → extends = ["bases/cli", "features/rag", "features/llm-local", "envs/dev", "backends/sqlite"]
+- full-local.toml → extends = ["bases/cli", "features/full", "features/llm-local", "envs/dev", "backends/sqlite"]
+- saas-production.toml → extends = ["bases/daemon", "features/memory", "envs/prod", "backends/postgres"] + RLS config
+- research.toml → extends = ["bases/cli", "features/full", "envs/dev", "backends/sqlite"] + trace logging
 
-2. Key configuration sections:
-   ```toml
-   # Phase 13 Features Showcase Profile
-   # Demonstrates: Adaptive Memory + Temporal Graph + Context Engineering
-   # Production-ready with PostgreSQL backend
-
-   [storage]
-   backend = "postgres"
-
-   [storage.postgres]
-   url = "postgresql://llmspell:password@localhost:5432/llmspell_dev"
-   pool_size = 20
-
-   [providers]
-   default_provider = "openai"
-
-   # Phase 13a: Adaptive Memory System
-   [runtime.memory]
-   enabled = true
-
-   [runtime.memory.episodic]
-   backend = "postgres_vector"  # vectorchord HNSW
-   max_entries = 10000
-
-   [runtime.memory.semantic]
-   backend = "postgres_graph"   # bi-temporal knowledge graph
-   enable_bi_temporal = true
-
-   [runtime.memory.procedural]
-   backend = "postgres"
-   max_patterns = 1000
-
-   [runtime.memory.consolidation]
-   provider_name = "openai"
-   batch_size = 10
-   max_concurrent = 3
-
-   [runtime.memory.daemon]
-   enabled = true
-   fast_interval_secs = 30
-   slow_interval_secs = 300
-
-   # Phase 13b: Temporal Knowledge Graph
-   [runtime.graph]
-   enabled = true
-   bi_temporal = true
-   valid_time_tracking = true
-   transaction_time_tracking = true
-
-   # Phase 13: Context Engineering Pipeline
-   [runtime.context]
-   enabled = true
-   max_context_tokens = 100000
-   default_strategy = "hybrid"
-   parallel_retrieval = true
-
-   # RAG with episodic memory integration
-   [rag]
-   enabled = true
-   embedding.default_provider = "openai"
-   vector_backend = "postgres_vector"
-   multi_tenant = false
-   integrate_with_memory = true
-
-   [runtime]
-   log_level = "debug"
-   trace_memory_operations = true
-   trace_graph_operations = true
-   trace_context_engineering = true
-   ```
-
-3. Test with Phase 13 examples:
-   ```bash
-   # Start PostgreSQL container
-   cd docker/postgres && docker compose up -d
-   export LLMSPELL_POSTGRES_URL="postgresql://llmspell:llmspell@localhost:5435/llmspell"
-   export OPENAI_API_KEY="sk-..."
-
-   # Test profile loading
-   cargo run -- -p phase13-showcase info
-
-   # Test adaptive memory
-   cargo run -- -p phase13-showcase run examples/script-users/memory/01-basic-memory.lua
-
-   # Test knowledge graph
-   cargo run -- -p phase13-showcase run examples/script-users/graph/01-basic-graph.lua
-
-   # Test context engineering
-   cargo run -- -p phase13-showcase run examples/script-users/context/01-context-assembly.lua
-   ```
-
-4. Verify debug output shows:
-   - Memory consolidation events
-   - Graph temporal queries (valid_time + transaction_time)
-   - Context assembly strategy selection
-   - Performance metrics for all subsystems
+**Checkpoint**:
+```bash
+cargo test -p llmspell-config test_all_presets_load
+cargo clippy --workspace (zero warnings)
+```
 
 **Definition of Done**:
-- [ ] phase13-showcase.toml exists
-- [ ] ALL Phase 13 features enabled (Memory + Graph + Context)
-- [ ] PostgreSQL backend configured
-- [ ] Debug logging comprehensive across all subsystems
-- [ ] Works with docker/postgres container
-- [ ] Validated with Phase 13 examples
-- [ ] Production-ready comments explaining Phase 13 architecture
-
-**Files to Create**:
-- `llmspell-config/builtins/phase13-showcase.toml`
-
-**Use Cases**:
-- Phase 13 feature demonstrations and validation
-- Production memory-augmented agent development
-- Knowledge graph application development
-- Long-running conversational systems with memory
-- Context engineering research and optimization
-- Phase 13 → Phase 14 transition testing
+- [ ] 20 preset files created (200+ lines total)
+- [ ] All presets load successfully
+- [ ] Backward compatibility verified (13 old names work)
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.7 Create 20 preset profile combinations"
 
 ---
 
-### Task 13c.4.4: Profile Catalog Documentation ⏹ PENDING
-**Priority**: MEDIUM
-**Estimated Time**: 2 hours
+### Task 13c.4.8: CLI Integration ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 1 day (8 hours)
+**Assignee**: CLI Team
+**Status**: ⏹ PENDING
+
+**Description**: Update CLI to support multi-layer composition syntax.
+
+**New Syntax Examples**:
+```bash
+# Preset (backward compatible)
+llmspell -p minimal run script.lua
+
+# Multi-layer composition (NEW)
+llmspell -p bases/cli,features/rag,envs/dev run script.lua
+
+# Named preset (explicit)
+llmspell -p presets/rag-dev run script.lua
+```
+
+**Files to EDIT**:
+- llmspell-cli/src/cli.rs - Update -p flag documentation
+- llmspell-cli/src/config.rs - Parse comma-separated layer syntax
+
+**Files to CREATE**:
+- llmspell-config/src/profile_resolver.rs (150 lines) - Path resolution logic
+
+**Checkpoint**:
+```bash
+cargo run -- -p minimal --help (verify loads)
+cargo run -- -p bases/cli,features/minimal,envs/dev --help (verify multi-layer)
+cargo clippy --workspace (zero warnings)
+```
+
+**Definition of Done**:
+- [ ] Multi-layer syntax parsing works
+- [ ] Backward compatibility preserved (old names work)
+- [ ] CLI help text updated
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.8 Add multi-layer composition CLI support"
+
+---
+
+### Task 13c.4.9: Testing & Validation ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 1.5 days (12 hours)
+**Assignee**: QA Team
+**Status**: ⏹ PENDING
+
+**Description**: Comprehensive test suite for layer system.
+
+**Test Coverage**:
+- Single layer loading (4 tests: bases, features, envs, backends)
+- Multi-layer composition (10 tests: various combinations)
+- Preset extends resolution (20 tests: all presets)
+- Circular extends detection (3 tests)
+- Missing layer errors (5 tests)
+- Config merge semantics (15 tests: deep merge behavior)
+
+**Total Tests**: 58+ new tests
+
+**Files to CREATE**:
+- llmspell-config/src/profile_composer_tests.rs (300 lines)
+- llmspell-config/src/integration_tests.rs (200 lines)
+
+**Files to EDIT**:
+- llmspell-config/src/lib.rs - Uncomment + rewrite 10 profile tests
+
+**Checkpoint**:
+```bash
+cargo test --workspace --all-features --lib (zero failures)
+cargo clippy --workspace (zero warnings)
+```
+
+**Definition of Done**:
+- [ ] 58+ tests implemented and passing
+- [ ] All 20 presets load successfully
+- [ ] Coverage >90% of profile_composer.rs
+- [ ] Zero clippy warnings
+- [ ] Commit: "13c.4.9 Complete layer system test suite"
+
+---
+
+### Task 13c.4.10: Documentation & Cleanup ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 2 days (16 hours)
 **Assignee**: Documentation Team
 **Status**: ⏹ PENDING
 
-**Description**: Create `llmspell-config/builtins/README.md` with complete profile catalog and decision matrix reflecting Phase 13c.4 updates.
+**Description**: Complete documentation overhaul + example cleanup.
 
-**Acceptance Criteria**:
-- [ ] README.md exists in llmspell-config/builtins/
-- [ ] All 16 profiles documented (13 existing + 3 new: postgres, sqlite-production, phase13-showcase)
-- [ ] Decision matrix: when to use which profile
-- [ ] Storage backend decision guide (PostgreSQL vs SQLite)
-- [ ] Environment progression guide (dev → staging → prod)
-- [ ] Profile composition examples
+**Documentation Files to CREATE**:
+- docs/user-guide/profile-layers-guide.md (800 lines) - Deep dive into layer system
+- llmspell-config/layers/README.md (200 lines) - Layer architecture
+- llmspell-config/presets/README.md (300 lines) - Preset catalog
 
-**Implementation Steps**:
-1. Create `llmspell-config/builtins/README.md`
+**Documentation Files to EDIT**:
+- docs/user-guide/03-configuration.md - Rewrite profiles section
+- docs/user-guide/05-cli-reference.md - Update -p flag examples
+- docs/developer-guide/02-development-workflow.md - Use new presets
+- llmspell-config/README.md - Architecture overview
 
-2. Structure:
-   ```markdown
-   # Builtin Profile Catalog
+**Example Cleanup Files to DELETE** (5 files, 223 lines):
+- examples/script-users/configs/example-providers.toml → use -p providers
+- examples/script-users/configs/rag-basic.toml → use -p rag-dev
+- examples/script-users/configs/state-enabled.toml → use -p state
+- examples/script-users/configs/session-enabled.toml → use -p sessions
+- examples/script-users/configs/basic.toml → use -p minimal
 
-   ## Quick Reference (16 Profiles)
+**Example Files to EDIT** (55 Lua scripts):
+- Add profile recommendations in comments
+- Update config loading patterns
 
-   | Profile | Use Case | Prerequisites | When to Use |
-   |---------|----------|---------------|-------------|
-   | minimal | Tools only | None | CLI testing |
-   | development | Full dev | API keys | Feature dev |
-   | postgres | PostgreSQL prod | PG 18 + VectorChord | Multi-tenant production |
-   | sqlite-production | Embedded prod | Ollama/Candle | Privacy/offline/edge |
-   | phase13-showcase | Phase 13 demo | PostgreSQL + OpenAI | Memory+Graph+Context |
-   | memory | Memory system | API keys | Memory development |
-   | ... | ... | ... | ... |
-
-   ## Decision Matrix
-
-   ### Storage Backend Choice (PRIMARY)
-   - Multi-tenant/cloud → postgres (PostgreSQL + RLS + VectorChord)
-   - Embedded/privacy/offline → sqlite-production (SQLite + local LLMs)
-
-   ### Development
-   - Quick testing → minimal
-   - Feature development → development
-   - Memory features → memory (existing)
-   - RAG development → rag-development
-   - Phase 13 features → phase13-showcase
-
-   ### Production
-   - PostgreSQL backend → postgres
-   - SQLite embedded → sqlite-production
-   - Cloud LLM + PostgreSQL → Custom config extending postgres
-   - Local LLM + SQLite → sqlite-production (default)
-
-   ## Environment Progression
-
-   Development → Staging → Production
-   - Dev: development.toml or memory.toml
-   - Staging: postgres.toml or sqlite-production.toml with staging config
-   - Prod: postgres.toml or sqlite-production.toml with production hardening
-   ```
-
-3. Add profile composition examples:
-   ```toml
-   # custom-prod.toml
-   extends = "postgres"
-
-   [runtime]
-   log_level = "warn"  # Override for production
-
-   # custom-privacy-prod.toml
-   extends = "sqlite-production"
-
-   [storage.sqlite]
-   path = "/secure/llmspell/data.db"  # Custom secure path
-   ```
+**Checkpoint**:
+```bash
+./scripts/quality/quality-check-fast.sh (zero warnings, all tests pass)
+```
 
 **Definition of Done**:
-- [ ] README.md comprehensive
-- [ ] All 16 profiles listed (13 + 3 new)
-- [ ] Decision matrix emphasizes storage backend choice
-- [ ] Composition examples provided
-- [ ] Links to full profile files
-- [ ] Phase 13c.4 new profiles clearly documented
+- [ ] 3 new documentation guides created
+- [ ] 4 existing guides updated
+- [ ] 5 redundant config files deleted
+- [ ] 55 example scripts updated with profile comments
+- [ ] All docs render correctly (no broken links)
+- [ ] Zero clippy warnings
+- [ ] All tests passing
+- [ ] Commit: "13c.4.10 Complete layer system documentation and cleanup"
 
-**Files to Create**:
-- `llmspell-config/builtins/README.md`
+---
+
+## Phase 13c.4 Summary
+
+**Deliverables**:
+- **Code**: 1,200+ new lines (profile_composer.rs, merge.rs, tests)
+- **Layers**: 18 files (4 bases + 7 features + 4 envs + 3 backends)
+- **Presets**: 20 files (13 backward-compat + 7 new combinations)
+- **Deleted**: 480 lines (old profiles) + 223 lines (redundant configs) = 703 lines
+- **Net Change**: +497 lines (10x more flexible)
+- **Tests**: 58+ new tests
+- **Documentation**: 4 guides updated, 3 new guides created
+
+**Timeline**: 9 days (72 hours)
+- 13c.4.1: 2 hours (delete old)
+- 13c.4.2: 1 day (composer architecture)
+- 13c.4.3: 4 hours (bases)
+- 13c.4.4: 1 day (features)
+- 13c.4.5: 4 hours (envs)
+- 13c.4.6: 4 hours (backends)
+- 13c.4.7: 1 day (presets)
+- 13c.4.8: 1 day (CLI)
+- 13c.4.9: 1.5 days (testing)
+- 13c.4.10: 2 days (docs)
+
+**Success Criteria**:
+- ✅ Zero clippy warnings at every checkpoint
+- ✅ All 58+ tests passing
+- ✅ Backward compatibility (13 old profile names work as presets)
+- ✅ New combinations available (postgres-prod, daemon-prod, full-local)
+- ✅ Documentation complete (layer catalog, preset catalog)
+- ✅ Example cleanup done (5 configs deleted)
+- ✅ quality-check-fast.sh passes
+
+**Breaking Changes**:
+- Old builtin profile TOML files deleted (replaced by presets with same names)
+- Profile composition via extends (new feature, opt-in)
+- Multi-layer CLI syntax (new feature, backward-compatible fallback)
 
 ---
 
