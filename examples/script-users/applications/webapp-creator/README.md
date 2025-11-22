@@ -251,11 +251,16 @@ generated/my-awesome-app/
 - **Output Quality**: Production-ready code
 - **Cost Efficiency**: Optimized model selection
 
-## Related Applications
+## Related Resources
+
+### Cookbook Patterns
+For focused code generation and workflow patterns:
+- **[Cookbook Examples](../../cookbook/)** - Reusable patterns for agents, workflows, and tools
+- **[Code Generation Patterns](../../cookbook/)** - Building blocks for code gen workflows
 
 ### Progressive Learning Path
 1. **Apps 01-02**: Foundation - Basic agents and tools
-2. **Apps 03-05**: Business Ready - Sessions, hooks, events  
+2. **Apps 03-05**: Business Ready - Sessions, hooks, events
 3. **Apps 06-08**: Advanced - Multi-agent, composite agents
 4. **App 09**: Expert - Meta-workflows and orchestration
 5. **App 10** (This): Master - Complete production systems

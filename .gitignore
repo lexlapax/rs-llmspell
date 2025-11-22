@@ -40,11 +40,16 @@ sessions/
 .cargo/config.toml
 *.db
 *.dylib
-*.so 
+*.so
 *.dll
 *.exe
 *.pdb
 *.lib
+
+# Example generated artifacts (Phase 13c.5.4)
+examples/script-users/applications/*/generated/
+examples/**/node_modules/
+examples/**/*.pyc
 
 
 # Benchmark datasets
