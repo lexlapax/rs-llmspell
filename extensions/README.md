@@ -1,4 +1,4 @@
-# This folder is intended to hold dynamyically loadable libraries
+# This folder is intended to hold dynamically loadable libraries
 
 ## types
 - macosx will be *.dylib
@@ -6,11 +6,8 @@
 - windows will be *.dll
 
 ## examples
-- sqlite-vec extension for sqlite - phase 13c.2.2
-    - vec0.dylib
-    - vec0
-- vectorlite extension for sqlite - phase 13c.2.2a
+- vectorlite-rs extension for sqlite - phase 13c.2.2a (pure Rust HNSW)
     - vectorlite.dylib
-    - livvectorlite_rs.so 
+    - libvectorlite_rs.so 
 
 

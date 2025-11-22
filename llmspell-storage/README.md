@@ -37,7 +37,7 @@ backend.set("user:123", serde_json::to_vec(&value)?).await?;
 use llmspell_storage::backends::sqlite::{SqliteVectorStorage, SqliteConfig};
 use std::sync::Arc;
 
-// Create SQLite vector storage with vectorlite-rs HNSW extension
+// Create SQLite vector storage with vectorlite-rs pure Rust HNSW extension
 let config = SqliteConfig::new("./data/vectors.db")
     .with_max_connections(20);
 
@@ -195,10 +195,8 @@ This temporal model is essential for Phase 9's Adaptive Memory System, enabling:
 llmspell-storage
 ├── backends/
 │   ├── memory.rs           # In-memory key-value storage
-│   └── vector/
-│       ├── hnsw.rs         # HNSW implementation with multi-tenant support
-│       ├── dimension_router.rs # Multi-dimensional embedding routing
-│       └── metadata_index.rs   # Inverted index for metadata filtering
+│   └── sqlite/
+│       └── vector.rs       # SQLite + vectorlite-rs HNSW implementation
 ├── vector_storage.rs       # VectorStorage trait with async operations
 └── traits.rs              # Storage backend abstractions
 ```

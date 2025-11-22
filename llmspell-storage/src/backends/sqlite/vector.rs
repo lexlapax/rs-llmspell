@@ -1,14 +1,14 @@
-//! SQLite-based vector storage with hybrid HNSW architecture
+//! SQLite-based vector storage with HNSW architecture
 //!
 //! Architecture:
-//! - **Persistence Layer**: vec_embeddings_* (sqlite-vec vec0) + vector_metadata tables
+//! - **Persistence Layer**: vec_embeddings_* + vector_metadata tables
 //! - **Search Layer**: In-memory HNSW index (vectorlite-rs) for 3-100x speedup
-//! - **Fallback**: Falls back to vec0 brute-force if HNSW unavailable
+//! - **Serialization**: HNSW index persisted to .hnsw files (MessagePack)
 //!
-//! The hybrid approach provides:
+//! The approach provides:
 //! - Disk persistence via SQLite tables
 //! - Fast K-NN search via HNSW (O(log N) vs O(N))
-//! - Graceful degradation to brute-force search
+//! - Index persistence for fast restarts
 //! - Tenant isolation via SQL WHERE clauses
 
 use anyhow::{Context, Result};
@@ -37,7 +37,7 @@ use vectorlite_rs::{DistanceMetric as VectorliteMetric, HnswIndex};
 ///
 /// # Architecture
 ///
-/// - **Storage**: vec_embeddings_{384,768,1536,3072} (vec0 virtual tables)
+/// - **Storage**: vec_embeddings_{384,768,1536,3072} (BLOB tables)
 /// - **Metadata**: vector_metadata table (tenant_id, scope, dimension, etc.)
 /// - **Search**: In-memory HNSW index (vectorlite-rs) rebuilt on startup
 /// - **Persistence**: HNSW index serialized to .hnsw files (MessagePack)
@@ -45,7 +45,7 @@ use vectorlite_rs::{DistanceMetric as VectorliteMetric, HnswIndex};
 /// # Performance
 ///
 /// - Insert: <1ms per vector (dual write: SQLite + HNSW)
-/// - Search: <10ms for 10K vectors (HNSW), <50ms fallback (vec0)
+/// - Search: <10ms for 10K vectors (HNSW index)
 /// - Speedup: 3-100x vs brute-force depending on dataset size
 ///
 /// # Examples
@@ -106,8 +106,6 @@ pub struct SqliteVectorStorage {
     max_elements: usize,
 
     /// Whether HNSW indexing is available
-    ///
-    /// Falls back to vec0 brute-force search if false
     hnsw_available: bool,
 }
 
@@ -462,7 +460,7 @@ impl VectorStorage for SqliteVectorStorage {
 
             let namespace = Self::scope_to_namespace(&entry.scope);
 
-            // Convert embedding to bytes (JSON format for compatibility with vec0)
+            // Convert embedding to bytes (JSON format)
             let embedding_json = serde_json::to_vec(&entry.embedding)?;
 
             // 1. Insert into vec_embeddings_* virtual table
@@ -912,7 +910,6 @@ mod tests {
         let conn = backend.get_connection().await.unwrap();
 
         // Create vec_embeddings tables for all dimensions
-        // Use regular tables in tests since vec0 extension may not be available
         for dim in &[384, 768, 1536, 3072] {
             let create_sql = format!(
                 "CREATE TABLE IF NOT EXISTS vec_embeddings_{} (rowid INTEGER PRIMARY KEY, embedding BLOB)",

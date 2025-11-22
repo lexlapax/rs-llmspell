@@ -19,10 +19,10 @@ llmspell provides built-in tools for lossless bidirectional migration of all dat
 
 **Migration Capabilities:**
 - ✅ Lossless roundtrip migration (zero data loss)
-- ✅ All 10 table types included (vectors, graph, sessions, etc.)
+- ✅ All 10 table types included (vectors via vectorlite-rs HNSW, graph, sessions, etc.)
 - ✅ Transaction-safe import with automatic rollback
 - ✅ Versioned JSON format for compatibility
-- ✅ Base64 encoding for binary data preservation
+- ✅ Base64 encoding for binary data preservation (including BLOB vector embeddings)
 - ✅ Detailed import statistics for verification
 
 ---

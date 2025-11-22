@@ -80,7 +80,7 @@ This document provides a technical deep dive into the PostgreSQL ↔ SQLite expo
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ Backend Storage                                                          │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  SQLite: libsql (vec0 virtual tables + regular tables)                 │
+│  SQLite: libsql (BLOB tables + vectorlite-rs HNSW + regular tables)    │
 │  PostgreSQL: sqlx (VectorChord HNSW + regular tables)                   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -431,8 +431,8 @@ async fn export_vectors(&self) -> Result<HashMap<usize, Vec<VectorEmbeddingExpor
         let mut vectors = Vec::new();
 
         for row in rows {
-            let embedding_json: String = row.get("embedding")?;
-            let embedding: Vec<f32> = serde_json::from_str(&embedding_json)?;
+            let embedding_blob: Vec<u8> = row.get("embedding")?;
+            let embedding: Vec<f32> = deserialize_embedding(&embedding_blob)?;
             let metadata_json: String = row.get("metadata")?;
             let metadata: Value = serde_json::from_str(&metadata_json)?;
 
@@ -635,11 +635,11 @@ async fn import_vectors(
 ) -> Result<()> {
     for (dimension, vectors_for_dim) in vectors {
         for vector in vectors_for_dim {
-            // 1. Insert embedding into vec0 virtual table
-            let embedding_json = serde_json::to_string(&vector.embedding)?;
+            // 1. Insert embedding into BLOB table
+            let embedding_blob = serialize_embedding(&vector.embedding)?;
             conn.execute(
                 &format!("INSERT INTO vec_embeddings_{} (embedding) VALUES (?)", dimension),
-                [&embedding_json],
+                [&embedding_blob],
             ).await?;
 
             // 2. Get rowid
@@ -841,26 +841,30 @@ SQLite INTEGER
 
 ### Vector Embedding Conversion
 
-**SQLite (vec0) → Export → PostgreSQL (VectorChord)**:
+**SQLite (BLOB) → Export → PostgreSQL (VectorChord)**:
 
 ```
-SQLite vec0 JSON: "[0.1, 0.2, 0.3]"
+SQLite BLOB: [binary f32 data]
+    ↓
+Deserialize to Vec<f32>: vec![0.1, 0.2, 0.3]
     ↓
 Export Vec<f32>: vec![0.1, 0.2, 0.3]
     ↓
 PostgreSQL vector: "[0.1, 0.2, 0.3]"::vector(768)
 ```
 
-**PostgreSQL (VectorChord) → Export → SQLite (vec0)**:
+**PostgreSQL (VectorChord) → Export → SQLite (BLOB)**:
 
 ```
 PostgreSQL vector::text: "[0.1, 0.2, 0.3]"
     ↓
 Parse to Vec<f32>: vec![0.1, 0.2, 0.3]
     ↓
-JSON serialize: "[0.1,0.2,0.3]"
+Export Vec<f32>: vec![0.1, 0.2, 0.3]
     ↓
-SQLite vec0 JSON
+Serialize to BLOB: [binary f32 data]
+    ↓
+SQLite BLOB storage
 ```
 
 **Precision**: Full f32 precision preserved (7 decimal digits).

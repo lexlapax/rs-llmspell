@@ -12,9 +12,9 @@ llmspell provides a unified storage abstraction layer with multiple backend impl
 
 **Core Storage Components**:
 - **StorageBackend trait**: Unified key-value interface
-- **Vector Storage**: HNSW-based similarity search via vectorlite-rs SQLite extension
+- **Vector Storage**: HNSW-based similarity search via vectorlite-rs pure Rust SQLite extension
 - **Multi-Tenant Collections**: Isolated data per tenant
-- **Persistence Options**: In-memory, SQLite (libsql with HNSW), PostgreSQL
+- **Persistence Options**: In-memory, SQLite (libsql with vectorlite-rs HNSW), PostgreSQL
 
 ---
 
@@ -118,7 +118,7 @@ storage.batch(vec![
 - O(log N) search complexity
 - Multi-layer structure for fast traversal
 - Configurable precision vs speed trade-offs
-- Integrated with SQLite for persistence and SQL querying
+- Integrated with SQLite BLOB storage for persistence and SQL querying
 
 **Dimension Routing**:
 Automatic routing based on embedding dimensions:
@@ -282,7 +282,7 @@ let storage = InMemoryBackend::new();
 - Crash recovery
 - Low memory footprint
 - File-based persistence
-- Integrated vector search via vectorlite-rs HNSW extension
+- Integrated vector search via vectorlite-rs pure Rust HNSW extension
 
 **When to Use**:
 - CLI applications needing persistence
@@ -310,7 +310,7 @@ let storage = SqliteBackend::with_config("/path", config)?;
 **Use Case**: RAG, similarity search, semantic search
 
 **Characteristics**:
-- Optimized for high-dimensional vectors
+- Optimized for high-dimensional vectors via vectorlite-rs HNSW
 - Approximate nearest neighbor (ANN) search
 - Metadata filtering support
 - Multi-tenant collections

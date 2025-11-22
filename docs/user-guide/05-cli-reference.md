@@ -518,7 +518,7 @@ llmspell storage export --backend postgres --output pg-export.json
 **Export Format**:
 - Version: 1.0 (semantic versioning)
 - Contains: Vector embeddings, knowledge graph, procedural memory, agent state, KV store, workflow states, sessions, artifacts, event log, hook history
-- Encoding: JSON with base64 for binary data (BLOB fields)
+- Encoding: JSON with base64 for binary data (BLOB fields, including vector embeddings from vectorlite-rs HNSW storage)
 - Metadata: Export timestamp, source backend, applied migrations
 
 #### IMPORT - Import storage data from JSON
