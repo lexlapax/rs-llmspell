@@ -803,7 +803,15 @@ mod tests {
         // PostgreSQL backend should enable persistence with incremental backup
         assert!(config.runtime.state_persistence.enabled);
         assert_eq!(config.runtime.state_persistence.backend_type, "postgres");
-        assert!(config.runtime.state_persistence.backup.as_ref().unwrap().incremental_enabled);
+        assert!(
+            config
+                .runtime
+                .state_persistence
+                .backup
+                .as_ref()
+                .unwrap()
+                .incremental_enabled
+        );
         assert!(config.runtime.memory.enabled);
     }
 
@@ -812,7 +820,12 @@ mod tests {
         let mut composer = ProfileComposer::new();
         // 4-layer composition: base + feature + environment + backend
         let config = composer
-            .load_multi(&["bases/daemon", "features/rag", "envs/prod", "backends/sqlite"])
+            .load_multi(&[
+                "bases/daemon",
+                "features/rag",
+                "envs/prod",
+                "backends/sqlite",
+            ])
             .unwrap();
 
         // Base: Daemon settings
@@ -842,12 +855,27 @@ mod tests {
         // All 20 presets should load without errors
         let presets = vec![
             // Backward compatible (12)
-            "minimal", "development", "providers", "state", "sessions",
-            "ollama", "candle", "memory", "rag-dev", "rag-prod", "rag-perf", "default",
+            "minimal",
+            "development",
+            "providers",
+            "state",
+            "sessions",
+            "ollama",
+            "candle",
+            "memory",
+            "rag-dev",
+            "rag-prod",
+            "rag-perf",
+            "default",
             // New combinations (8)
-            "postgres-prod", "daemon-dev", "daemon-prod",
-            "gemini-prod", "openai-prod", "claude-prod",
-            "full-local-ollama", "research",
+            "postgres-prod",
+            "daemon-dev",
+            "daemon-prod",
+            "gemini-prod",
+            "openai-prod",
+            "claude-prod",
+            "full-local-ollama",
+            "research",
         ];
 
         for preset in presets {
@@ -863,7 +891,10 @@ mod tests {
         let config = composer.load_layer("gemini-prod").unwrap();
 
         // Should have Gemini as default provider
-        assert_eq!(config.providers.default_provider, Some("gemini".to_string()));
+        assert_eq!(
+            config.providers.default_provider,
+            Some("gemini".to_string())
+        );
 
         // Should have full features enabled
         // Note: state_persistence.enabled merge issue - bases/cli sets false,
@@ -884,7 +915,10 @@ mod tests {
         let config = composer.load_layer("openai-prod").unwrap();
 
         // Should have OpenAI as default provider
-        assert_eq!(config.providers.default_provider, Some("openai".to_string()));
+        assert_eq!(
+            config.providers.default_provider,
+            Some("openai".to_string())
+        );
 
         // Should have full features (Phase 13 stack)
         // Note: state_persistence.enabled has merge strategy limitation
@@ -898,7 +932,10 @@ mod tests {
         let config = composer.load_layer("claude-prod").unwrap();
 
         // Should have Anthropic/Claude as default provider
-        assert_eq!(config.providers.default_provider, Some("anthropic".to_string()));
+        assert_eq!(
+            config.providers.default_provider,
+            Some("anthropic".to_string())
+        );
 
         // Should have full features (Phase 13 stack)
         // Note: state_persistence.enabled has merge strategy limitation
@@ -925,8 +962,14 @@ mod tests {
         let minimal_config = composer.load_layer("minimal").unwrap();
 
         // Default should have same settings as minimal
-        assert_eq!(default_config.runtime.max_concurrent_scripts, minimal_config.runtime.max_concurrent_scripts);
-        assert_eq!(default_config.runtime.state_persistence.enabled, minimal_config.runtime.state_persistence.enabled);
+        assert_eq!(
+            default_config.runtime.max_concurrent_scripts,
+            minimal_config.runtime.max_concurrent_scripts
+        );
+        assert_eq!(
+            default_config.runtime.state_persistence.enabled,
+            minimal_config.runtime.state_persistence.enabled
+        );
     }
 
     #[test]
@@ -1053,7 +1096,12 @@ mod tests {
 
         // Test composition with all 4 layer types
         let config = composer
-            .load_multi(&["bases/daemon", "features/full", "envs/prod", "backends/postgres"])
+            .load_multi(&[
+                "bases/daemon",
+                "features/full",
+                "envs/prod",
+                "backends/postgres",
+            ])
             .unwrap();
 
         // Verify daemon-specific settings (high concurrency)
@@ -1075,7 +1123,9 @@ mod tests {
         let mut composer = ProfileComposer::new();
 
         // Test minimal viable stack: base + feature
-        let config = composer.load_multi(&["bases/cli", "features/minimal"]).unwrap();
+        let config = composer
+            .load_multi(&["bases/cli", "features/minimal"])
+            .unwrap();
 
         // CLI has low concurrency
         assert_eq!(config.runtime.max_concurrent_scripts, 1);
@@ -1158,7 +1208,10 @@ mod tests {
 
         let config = LLMSpellConfig::load_builtin_profile("presets/gemini-prod").unwrap();
 
-        assert_eq!(config.providers.default_provider, Some("gemini".to_string()));
+        assert_eq!(
+            config.providers.default_provider,
+            Some("gemini".to_string())
+        );
         assert!(config.rag.enabled);
         assert!(config.runtime.memory.enabled);
     }
@@ -1169,8 +1222,7 @@ mod tests {
         use crate::LLMSpellConfig;
 
         let config =
-            LLMSpellConfig::load_builtin_profile("bases/cli, features/minimal, envs/dev")
-                .unwrap();
+            LLMSpellConfig::load_builtin_profile("bases/cli, features/minimal, envs/dev").unwrap();
 
         // CLI has low concurrency (merge limitation: base value not overridden)
         assert_eq!(config.runtime.max_concurrent_scripts, 1);

@@ -121,7 +121,12 @@ mod tests {
         let result = resolve_profile_spec("bases/daemon,features/full,envs/prod,backends/postgres");
         assert_eq!(
             result,
-            vec!["bases/daemon", "features/full", "envs/prod", "backends/postgres"]
+            vec![
+                "bases/daemon",
+                "features/full",
+                "envs/prod",
+                "backends/postgres"
+            ]
         );
     }
 
