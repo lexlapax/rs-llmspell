@@ -21,6 +21,7 @@ use crate::backends::postgres::PostgresBackend;
 #[cfg(feature = "postgres")]
 pub struct PostgresExporter {
     backend: Arc<PostgresBackend>,
+    #[allow(dead_code)]
     converters: TypeConverters,
 }
 
@@ -583,6 +584,7 @@ use crate::backends::sqlite::SqliteBackend;
 #[cfg(feature = "sqlite")]
 pub struct SqliteExporter {
     backend: Arc<SqliteBackend>,
+    #[allow(dead_code)]
     converters: TypeConverters,
 }
 

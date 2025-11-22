@@ -36,4 +36,8 @@ pub use exporter::PostgresExporter;
 #[cfg(feature = "sqlite")]
 pub use exporter::SqliteExporter;
 pub use format::ExportFormat;
-pub use importer::StorageImporter;
+pub use importer::ImportStats;
+#[cfg(feature = "postgres")]
+pub use importer::PostgresImporter;
+#[cfg(feature = "sqlite")]
+pub use importer::SqliteImporter;
