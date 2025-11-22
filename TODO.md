@@ -7098,11 +7098,12 @@ cargo clippy --workspace (zero warnings)
 
 ---
 
-### Task 13c.4.8: CLI Integration ⏹ PENDING
+### Task 13c.4.8: CLI Integration ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 1 day (8 hours)
+**Time Spent**: ~2 hours
 **Assignee**: CLI Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE (2025-11-22)
 
 **Description**: Update CLI to support multi-layer composition syntax.
 
@@ -7133,11 +7134,42 @@ cargo clippy --workspace (zero warnings)
 ```
 
 **Definition of Done**:
-- [ ] Multi-layer syntax parsing works
-- [ ] Backward compatibility preserved (old names work)
-- [ ] CLI help text updated
-- [ ] Zero clippy warnings
-- [ ] Commit: "13c.4.8 Add multi-layer composition CLI support"
+- [x] Multi-layer syntax parsing works
+- [x] Backward compatibility preserved (old names work)
+- [x] CLI help text updated
+- [x] Zero clippy warnings
+- [x] Commit: "13c.4.8 Add multi-layer composition CLI support" (332fb3b6)
+
+**Implementation Summary**:
+- Created profile_resolver.rs (159 lines) with `resolve_profile_spec()` function
+  - Handles 3 syntax forms: single preset, explicit preset path, multi-layer composition
+  - Parses comma-separated layers with whitespace trimming
+  - 7 comprehensive tests covering all syntax forms
+- Updated llmspell-config/src/lib.rs:
+  - Implemented `load_builtin_profile()` using ProfileComposer + profile_resolver
+  - Updated `list_builtin_profiles()` to return all 20 preset names
+  - Added detailed documentation with examples
+- Updated llmspell-cli/src/cli.rs:
+  - Rewrote -p flag documentation to explain 3 syntax forms
+  - Listed all 20 presets organized by category
+  - Documented 4-layer composition system
+
+**Key Insights**:
+- **No changes needed to config.rs** - It already delegates to LLMSpellConfig::load_with_profile(), which now uses ProfileComposer internally
+- **Thin parsing layer** - profile_resolver is just a parsing utility, all composition logic stays in ProfileComposer
+- **100% backward compatible** - All existing `-p minimal` style commands work unchanged
+- **Powerful flexibility** - Multi-layer syntax enables custom configurations: `llmspell -p bases/daemon,features/full,envs/prod,backends/postgres run script.lua`
+
+**Testing Results**:
+- ✅ profile_resolver unit tests (7/7 passed)
+- ✅ Backward compatibility: `cargo run -- -p minimal --help` works
+- ✅ Multi-layer: `cargo run -- -p bases/cli,features/rag,envs/dev --help` works
+- ✅ Zero clippy warnings
+
+**Files Modified/Created**:
+- llmspell-config/src/profile_resolver.rs (159 lines, new file)
+- llmspell-config/src/lib.rs (106 insertions, 40 deletions)
+- llmspell-cli/src/cli.rs (44 insertions, 6 deletions)
 
 ---
 
