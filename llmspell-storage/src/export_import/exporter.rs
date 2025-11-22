@@ -1114,7 +1114,7 @@ mod tests {
             return;
         }
 
-        let config = PostgresConfig::new(&std::env::var("DATABASE_URL").unwrap());
+        let config = PostgresConfig::new(std::env::var("DATABASE_URL").unwrap());
         let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
         let exporter = PostgresExporter::new(backend);
 

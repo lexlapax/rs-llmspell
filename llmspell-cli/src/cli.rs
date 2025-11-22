@@ -1620,6 +1620,48 @@ EXAMPLES:
         #[arg(long)]
         components: String,
     },
+
+    /// Export storage data to JSON file
+    #[command(
+        long_about = "Export all storage data from PostgreSQL or SQLite to JSON format.
+
+Exports all 10 data types (vectors, graph, patterns, state, workflows, sessions, artifacts, events, hooks).
+The JSON export can be imported into any backend for migration or backup.
+
+EXAMPLES:
+    llmspell storage export --backend postgres --output backup.json
+    llmspell storage export --backend sqlite --output export.json"
+    )]
+    Export {
+        /// Backend to export from (sqlite, postgres)
+        #[arg(long)]
+        backend: String,
+
+        /// Output JSON file path
+        #[arg(long)]
+        output: std::path::PathBuf,
+    },
+
+    /// Import storage data from JSON file
+    #[command(
+        long_about = "Import storage data from JSON file into PostgreSQL or SQLite backend.
+
+Imports all data types using transaction safety (rollback on error).
+The target backend must have all required migrations applied.
+
+EXAMPLES:
+    llmspell storage import --backend sqlite --input backup.json
+    llmspell storage import --backend postgres --input export.json"
+    )]
+    Import {
+        /// Backend to import into (sqlite, postgres)
+        #[arg(long)]
+        backend: String,
+
+        /// Input JSON file path
+        #[arg(long)]
+        input: std::path::PathBuf,
+    },
 }
 
 /// Migration action subcommands
