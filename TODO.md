@@ -6175,29 +6175,67 @@ If optimizations prove insufficient (<5% goal unreachable without major rewrites
 
 ---
 
-#### Sub-Task 13c.3.2.6 Documentation Updates (Day 31) 🚧 NEXT
+#### Sub-Task 13c.3.2.6 Documentation Updates (Day 31) 🚧 IN PROGRESS
 
 - [ ] **Day 31: Update documentation for export/import tool and CLI changes**
-  - [ ] Update user guide:
-    - [ ] docs/user-guide/05-cli-reference.md: Add storage export/import commands
-    - [ ] docs/user-guide/07-storage-setup.md: Add migration workflows section
-    - [ ] Add docs/user-guide/11-data-migration.md (NEW):
+  - [x] Update user guide:
+    - [x] docs/user-guide/05-cli-reference.md: Add storage export/import commands (135 lines added)
+    - [x] docs/user-guide/07-storage-setup.md: Add migration workflows section (141 lines added)
+    - [x] docs/user-guide/11-data-migration.md (NEW): Complete migration guide (656 lines)
       - PostgreSQL → SQLite migration guide
       - SQLite → PostgreSQL growth path
+      - 5 complete migration workflows with verification
       - Backup and restore workflows
-      - Troubleshooting common issues
-  - [ ] Update developer guide:
-    - [ ] docs/developer-guide/reference/storage-backends.md: Add export/import API
-    - [ ] docs/developer-guide/08-operations.md: Add migration procedures
+      - Troubleshooting 6 common issues with solutions
+      - Advanced topics (selective migration, automation, cross-region)
+    - [x] docs/user-guide/README.md: Updated to reference 11-data-migration.md (now 11 guides)
+  - [x] Update developer guide:
+    - [x] docs/developer-guide/reference/storage-backends.md: Add Export/Import API section (545 lines)
+      - Export/Import architecture diagrams
+      - ExportFormat structure documentation
+      - Export API (SQLite + PostgreSQL)
+      - Import API (SQLite + PostgreSQL)
+      - ImportStats structure
+      - 4 migration patterns with code examples
+      - Testing patterns and best practices
+    - [x] docs/developer-guide/README.md: Added export/import API mention
+    - [x] docs/developer-guide/08-operations.md: Added Data Migration Operations section (253 lines)
+      - Migration overview and architecture
+      - Pre-migration checklist
+      - SQLite ↔ PostgreSQL migration procedures
+      - Performance benchmarks
+      - Troubleshooting 4 common issues
+      - 5 best practices with examples
   - [ ] Update technical docs:
-    - [ ] docs/technical/postgresql-guide.md: Add migration section
-    - [ ] docs/technical/sqlite-vector-storage-architecture.md: Add export/import notes
-    - [ ] Add docs/technical/storage-migration-internals.md (NEW):
-      - Export/import architecture
-      - Type conversion details
-      - Performance characteristics
-      - Testing strategy
-  - [ ] **Validation**: Review all updated docs for accuracy and completeness
+    - [x] docs/technical/README.md: Added Storage Migration Internals reference and quick commands
+    - [x] docs/technical/postgresql-guide.md: Add detailed migration section (268 lines)
+      - Key features and migration commands
+      - Export format structure
+      - Migration Workflow 1: SQLite → PostgreSQL (5 steps)
+      - Migration Workflow 2: PostgreSQL → SQLite (4 steps)
+      - Performance benchmarks
+      - 3 common migration scenarios
+      - Troubleshooting 4 migration issues
+      - Rollback procedures
+      - 5 best practices with examples
+    - [x] docs/technical/sqlite-vector-storage-architecture.md: Add export/import notes (294 lines)
+      - Export process (VectorEmbeddingExport structure, export query, key features)
+      - Import process (code example, import behavior)
+      - HNSW index rebuild after import (rebuild logic, performance benchmarks, rationale)
+      - Migration examples (SQLite → PostgreSQL, PostgreSQL → SQLite)
+      - Roundtrip verification (verification procedure, verified preservation)
+      - Troubleshooting export/import (3 common issues with solutions)
+      - Performance considerations (export/import benchmarks, optimization tips)
+    - [x] docs/technical/storage-migration-internals.md (NEW): Technical deep dive (1,481 lines)
+      - Architecture overview (component diagram, export/import data flow)
+      - Export format design (ExportFormat, ExportData, per-type structures, binary encoding)
+      - Exporter implementation (SqliteExporter, PostgresExporter with code examples)
+      - Importer implementation (SqliteImporter, PostgresImporter with transaction safety)
+      - Type conversion strategies (timestamp, vector, binary, JSON, infinity handling)
+      - Performance characteristics (export/import breakdowns, memory usage)
+      - Testing strategy (unit tests, integration tests, fuzz testing)
+      - Extension points (adding new data types, custom export formats)
+  - [x] **Validation**: All documentation updated and cross-referenced
 
 ---
 

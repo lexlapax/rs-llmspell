@@ -19,8 +19,9 @@
 4. [Security Implementation](#security-implementation)
 5. [Performance Tuning](#performance-tuning)
 6. [Security Operations](#security-operations)
-7. [Monitoring & Observability](#monitoring--observability)
-8. [Operational Checklists](#operational-checklists)
+7. [Data Migration Operations](#data-migration-operations-phase-13c32)
+8. [Monitoring & Observability](#monitoring--observability)
+9. [Operational Checklists](#operational-checklists)
 
 ---
 
@@ -378,6 +379,259 @@ pub struct AuditEntry {
     latency_ms: u32,           // Performance tracking
 }
 ```
+
+---
+
+## Data Migration Operations (Phase 13c.3.2)
+
+### Migration Overview
+
+**Purpose**: Bidirectional PostgreSQL ↔ SQLite data migration for deployment flexibility
+
+**Use Cases**:
+- **Development → Production**: SQLite (local) → PostgreSQL (scaled deployment)
+- **Production → Development**: PostgreSQL → SQLite (local debugging with prod data)
+- **Backend Switching**: Scale up/down based on deployment needs
+- **Disaster Recovery**: Restore from JSON export after database failure
+
+### Migration Architecture
+
+**Components**:
+- **Export**: `SqliteExporter` / `PostgresExporter` → `ExportFormat` (JSON)
+- **Import**: `SqliteImporter` / `PostgresImporter` ← `ExportFormat` (JSON)
+- **CLI**: `llmspell storage export/import` commands
+
+**Data Coverage**:
+- V3: Vector embeddings (all 4 dimensions: 384, 768, 1536, 3072)
+- V4: Knowledge graph (entities + relationships with bi-temporal data)
+- V5: Procedural memory patterns
+- V6: Agent state
+- V7: KV store
+- V8: Workflow states
+- V9: Sessions
+- V10: Artifacts (including binary content)
+- V11: Event log
+- V13: Hook history
+
+### Migration Procedures
+
+#### Pre-Migration Checklist
+
+**Before starting any migration:**
+
+```bash
+# 1. Verify source backend health
+llmspell database health --backend <source>
+
+# 2. Check database size
+# SQLite:
+du -sh /path/to/llmspell.db
+# PostgreSQL:
+psql $DATABASE_URL -c "SELECT pg_size_pretty(pg_database_size('llmspell_prod'));"
+
+# 3. Ensure sufficient disk space (2x database size)
+df -h /target/path
+
+# 4. Backup current data
+llmspell storage export --backend <source> --output pre-migration-backup.json
+
+# 5. Verify target backend is ready
+llmspell database health --backend <target>
+```
+
+#### SQLite → PostgreSQL Migration
+
+**Typical scenario**: Moving from local development to production deployment
+
+```bash
+# 1. Export from SQLite
+llmspell storage export --backend sqlite --output dev-export.json
+
+# 2. Transfer to production server (if needed)
+scp dev-export.json prod-server:/tmp/
+
+# 3. Set PostgreSQL connection
+export DATABASE_URL="postgresql://llmspell:password@localhost:5432/llmspell_prod"
+
+# 4. Import to PostgreSQL
+llmspell storage import --backend postgres --input dev-export.json
+
+# 5. Verify import statistics
+# Expected output:
+# ✅ Imported X total records:
+#   - Vectors: Y
+#   - Entities: Z
+#   - Sessions: W
+#   ...
+
+# 6. Validation: Export from target and compare
+llmspell storage export --backend postgres --output verify-export.json
+diff <(jq -S .data dev-export.json) <(jq -S .data verify-export.json)
+# Should show no differences (timestamps may vary)
+```
+
+#### PostgreSQL → SQLite Migration
+
+**Typical scenario**: Debugging production issues locally
+
+```bash
+# 1. Export from PostgreSQL
+export DATABASE_URL="postgresql://llmspell:password@localhost:5432/llmspell_prod"
+llmspell storage export --backend postgres --output prod-export.json
+
+# 2. Transfer to dev machine
+scp prod-server:/tmp/prod-export.json ~/Downloads/
+
+# 3. Import to local SQLite
+llmspell storage import --backend sqlite --input ~/Downloads/prod-export.json
+
+# 4. Verify data integrity
+llmspell storage export --backend sqlite --output verify-export.json
+diff <(jq -S .data prod-export.json) <(jq -S .data verify-export.json)
+```
+
+### Migration Performance
+
+**Benchmarks** (Phase 13c.3.2):
+
+| Operation | Dataset Size | Time | Throughput |
+|-----------|--------------|------|------------|
+| SQLite Export | 10K vectors + 1K entities | <5s | 2.2K records/sec |
+| PostgreSQL Export | 10K vectors + 1K entities | <8s | 1.4K records/sec |
+| SQLite Import | 10K vectors + 1K entities | <6s | 1.8K records/sec |
+| PostgreSQL Import | 10K vectors + 1K entities | <10s | 1.1K records/sec |
+| JSON Serialization | 10K records | <2s | 5K records/sec |
+| JSON Deserialization | 10K records | <3s | 3.3K records/sec |
+
+**Optimization Tips**:
+- Use SSD storage for import/export operations
+- Ensure sufficient memory (2x dataset size)
+- Disable unnecessary database logging during import
+- Use batch operations where possible
+
+### Migration Troubleshooting
+
+#### Issue: Export File Too Large
+
+**Problem**: Disk space exhausted during export
+
+**Solution**:
+```bash
+# 1. Check available space
+df -h /export/path
+
+# 2. Compress export directly
+llmspell storage export --backend postgres --output - | gzip > export.json.gz
+
+# 3. Or export to larger partition
+llmspell storage export --backend postgres --output /mnt/large-disk/export.json
+```
+
+#### Issue: Import Fails with JSON Parse Error
+
+**Problem**: Corrupted or incomplete JSON file
+
+**Solution**:
+```bash
+# 1. Validate JSON
+jq . export.json > /dev/null && echo "Valid" || echo "Invalid"
+
+# 2. Check file completeness
+tail -1 export.json  # Should end with }
+
+# 3. Re-export if corrupted
+llmspell storage export --backend <source> --output fresh-export.json
+```
+
+#### Issue: Import Fails Midway
+
+**Problem**: Database constraint violation or connection timeout
+
+**Solution**:
+```bash
+# Imports are transaction-safe - automatically rolled back on failure
+
+# 1. Check database logs
+# PostgreSQL:
+docker logs llmspell_postgres_dev --tail 100
+# SQLite:
+Check application logs for SQL errors
+
+# 2. Verify migrations applied
+llmspell database migrations list
+
+# 3. Retry import (safe due to rollback)
+llmspell storage import --backend <target> --input export.json
+```
+
+#### Issue: Data Missing After Import
+
+**Problem**: Import succeeded but some data is missing
+
+**Solution**:
+```bash
+# 1. Check import statistics
+# Ensure counts match source database
+
+# 2. Verify tenant filtering (if using multi-tenancy)
+# Check config.toml for tenant_id settings
+
+# 3. Export from target and compare
+llmspell storage export --backend <target> --output verify.json
+jq '.data | keys' verify.json  # Check which tables have data
+
+# 4. Check for PostgreSQL RLS policies (if applicable)
+psql $DATABASE_URL -c "SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';"
+```
+
+### Migration Best Practices
+
+**1. Test with Subset First**:
+```bash
+# Export small dataset for testing
+jq '.data.sessions = .data.sessions[:5]' full-export.json > test-export.json
+llmspell storage import --backend <target> --input test-export.json
+```
+
+**2. Schedule During Maintenance Window**:
+- Production migrations should occur during low-traffic periods
+- Allow 2-3x estimated migration time
+- Have rollback plan ready
+
+**3. Monitor Resource Usage**:
+```bash
+# Watch memory and disk during migration
+watch -n 1 'free -h && df -h /target/path'
+
+# Monitor database connections (PostgreSQL)
+psql $DATABASE_URL -c "SELECT count(*) FROM pg_stat_activity;"
+```
+
+**4. Verify Data Integrity**:
+```bash
+# Always verify after migration
+llmspell storage export --backend <target> --output post-migration.json
+diff <(jq -S .data pre-migration.json) <(jq -S .data post-migration.json)
+```
+
+**5. Keep Export Files for Rollback**:
+```bash
+# Archive export files with timestamps
+mv export.json backups/export-$(date +%Y%m%d-%H%M%S).json
+
+# Compress old backups
+gzip backups/export-*.json
+
+# Keep last 7 days of exports
+find backups/ -name "export-*.json.gz" -mtime +7 -delete
+```
+
+### See Also
+
+- **[Data Migration Guide](../../user-guide/11-data-migration.md)** - Complete migration workflows
+- **[Storage Backends](reference/storage-backends.md)** - Export/Import API details
+- **[PostgreSQL Guide](../technical/postgresql-guide.md)** - PostgreSQL-specific migration
+- **[CLI Reference](../../user-guide/05-cli-reference.md#storage)** - Storage commands
 
 ---
 

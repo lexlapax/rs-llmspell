@@ -260,6 +260,148 @@ See [Technical Docs - Backup Guide](storage/backup-restore.md) for:
 
 ---
 
+## Migration Between Backends
+
+**Lossless bidirectional migration between PostgreSQL and SQLite**
+
+llmspell provides built-in migration tools for moving data between storage backends. This enables seamless transitions between development (SQLite) and production (PostgreSQL) environments, or scaling decisions as your deployment evolves.
+
+### When to Migrate
+
+**Common Migration Scenarios:**
+
+1. **Development → Production**: Migrate local SQLite data to PostgreSQL for deployment
+2. **Production → Development**: Export production data for local testing/debugging
+3. **Backend Switching**: Scale up (SQLite → PostgreSQL) or scale down (PostgreSQL → SQLite)
+4. **Cross-Environment**: Sync data between staging and production
+5. **Disaster Recovery**: Restore from JSON export when database is lost
+
+### Quick Migration Example
+
+**SQLite → PostgreSQL (Most Common)**
+
+```bash
+# 1. Export from SQLite
+llmspell storage export --backend sqlite --output dev-data.json
+
+# 2. Set PostgreSQL connection
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell_prod"
+
+# 3. Import to PostgreSQL
+llmspell storage import --backend postgres --input dev-data.json
+
+# 4. Verify migration
+llmspell storage export --backend postgres --output verify.json
+diff <(jq -S .data dev-data.json) <(jq -S .data verify.json)
+```
+
+### Migration Prerequisites
+
+**Before migrating, ensure:**
+
+1. **Target backend is running and accessible**
+   - PostgreSQL: `DATABASE_URL` environment variable set
+   - SQLite: Database file path exists or can be created
+
+2. **Migrations are applied**
+   ```bash
+   # PostgreSQL
+   cargo run -- database migrate
+
+   # SQLite (automatic on first connection)
+   ```
+
+3. **Sufficient disk space**
+   ```bash
+   # Check export size estimate
+   du -sh ~/.local/share/llmspell/llmspell.db
+   ```
+
+4. **PostgreSQL feature (if using PostgreSQL)**
+   ```bash
+   cargo build --features postgres
+   ```
+
+### Verification Steps
+
+**After migration, verify data integrity:**
+
+1. **Check import statistics**
+   ```bash
+   llmspell storage import --backend postgres --input data.json
+   # ✅ Imported 1,234 total records:
+   #   - Vectors: 500
+   #   - Entities: 100
+   #   - Sessions: 12
+   #   ...
+   ```
+
+2. **Export from target and compare**
+   ```bash
+   # Export from source
+   llmspell storage export --backend sqlite --output source.json
+
+   # Export from target
+   llmspell storage export --backend postgres --output target.json
+
+   # Compare data (ignore timestamps)
+   diff <(jq -S .data source.json) <(jq -S .data target.json)
+   # Should be empty (identical)
+   ```
+
+3. **Run application tests**
+   ```bash
+   # Test queries work against new backend
+   cargo test --test integration_tests
+   ```
+
+### Migration Data Format
+
+**Export produces versioned JSON:**
+- **Version**: 1.0 (semantic versioning for compatibility)
+- **Metadata**: Export timestamp, source backend, applied migrations
+- **Data**: All 10 table types (vectors, graph, sessions, etc.)
+- **Encoding**: Base64 for binary data (BLOBs)
+
+**What's Included:**
+- Vector embeddings (all dimensions: 384, 768, 1536, 3072)
+- Knowledge graph (entities and relationships)
+- Procedural memory patterns
+- Agent state
+- Key-value store entries
+- Workflow states
+- Sessions and artifacts
+- Event log
+- Hook history
+
+### Rollback Procedure
+
+**If migration fails or needs reversal:**
+
+1. **Keep original backend running** until migration is verified
+2. **Export before importing** to create rollback point
+3. **Use transactions** (automatic in import process)
+   - If import fails, changes are automatically rolled back
+   - Database remains in consistent state
+
+**Rollback example:**
+```bash
+# Before migration, create backup export
+llmspell storage export --backend postgres --output pre-migration-backup.json
+
+# If something goes wrong, restore from backup
+llmspell storage import --backend postgres --input pre-migration-backup.json
+```
+
+### Advanced Migration Workflows
+
+**For complex migration scenarios, see:**
+- **[Data Migration Guide](11-data-migration.md)** - Complete workflows with examples
+- **[PostgreSQL Guide](../technical/postgresql-guide.md#migration)** - PostgreSQL-specific migration details
+- **[CLI Reference](05-cli-reference.md#storage)** - Full command documentation
+
+---
+
 ## Multi-Tenancy Setup
 
 ### Enable Row-Level Security

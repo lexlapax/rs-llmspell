@@ -8,15 +8,15 @@
 
 ## Overview
 
-> **📚 Central Hub**: Your starting point for AI experimentation with LLMSpell. Everything you need is organized into **10 numbered guides** plus a comprehensive appendix with complete API references. Master the essentials quickly, then explore advanced features at your own pace!
+> **📚 Central Hub**: Your starting point for AI experimentation with LLMSpell. Everything you need is organized into **11 numbered guides** plus a comprehensive appendix with complete API references. Master the essentials quickly, then explore advanced features at your own pace!
 
 **Version**: 0.13.1 | **Status**: Phase 13b Complete - Production Storage Infrastructure & Documentation Consolidation | **Last Updated**: 2025-11-08
 
 ---
 
-## 📖 The 10 Essential Guides
+## 📖 The 11 Essential Guides
 
-**Linear learning path from setup to production deployment**
+**Linear learning path from setup to production deployment (including data migration)**
 
 ### [01. Getting Started](01-getting-started.md)
 **Get up and running in under 10 minutes**
@@ -105,6 +105,17 @@
 - Script errors and tool issues
 - IDE integration debugging
 - Diagnostic procedures
+
+### [11. Data Migration](11-data-migration.md)
+**PostgreSQL ↔ SQLite data migration**
+- Lossless bidirectional migration workflows
+- When and why to migrate backends
+- Step-by-step migration procedures
+- Verification and rollback procedures
+- Troubleshooting migration issues
+- Advanced migration patterns
+- Automated migration pipelines
+- Cross-region and cross-environment migrations
 
 ---
 
@@ -338,6 +349,7 @@ sudo systemctl status llmspell-kernel
 - **Deployment?** See [08. Deployment](08-deployment.md)
 - **Security?** See [09. Security](09-security.md)
 - **Troubleshooting?** See [10. Troubleshooting](10-troubleshooting.md)
+- **Data Migration?** See [11. Data Migration](11-data-migration.md)
 - **API Reference?** See [Lua API](appendix/lua-api-reference.md)
 - **Examples?** See [Example Index](../../examples/EXAMPLE-INDEX.md)
 - **Developer Guide?** See [Developer Guide](../developer-guide/README.md)

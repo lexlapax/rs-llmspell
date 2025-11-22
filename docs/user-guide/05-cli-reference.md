@@ -20,6 +20,7 @@ Complete user guide for all llmspell CLI commands.
    - [config](#config) - Configuration management
    - [keys](#keys) - API key management
    - [backup](#backup) - Backup/restore
+   - [storage](#storage) - Storage export/import
 7. [Scripting Resources](#scripting-resources)
    - [app](#app) - Application management
    - [tool](#tool) - Tool operations
@@ -472,6 +473,138 @@ llmspell backup restore backup-20250130.tar.gz
 - Migration between systems
 - Version rollback
 - Disaster recovery
+
+### storage
+
+Export and import storage data for PostgreSQL ↔ SQLite migration.
+
+The storage command enables lossless bidirectional migration of all data between PostgreSQL
+and SQLite backends. Export creates a JSON file containing all tables (vectors, knowledge
+graph, sessions, artifacts, etc.), and import loads this data into the target backend.
+
+**Usage**:
+```bash
+llmspell storage <SUBCOMMAND>
+```
+
+**Subcommands**:
+- `export` - Export data to JSON file
+- `import` - Import data from JSON file
+
+#### EXPORT - Export storage data to JSON
+
+```bash
+llmspell storage export --backend <BACKEND> --output <FILE>
+```
+
+**Options**:
+- `--backend <BACKEND>` - Source backend (sqlite, postgres)
+- `--output <FILE>` - Output JSON file path
+
+**Examples**:
+```bash
+# Export from SQLite
+llmspell storage export --backend sqlite --output export.json
+
+# Export from PostgreSQL (requires DATABASE_URL env var)
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell"
+llmspell storage export --backend postgres --output pg-export.json
+```
+
+**Configuration**:
+- **SQLite**: Uses `persistence_path` from config or defaults to `./storage/llmspell.db`
+- **PostgreSQL**: Requires `DATABASE_URL` environment variable
+
+**Export Format**:
+- Version: 1.0 (semantic versioning)
+- Contains: Vector embeddings, knowledge graph, procedural memory, agent state, KV store, workflow states, sessions, artifacts, event log, hook history
+- Encoding: JSON with base64 for binary data (BLOB fields)
+- Metadata: Export timestamp, source backend, applied migrations
+
+#### IMPORT - Import storage data from JSON
+
+```bash
+llmspell storage import --backend <BACKEND> --input <FILE>
+```
+
+**Options**:
+- `--backend <BACKEND>` - Target backend (sqlite, postgres)
+- `--input <FILE>` - Input JSON file path
+
+**Examples**:
+```bash
+# Import to SQLite
+llmspell storage import --backend sqlite --input export.json
+
+# Import to PostgreSQL (requires DATABASE_URL env var)
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell"
+llmspell storage import --backend postgres --input pg-export.json
+```
+
+**Import Behavior**:
+- Transaction-safe: All-or-nothing import with automatic rollback on errors
+- Validates JSON structure before importing
+- Reports detailed import statistics by data type
+- Supports importing across backend versions (if migrations match)
+
+**PostgreSQL Support**:
+PostgreSQL support requires compilation with the `postgres` feature:
+```bash
+cargo build --features postgres
+```
+
+**Use Cases**:
+- **PostgreSQL → SQLite Migration**: Move from cloud database to embedded storage
+- **SQLite → PostgreSQL Migration**: Scale from embedded to shared database
+- **Cross-Environment Migration**: Move data between development/staging/production
+- **Data Backup**: Export to JSON for external archival
+- **Disaster Recovery**: Restore from JSON to new database instance
+- **Multi-Backend Testing**: Verify data consistency across backends
+
+**Common Migration Workflows**:
+
+1. **Development → Production Migration**:
+   ```bash
+   # On development machine (SQLite)
+   llmspell storage export --backend sqlite --output dev-data.json
+
+   # Transfer file to production server
+   scp dev-data.json prod-server:/tmp/
+
+   # On production server (PostgreSQL)
+   export DATABASE_URL="postgresql://prod-user:pass@localhost/llmspell"
+   llmspell storage import --backend postgres --input /tmp/dev-data.json
+   ```
+
+2. **Cross-Database Backup**:
+   ```bash
+   # Export from PostgreSQL
+   llmspell storage export --backend postgres --output backup-$(date +%Y%m%d).json
+
+   # Import to SQLite for offline backup
+   llmspell storage import --backend sqlite --input backup-20250122.json
+   ```
+
+3. **Testing Data Consistency**:
+   ```bash
+   # Export from source
+   llmspell storage export --backend sqlite --output source.json
+
+   # Import to target
+   llmspell storage import --backend postgres --input source.json
+
+   # Export from target
+   llmspell storage export --backend postgres --output target.json
+
+   # Compare (should be identical except timestamps)
+   diff <(jq -S .data source.json) <(jq -S .data target.json)
+   ```
+
+**See Also**:
+- [Data Migration Guide](11-data-migration.md) - Complete migration workflows
+- [Storage Setup](07-storage-setup.md) - Backend configuration
+- [PostgreSQL Guide](../technical/postgresql-guide.md) - PostgreSQL-specific details
+- [Storage Architecture](../technical/sqlite-vector-storage-architecture.md) - Technical details
 
 ## Scripting Resources
 

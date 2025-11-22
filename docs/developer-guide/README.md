@@ -130,7 +130,7 @@
 Consolidated guides covering multiple crates by topic:
 
 1. **[Core Traits & Foundation](reference/core-traits.md)** - BaseAgent, ExecutionContext, testing framework
-2. **[Storage Backends](reference/storage-backends.md)** - Vector storage, HNSW, backends
+2. **[Storage Backends](reference/storage-backends.md)** - Vector storage, HNSW, backends, **export/import API (Phase 13c.3.2)**
 3. **[RAG Pipeline & Context Engineering](reference/rag-pipeline.md)** - Document ingestion, retrieval, knowledge graph
 4. **[Memory Backends](reference/memory-backends.md)** - Episodic, semantic, procedural memory systems
 5. **[Security & Multi-Tenancy](reference/security-integration.md)** - Access control, sandboxing, tenant isolation

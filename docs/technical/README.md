@@ -111,6 +111,17 @@
 - Zero-downtime migration techniques
 - Version compatibility matrix
 
+### 📤 [Storage Migration Internals](storage-migration-internals.md) ✅ v0.14.0 **NEW**
+**Purpose**: PostgreSQL ↔ SQLite data migration technical deep dive (Phase 13c.3.2)
+**Coverage**: Export/Import API implementation and migration architecture
+**Key Content**:
+- Export format design (JSON with base64 encoding)
+- Exporter/Importer implementation patterns
+- Transaction-safe import with rollback
+- ImportStats tracking and verification
+- Roundtrip migration validation
+- Binary data encoding strategies
+
 ---
 
 ## Supplementary Documentation
@@ -389,6 +400,23 @@ llmspell template search "code" --category codegen
 
 # Get parameter schema
 llmspell template schema research-assistant
+```
+
+### Storage Migration Commands ⭐ Phase 13c.3.2 **NEW**
+```bash
+# Export from SQLite
+llmspell storage export --backend sqlite --output export.json
+
+# Export from PostgreSQL
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell"
+llmspell storage export --backend postgres --output pg-export.json
+
+# Import to SQLite
+llmspell storage import --backend sqlite --input export.json
+
+# Import to PostgreSQL
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell"
+llmspell storage import --backend postgres --input pg-export.json
 ```
 
 ### Fleet Management
