@@ -91,13 +91,50 @@ LLMSpell includes 10 builtin profiles for common workflows:
 ./target/debug/llmspell -p rag-prod run examples/script-users/cookbook/rag-multi-tenant.lua
 
 # Local LLM with Ollama
-./target/debug/llmspell -p ollama run examples/local_llm_status.lua
+./target/debug/llmspell -p ollama run examples/script-users/features/local-llm-status.lua
 
 # Sessions (state + hooks + events)
 ./target/debug/llmspell -p sessions run examples/script-users/cookbook/rag-session.lua
 ```
 
-**Available Profiles**: minimal, development, providers, state, sessions, ollama, candle, rag-dev, rag-prod, rag-perf
+**Available Profiles**: See [Configuration Guide](../docs/user-guide/03-configuration.md#builtin-profiles) for all 20 profiles
+
+---
+
+## 🤔 Decision Matrix: Rust Embedding vs Lua Scripting
+
+**Choose your path based on your use case:**
+
+| Factor | **Lua Scripting** ([script-users/](script-users/)) | **Rust Embedding** ([rust-developers/](rust-developers/)) |
+|--------|-------------------------------------------|------------------------------------------------|
+| **Best For** | Rapid prototyping, workflows, automation | Production integration, custom extensions |
+| **Setup Time** | Instant (no compilation) | Moderate (add dependency, rebuild) |
+| **Type Safety** | Runtime checking | Compile-time checking |
+| **Performance** | Excellent (mlua bridge) | Native Rust speed |
+| **Iteration Speed** | Instant (edit and run) | Slower (rebuild required) |
+| **Extensibility** | Limited to exposed APIs | Full access to Rust ecosystem |
+| **Use Cases** | Scripts, automation, workflows, experiments | Libraries, services, production systems |
+| **Learning Curve** | Low (Lua basics + LLMSpell API) | Higher (Rust + LLMSpell traits) |
+
+**Decision Guide**:
+
+✅ **Choose Lua Scripting If:**
+- Rapid prototyping or experimentation
+- Building workflows or automation scripts
+- Quick iteration is important
+- Don't need custom components
+- Using LLMSpell as a standalone tool
+
+✅ **Choose Rust Embedding If:**
+- Building production services or libraries
+- Need custom tools, agents, or workflows
+- Integrating LLMSpell into existing Rust applications
+- Performance critical paths
+- Need compile-time safety guarantees
+
+**Hybrid Approach**: Many projects start with Lua for prototyping, then extract performance-critical components to Rust.
+
+---
 
 ### Custom Configuration (Advanced)
 

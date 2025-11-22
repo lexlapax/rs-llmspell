@@ -1,47 +1,36 @@
-#!/usr/bin/env llmspell
-
--- ============================================================
--- LLMSPELL LOCAL LLM EXAMPLES
--- ============================================================
--- Example: Model Information and Test Inference
--- Complexity Level: BEGINNER
--- Real-World Use Case: Inspect local model details and test inference
--- Category: Local LLM Integration
+-- ============================================================================
+-- Example: Local LLM Model Information
+-- Category: features
+-- Phase: 13c
+-- ============================================================================
 --
--- Purpose: Demonstrate LocalLLM.info() API and agent creation with local models
--- Architecture: LocalLLM API + Agent creation for inference testing
--- Key Features:
---   • Get detailed model information (size, architecture, quantization)
---   • Display model metadata and file paths
---   • Test inference with sample prompt
---   • Works with both Ollama and Candle backends
+-- Description:
+--   Get detailed model information and test inference with local models.
+--   Demonstrates LocalLLM.info() API and agent creation.
 --
 -- Prerequisites:
---   • LLMSpell installed and built
---   • At least one local model available:
---     - For Ollama: ollama pull llama3.1:8b
---     - For Candle: llmspell model pull tinyllama:Q4_K_M@candle
+--   - At least one local model:
+--     - Ollama: ollama pull llama3.1:8b
+--     - Candle: llmspell model pull tinyllama:Q4_K_M@candle
 --
--- HOW TO RUN:
--- # For Ollama models:
--- ./target/debug/llmspell -p ollama \
---   run examples/local_llm_model_info.lua llama3.1:8b@ollama
+-- Profile: ollama
+-- Runtime: ~10 seconds
+-- Complexity: BEGINNER
 --
--- # For Candle models:
--- ./target/debug/llmspell -p candle \
---   run examples/local_llm_model_info.lua tinyllama:Q4_K_M@candle
+-- Usage:
+--   # Ollama models
+--   llmspell -p ollama run examples/script-users/features/local-llm-model-info.lua llama3.1:8b@ollama
 --
--- EXPECTED OUTPUT:
--- Model details followed by test inference response
--- Execution time: 5-15 seconds (depending on model size)
+--   # Candle models
+--   llmspell -p candle run examples/script-users/features/local-llm-model-info.lua tinyllama:Q4_K_M@candle
+--
+-- Expected Output:
+--   Model details (size, architecture, quantization) followed by test inference
 --
 -- Arguments:
 --   MODEL_SPEC - Model specification (e.g., "llama3.1:8b@ollama")
 --
--- Next Steps:
--- - See local_llm_chat.lua for interactive chat interface
--- - See local_llm_comparison.lua for backend comparison
--- ============================================================
+-- ============================================================================
 
 -- Get model spec from command line argument or environment
 local model_spec = arg[1] or os.getenv("MODEL_SPEC")

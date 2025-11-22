@@ -1,39 +1,34 @@
-#!/usr/bin/env llmspell
-
--- ============================================================
--- LLMSPELL LOCAL LLM EXAMPLES
--- ============================================================
--- Example: Local LLM Status
--- Complexity Level: BEGINNER
--- Real-World Use Case: Check status of local LLM backends
--- Category: Local LLM Integration
+-- ============================================================================
+-- Example: Local LLM Status Check
+-- Category: features
+-- Phase: 13c
+-- ============================================================================
 --
--- Purpose: Demonstrate LocalLLM.status() and LocalLLM.list() APIs
---          for checking backend availability and listing models
--- Architecture: Direct LocalLLM API usage without agent creation
--- Key Features:
---   • Check Ollama backend status
---   • Check Candle backend status
---   • List all available local models
---   • Display model metadata (size, quantization, modified date)
+-- Description:
+--   Check status and list available models for Ollama and Candle backends.
+--   Demonstrates LocalLLM.status() and LocalLLM.list() APIs.
 --
 -- Prerequisites:
---   • LLMSpell installed and built
---   • Optional: Ollama installed and running
---   • Optional: Candle models downloaded via llmspell model pull
+--   - LLMSpell installed and built
+--   - Optional: Ollama running (ollama serve)
+--   - Optional: Candle models downloaded
 --
--- HOW TO RUN:
--- ./target/debug/llmspell -p minimal run examples/local_llm_status.lua
+-- Profile: minimal
+-- Runtime: ~1 second
+-- Complexity: BEGINNER
 --
--- EXPECTED OUTPUT:
--- Status of Ollama and Candle backends with list of available models
--- Execution time: <1 second
+-- Usage:
+--   llmspell -p minimal run examples/script-users/features/local-llm-status.lua
+--
+-- Expected Output:
+--   Status of Ollama and Candle backends with list of available models
 --
 -- Next Steps:
--- - To add Ollama models: ollama pull llama3.1:8b
--- - To add Candle models: llmspell model pull tinyllama:Q4_K_M@candle
--- - See local_llm_chat.lua for interactive chat with local models
--- ============================================================
+--   - Add models: ollama pull llama3.1:8b
+--   - Add models: llmspell model pull tinyllama:Q4_K_M@candle
+--   - See cookbook/local-llm-chat-patterns.lua for usage examples
+--
+-- ============================================================================
 
 print("=== Local LLM Status ===\n")
 
