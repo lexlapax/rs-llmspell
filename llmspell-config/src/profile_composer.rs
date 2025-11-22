@@ -655,9 +655,7 @@ mod tests {
     #[test]
     fn test_compose_base_with_features() {
         let mut composer = ProfileComposer::new();
-        let config = composer
-            .load_multi(&["bases/cli", "features/rag"])
-            .unwrap();
+        let config = composer.load_multi(&["bases/cli", "features/rag"]).unwrap();
 
         // CLI base settings
         assert_eq!(config.runtime.max_concurrent_scripts, 1);
