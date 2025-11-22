@@ -6869,34 +6869,69 @@ cargo clippy --workspace (zero warnings)
 
 ---
 
-### Task 13c.4.5: Create Layer Files - Environments (4 files) ⏹ PENDING
+### Task 13c.4.5: Create Layer Files - Environments (4 files) ✅ COMPLETED
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Configuration Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETED (2025-11-22)
+**Commit**: 15ae3c80
 
 **Description**: Create 4 environment tuning layers (dev, staging, prod, perf).
 
 **Directory**: llmspell-config/layers/envs/
 
-**Files to CREATE** (95 lines total):
+**Files CREATED** (93 lines total):
 
-1. **envs/dev.toml** (25 lines) - Debug logging, strict validation
-2. **envs/staging.toml** (20 lines) - Info logging, near-production
-3. **envs/prod.toml** (20 lines) - Warn logging, relaxed validation, optimized
-4. **envs/perf.toml** (30 lines) - Error logging, max throughput, large caches
+1. **envs/dev.toml** (25 lines) - Debug logging, 600s timeout, 10 concurrent
+2. **envs/staging.toml** (19 lines) - Info logging, 300s timeout, 50 concurrent
+3. **envs/prod.toml** (19 lines) - Warn logging (disabled), 300s timeout, 100 concurrent
+4. **envs/perf.toml** (30 lines) - Error logging (disabled), 600s timeout, 100 concurrent, large caches
+
+**Implementation Details**:
+
+**Environment Layer Characteristics**:
+- **dev.toml**: Debug logging (level="debug"), performance monitoring (60s intervals, min_duration_ms=10), moderate concurrency (10), extended timeout (600s), colored text output
+- **staging.toml**: Info logging (level="info"), moderate concurrency (50), standard timeout (300s), JSON output for log aggregation
+- **prod.toml**: Minimal logging (disabled, level="warn"), high concurrency (100), standard timeout (300s), JSON output, optimized for production
+- **perf.toml**: Error-only logging (disabled, level="error"), high concurrency (100), extended timeout (600s), large caches (100K embedding cache, 8GB vector storage), batch size 500
+
+**Challenges Encountered**:
+1. **Invalid Field Error**: Initially used `strict_validation` and `enable_hot_reload` fields in [runtime] section - these don't exist in GlobalRuntimeConfig struct
+   - Solution: Removed these fields, used valid fields (max_concurrent_scripts, script_timeout_seconds) instead
+   - Updated tests to check for valid fields only
+2. **Test Compilation Errors**: 4 test assertions failed because they referenced non-existent fields
+   - Solution: Updated all test assertions to use valid struct fields
+   - Tests now verify logging levels, concurrency, timeouts, and cache sizes
+
+**Testing Strategy**:
+- Created 5 new tests (118 total passing):
+  * `test_load_env_dev`: Verifies debug logging, 600s timeout, 10 concurrent
+  * `test_load_env_staging`: Verifies info logging, 50 concurrent
+  * `test_load_env_prod`: Verifies disabled debug, warn level, 100 concurrent
+  * `test_load_env_perf`: Verifies error-only logging, large caches (100K), 100 concurrent
+  * `test_compose_base_feature_env`: **3-layer composition test** (bases/cli + features/rag + envs/dev)
+- All environment layers load and parse successfully
+- 3-layer composition properly merges base + feature + environment settings
+
+**Code Changes**:
+- **profile_composer.rs**: Added 4 include_str!() entries for environment layers, updated error message, added 5 tests
+
+**Quality Metrics**:
+- Tests: 118 passing (5 new environment tests)
+- Clippy: Zero warnings
+- Code: 93 lines TOML + 72 lines tests = 165 total
 
 **Checkpoint**:
 ```bash
-cargo test -p llmspell-config test_environment_layers
-cargo clippy --workspace (zero warnings)
+cargo test -p llmspell-config  # 118 passed
+cargo clippy --workspace --all-features  # 0 warnings
 ```
 
 **Definition of Done**:
-- [ ] 4 environment files created
-- [ ] 3-layer composition works (base+feature+env)
-- [ ] Zero clippy warnings
-- [ ] Commit: "13c.4.5 Create 4 environment tuning layers"
+- [x] 4 environment files created (93 lines)
+- [x] 3-layer composition works (bases/cli + features/rag + envs/dev tested)
+- [x] Zero clippy warnings
+- [x] Commit: "13c.4.5 Create 4 environment tuning layers" (15ae3c80)
 
 ---
 
