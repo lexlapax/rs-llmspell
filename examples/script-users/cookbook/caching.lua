@@ -1,3 +1,7 @@
+-- Recommended profile: development
+-- Run with: llmspell -p development run caching.lua
+-- Development environment with debug logging
+
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================

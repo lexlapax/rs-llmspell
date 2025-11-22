@@ -1,3 +1,7 @@
+-- Recommended profile: rag-dev
+-- Run with: llmspell -p rag-dev run rag-memory-hybrid.lua
+-- RAG features with debug logging
+
 -- ============================================================
 -- LLMSPELL COOKBOOK - RAG + MEMORY HYBRID RETRIEVAL
 -- ============================================================

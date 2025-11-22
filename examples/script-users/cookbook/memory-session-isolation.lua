@@ -1,3 +1,7 @@
+-- Recommended profile: memory
+-- Run with: llmspell -p memory run memory-session-isolation.lua
+-- Adaptive memory system
+
 -- ============================================================
 -- LLMSPELL COOKBOOK - MEMORY PATTERNS
 -- ============================================================

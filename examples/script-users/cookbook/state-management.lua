@@ -1,3 +1,7 @@
+-- Recommended profile: sessions
+-- Run with: llmspell -p sessions run state-management.lua
+-- Session management with SQLite
+
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================

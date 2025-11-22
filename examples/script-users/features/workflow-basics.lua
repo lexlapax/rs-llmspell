@@ -1,3 +1,7 @@
+-- Recommended profile: minimal
+-- Run with: llmspell -p minimal run workflow-basics.lua
+-- No LLM required
+
 -- ============================================================
 -- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================

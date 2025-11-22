@@ -1,3 +1,7 @@
+-- Recommended profile: research
+-- Run with: llmspell -p research run context-strategy-comparison.lua
+-- Context engineering
+
 -- ============================================================
 -- LLMSPELL COOKBOOK - CONTEXT STRATEGY COMPARISON
 -- ============================================================

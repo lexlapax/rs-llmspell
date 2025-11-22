@@ -1,3 +1,7 @@
+-- Recommended profile: rag-prod
+-- Run with: llmspell -p rag-prod run main.lua
+-- RAG production configuration
+
 -- Application: Knowledge Base v1.0 (Personal Knowledge Management with RAG)
 -- Purpose: Build and query a personal knowledge base with semantic search
 -- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables

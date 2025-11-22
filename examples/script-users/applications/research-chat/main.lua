@@ -1,3 +1,7 @@
+-- Recommended profile: research
+-- Run with: llmspell -p research run main.lua
+-- Full stack with trace logging
+
 -- Application: Research-Chat v1.0 (Phase 13 Workflow-Template Delegation Demo)
 -- Purpose: AI research assistant with conversational follow-up
 -- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables

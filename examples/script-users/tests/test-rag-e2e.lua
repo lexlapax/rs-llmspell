@@ -1,3 +1,7 @@
+-- Recommended profile: rag-dev
+-- Run with: llmspell -p rag-dev run test-rag-e2e.lua
+-- RAG testing with debug output
+
 -- Test: End-to-End RAG Validation Test
 -- Purpose: Comprehensive RAG functionality and performance validation
 -- Prerequisites: OPENAI_API_KEY environment variable for embeddings

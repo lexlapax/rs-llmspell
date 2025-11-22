@@ -1,3 +1,7 @@
+-- Recommended profile: memory
+-- Run with: llmspell -p memory run memory-context-workflow.lua
+-- Adaptive memory system
+
 -- ============================================================
 -- LLMSPELL COOKBOOK - MEMORY + CONTEXT E2E WORKFLOW
 -- ============================================================

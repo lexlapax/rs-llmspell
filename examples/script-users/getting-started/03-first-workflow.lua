@@ -1,3 +1,7 @@
+-- Recommended profile: minimal
+-- Run with: llmspell -p minimal run 03-first-workflow.lua
+-- Basic tools and workflows
+
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================

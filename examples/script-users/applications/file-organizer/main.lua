@@ -1,3 +1,7 @@
+-- Recommended profile: gemini-prod
+-- Run with: llmspell -p gemini-prod run main.lua
+-- Full Phase 13 stack with Gemini
+
 -- Application: File Organizer v1.0 (Universal Layer)
 -- Purpose: Organize messy file collections with AI-powered categorization
 -- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables

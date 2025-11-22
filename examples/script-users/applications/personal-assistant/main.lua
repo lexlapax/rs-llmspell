@@ -1,3 +1,7 @@
+-- Recommended profile: gemini-prod
+-- Run with: llmspell -p gemini-prod run main.lua
+-- Full Phase 13 stack with Gemini
+
 -- Application: Personal Assistant v1.0 (AI-Powered Productivity with RAG)
 -- Purpose: Comprehensive personal assistant for daily tasks and knowledge management
 -- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables

@@ -1,3 +1,7 @@
+-- Recommended profile: development
+-- Run with: llmspell -p development run 02-first-agent.lua
+-- LLM provider required (OpenAI/Anthropic/Gemini)
+
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================

@@ -1,3 +1,7 @@
+-- Recommended profile: research
+-- Run with: llmspell -p research run main.lua
+-- Full stack with trace logging
+
 -- Application: Research Collector v2.0 (Universal Layer with RAG)
 -- Purpose: Gather information for everyday research needs with AI assistance and knowledge persistence
 -- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables

@@ -1,3 +1,7 @@
+-- Recommended profile: memory
+-- Run with: llmspell -p memory run 06-episodic-memory-basic.lua
+-- Adaptive memory system
+
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================

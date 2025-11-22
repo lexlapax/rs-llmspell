@@ -1,3 +1,7 @@
+-- Recommended profile: minimal
+-- Run with: llmspell -p minimal run content-input.lua
+-- Input file (no execution profile needed)
+
 -- Content Input for Content Generation Platform
 -- This file provides content requests to be processed
 -- Similar pattern to code-review-assistant's code-input.lua

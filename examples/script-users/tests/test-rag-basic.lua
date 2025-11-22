@@ -1,3 +1,7 @@
+-- Recommended profile: rag-dev
+-- Run with: llmspell -p rag-dev run test-rag-basic.lua
+-- RAG testing with debug output
+
 -- Test: Basic RAG Functionality Test
 -- Purpose: Minimal test to verify RAG works via CLI
 -- Prerequisites: OPENAI_API_KEY environment variable for embeddings

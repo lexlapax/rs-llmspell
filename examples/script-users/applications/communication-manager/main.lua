@@ -1,3 +1,7 @@
+-- Recommended profile: gemini-prod
+-- Run with: llmspell -p gemini-prod run main.lua
+-- Full Phase 13 stack with Gemini
+
 -- Application: Communication Manager v3.0 (Business Layer)
 -- Purpose: Comprehensive business communication management with state persistence
 -- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables

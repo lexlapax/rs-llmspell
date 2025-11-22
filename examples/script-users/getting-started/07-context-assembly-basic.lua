@@ -1,3 +1,7 @@
+-- Recommended profile: research
+-- Run with: llmspell -p research run 07-context-assembly-basic.lua
+-- Context engineering with trace logging
+
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================

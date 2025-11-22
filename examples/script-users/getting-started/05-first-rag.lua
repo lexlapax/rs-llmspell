@@ -1,3 +1,7 @@
+-- Recommended profile: rag-dev
+-- Run with: llmspell -p rag-dev run 05-first-rag.lua
+-- RAG features with debug logging
+
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================

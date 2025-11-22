@@ -1,3 +1,7 @@
+-- Recommended profile: memory
+-- Run with: llmspell -p memory run memory-semantic-basic.lua
+-- Adaptive memory system
+
 -- ============================================================
 -- LLMSPELL FEATURES - SEMANTIC MEMORY
 -- ============================================================

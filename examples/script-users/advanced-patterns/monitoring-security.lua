@@ -1,3 +1,7 @@
+-- Recommended profile: research
+-- Run with: llmspell -p research run monitoring-security.lua
+-- Full stack with trace logging for complex patterns
+
 -- ============================================================
 -- LLMSPELL ADVANCED PATTERNS SHOWCASE
 -- ============================================================

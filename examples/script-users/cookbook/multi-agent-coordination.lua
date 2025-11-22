@@ -1,3 +1,7 @@
+-- Recommended profile: research
+-- Run with: llmspell -p research run multi-agent-coordination.lua
+-- Full stack with trace logging
+
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================

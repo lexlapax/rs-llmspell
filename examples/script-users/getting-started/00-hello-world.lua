@@ -1,3 +1,7 @@
+-- Recommended profile: minimal
+-- Run with: llmspell -p minimal run 00-hello-world.lua
+-- Basic tools and workflows
+
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================

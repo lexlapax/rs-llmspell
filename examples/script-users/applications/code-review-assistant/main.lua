@@ -1,3 +1,7 @@
+-- Recommended profile: gemini-prod
+-- Run with: llmspell -p gemini-prod run main.lua
+-- Full Phase 13 stack with Gemini
+
 -- ============================================================
 -- LLMSPELL APPLICATION SHOWCASE
 -- ============================================================

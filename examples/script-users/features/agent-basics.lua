@@ -1,3 +1,7 @@
+-- Recommended profile: providers
+-- Run with: llmspell -p providers run agent-basics.lua
+-- All LLM providers enabled
+
 -- ============================================================
 -- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================

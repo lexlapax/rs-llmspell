@@ -1,3 +1,7 @@
+-- Recommended profile: state
+-- Run with: llmspell -p state run state-persistence.lua
+-- State persistence enabled
+
 -- ============================================================
 -- LLMSPELL FEATURES SHOWCASE
 -- ============================================================
