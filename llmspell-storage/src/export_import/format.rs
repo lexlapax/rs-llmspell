@@ -41,43 +41,43 @@ impl ExportFormat {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ExportData {
     /// Vector embeddings by dimension (384, 768, 1536, 3072)
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub vector_embeddings: HashMap<usize, Vec<VectorEmbeddingExport>>,
 
     /// Knowledge graph (entities and relationships)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub knowledge_graph: Option<KnowledgeGraphExport>,
 
     /// Procedural memory patterns
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub procedural_memory: Vec<PatternExport>,
 
     /// Agent state entries
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub agent_state: Vec<AgentStateExport>,
 
     /// Key-value store entries
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub kv_store: Vec<KVEntryExport>,
 
     /// Workflow states
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub workflow_states: Vec<WorkflowStateExport>,
 
     /// Sessions
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sessions: Vec<SessionExport>,
 
     /// Artifacts and content
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artifacts: Option<ArtifactsExport>,
 
     /// Event log entries
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub event_log: Vec<EventExport>,
 
     /// Hook history entries
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hook_history: Vec<HookExport>,
 }
 
