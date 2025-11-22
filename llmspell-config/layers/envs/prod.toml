@@ -1,0 +1,19 @@
+# Production Environment Layer
+# Warn logging, optimized performance, minimal overhead
+
+[profile]
+name = "Production Environment"
+description = "Optimized configuration for production deployment"
+
+[debug]
+enabled = false
+level = "warn"
+
+[debug.output]
+stdout = false
+colored = false
+format = "json"
+
+[runtime]
+script_timeout_seconds = 300
+max_concurrent_scripts = 100

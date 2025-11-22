@@ -228,7 +228,12 @@ impl ProfileComposer {
             "features/memory" => include_str!("../layers/features/memory.toml"),
             "features/full" => include_str!("../layers/features/full.toml"),
 
-            // Environment layers (Task 13c.4.5) - TODO
+            // Environment layers (Task 13c.4.5)
+            "envs/dev" => include_str!("../layers/envs/dev.toml"),
+            "envs/staging" => include_str!("../layers/envs/staging.toml"),
+            "envs/prod" => include_str!("../layers/envs/prod.toml"),
+            "envs/perf" => include_str!("../layers/envs/perf.toml"),
+
             // Backend layers (Task 13c.4.6) - TODO
             // Preset profiles (Task 13c.4.7) - TODO
 
@@ -240,7 +245,8 @@ impl ProfileComposer {
                         "Layer '{}' not found.\n\
                          Available base layers: bases/cli, bases/daemon, bases/embedded, bases/testing\n\
                          Available feature layers: features/minimal, features/llm, features/llm-local, features/state, features/rag, features/memory, features/full\n\
-                         Environment/backend/preset layers coming in Tasks 13c.4.5-13c.4.7",
+                         Available environment layers: envs/dev, envs/staging, envs/prod, envs/perf\n\
+                         Backend/preset layers coming in Tasks 13c.4.6-13c.4.7",
                         layer_path
                     ),
                 })
@@ -666,6 +672,76 @@ mod tests {
         assert_eq!(config.rag.vector_storage.dimensions, 384);
     }
 
+    // Environment layer loading tests (Task 13c.4.5)
+
+    #[test]
+    fn test_load_env_dev() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("envs/dev").unwrap();
+
+        // Dev should have debug logging and longer timeout
+        assert!(config.debug.enabled);
+        assert_eq!(config.debug.level, "debug");
+        assert_eq!(config.runtime.script_timeout_seconds, 600);
+        assert_eq!(config.runtime.max_concurrent_scripts, 10);
+    }
+
+    #[test]
+    fn test_load_env_staging() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("envs/staging").unwrap();
+
+        // Staging should have info logging and moderate concurrency
+        assert!(config.debug.enabled);
+        assert_eq!(config.debug.level, "info");
+        assert_eq!(config.runtime.max_concurrent_scripts, 50);
+    }
+
+    #[test]
+    fn test_load_env_prod() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("envs/prod").unwrap();
+
+        // Prod should have minimal logging and high concurrency
+        assert!(!config.debug.enabled);
+        assert_eq!(config.debug.level, "warn");
+        assert_eq!(config.runtime.max_concurrent_scripts, 100);
+    }
+
+    #[test]
+    fn test_load_env_perf() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("envs/perf").unwrap();
+
+        // Perf should have error-only logging and large caches
+        assert!(!config.debug.enabled);
+        assert_eq!(config.debug.level, "error");
+        assert_eq!(config.runtime.max_concurrent_scripts, 100);
+        assert_eq!(config.rag.embedding.cache_size, 100000);
+    }
+
+    #[test]
+    fn test_compose_base_feature_env() {
+        let mut composer = ProfileComposer::new();
+        // 3-layer composition: base + feature + environment
+        let config = composer
+            .load_multi(&["bases/cli", "features/rag", "envs/dev"])
+            .unwrap();
+
+        // Base: CLI settings
+        assert_eq!(config.runtime.max_concurrent_scripts, 1);
+        assert!(config.runtime.enable_streaming);
+
+        // Feature: RAG enabled
+        assert!(config.rag.enabled);
+        assert_eq!(config.rag.vector_storage.dimensions, 384);
+
+        // Environment: Dev logging and timeout
+        assert!(config.debug.enabled);
+        assert_eq!(config.debug.level, "debug");
+        assert_eq!(config.runtime.script_timeout_seconds, 600);
+    }
+
     // Note: Additional tests for circular extends detection, depth limits, and
-    // feature/env/backend/preset layers will be added in Tasks 13c.4.4-13c.4.9
+    // backend/preset layers will be added in Tasks 13c.4.6-13c.4.9
 }

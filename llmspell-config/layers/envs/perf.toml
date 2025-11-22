@@ -1,0 +1,30 @@
+# Performance Environment Layer
+# Error-only logging, maximum throughput, large caches
+
+[profile]
+name = "Performance Environment"
+description = "Maximum throughput configuration for performance testing"
+
+[debug]
+enabled = false
+level = "error"
+
+[debug.output]
+stdout = false
+colored = false
+format = "json"
+
+[runtime]
+strict_validation = false
+script_timeout_seconds = 600
+max_concurrent_scripts = 100
+enable_streaming = true
+
+[rag.embedding]
+cache_enabled = true
+cache_size = 100000
+cache_ttl_seconds = 86400
+batch_size = 500
+
+[rag.vector_storage]
+max_memory_mb = 8192
