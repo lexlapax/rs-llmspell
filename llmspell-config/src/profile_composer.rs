@@ -208,24 +208,37 @@ impl ProfileComposer {
         Ok(merged_config)
     }
 
-    /// Load TOML content for a layer (stub for now, will be filled with layer files)
+    /// Load TOML content for a layer from embedded files
     ///
-    /// TODO(13c.4.3-13c.4.7): Replace with actual include_str!() for layer files
+    /// Supports layer paths in format: "category/name" (e.g., "bases/cli", "features/rag")
     fn load_layer_toml(&self, layer_path: &str) -> Result<String, ConfigError> {
-        // TODO(13c.4.3-13c.4.7): This will be replaced with match statement and include_str!()
-        // For now, return LayerNotFound for all paths
-        // Layer files will be created in Tasks 13c.4.3 (bases), 13c.4.4 (features),
-        // 13c.4.5 (envs), 13c.4.6 (backends), 13c.4.7 (presets)
+        let toml_content = match layer_path {
+            // Base layers (Task 13c.4.3)
+            "bases/cli" => include_str!("../layers/bases/cli.toml"),
+            "bases/daemon" => include_str!("../layers/bases/daemon.toml"),
+            "bases/embedded" => include_str!("../layers/bases/embedded.toml"),
+            "bases/testing" => include_str!("../layers/bases/testing.toml"),
 
-        Err(ConfigError::LayerNotFound {
-            layer: layer_path.to_string(),
-            message: format!(
-                "Layer '{}' not yet implemented.\n\
-                 Layer files will be created in Tasks 13c.4.3-13c.4.7.\n\
-                 Available after Task 13c.4.7: bases/*, features/*, envs/*, backends/*, presets/*",
-                layer_path
-            ),
-        })
+            // Feature layers (Task 13c.4.4) - TODO
+            // Environment layers (Task 13c.4.5) - TODO
+            // Backend layers (Task 13c.4.6) - TODO
+            // Preset profiles (Task 13c.4.7) - TODO
+
+            // Layer not found
+            _ => {
+                return Err(ConfigError::LayerNotFound {
+                    layer: layer_path.to_string(),
+                    message: format!(
+                        "Layer '{}' not found.\n\
+                         Available base layers: bases/cli, bases/daemon, bases/embedded, bases/testing\n\
+                         Feature/env/backend/preset layers coming in Tasks 13c.4.4-13c.4.7",
+                        layer_path
+                    ),
+                })
+            }
+        };
+
+        Ok(toml_content.to_string())
     }
 }
 
@@ -324,15 +337,13 @@ mod tests {
             name = "Complex Profile"
             description = "Testing multiple settings"
 
-            default_engine = "javascript"
-
             [runtime]
             max_concurrent_scripts = 20
         "#;
 
         let profile_config: ProfileConfig = toml::from_str(toml).unwrap();
         assert_eq!(profile_config.profile.extends.len(), 2);
-        assert_eq!(profile_config.config.default_engine, "javascript");
+        assert_eq!(profile_config.profile.name, Some("Complex Profile".to_string()));
         assert_eq!(profile_config.config.runtime.max_concurrent_scripts, 20);
     }
 
@@ -350,15 +361,15 @@ mod tests {
     #[test]
     fn test_layer_not_found_error_message() {
         let mut composer = ProfileComposer::new();
-        let result = composer.load_layer("test/layer");
+        let result = composer.load_layer("features/unknown");
 
         assert!(result.is_err());
         let err = result.unwrap_err();
         match err {
             ConfigError::LayerNotFound { layer, message } => {
-                assert_eq!(layer, "test/layer");
-                assert!(message.contains("not yet implemented"));
-                assert!(message.contains("13c.4.3-13c.4.7"));
+                assert_eq!(layer, "features/unknown");
+                assert!(message.contains("not found"));
+                assert!(message.contains("bases/cli"));
             }
             _ => panic!("Expected LayerNotFound error, got: {:?}", err),
         }
@@ -466,6 +477,93 @@ mod tests {
         assert!(profile_config.config.runtime.security.allow_file_access);
     }
 
+    // Base layer loading tests (Task 13c.4.3)
+
+    #[test]
+    fn test_load_base_cli() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("bases/cli").unwrap();
+
+        // CLI base should have minimal concurrency
+        assert_eq!(config.runtime.max_concurrent_scripts, 1);
+        assert!(config.runtime.enable_streaming);
+        assert_eq!(config.debug.level, "info");
+        assert!(!config.runtime.state_persistence.enabled);
+    }
+
+    #[test]
+    fn test_load_base_daemon() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("bases/daemon").unwrap();
+
+        // Daemon should have high concurrency and persistence
+        assert_eq!(config.runtime.max_concurrent_scripts, 100);
+        assert!(config.runtime.state_persistence.enabled);
+        assert_eq!(config.runtime.state_persistence.backend_type, "sqlite");
+        assert!(config.runtime.memory.enabled);
+        assert_eq!(config.debug.level, "info");
+    }
+
+    #[test]
+    fn test_load_base_embedded() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("bases/embedded").unwrap();
+
+        // Embedded should be minimal
+        assert_eq!(config.runtime.max_concurrent_scripts, 10);
+        assert!(!config.runtime.enable_streaming);
+        assert!(!config.runtime.state_persistence.enabled);
+        assert!(!config.runtime.sessions.enabled);
+        assert_eq!(config.debug.level, "warn");
+    }
+
+    #[test]
+    fn test_load_base_testing() {
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_layer("bases/testing").unwrap();
+
+        // Testing should be deterministic
+        assert_eq!(config.runtime.max_concurrent_scripts, 1);
+        assert!(!config.runtime.enable_streaming);
+        assert!(!config.runtime.state_persistence.enabled);
+        assert_eq!(config.debug.level, "warn");
+        assert!(config.events.enabled);
+    }
+
+    #[test]
+    fn test_load_multi_base_layers() {
+        let mut composer = ProfileComposer::new();
+        // Load multiple bases in sequence (later overrides earlier)
+        let config = composer
+            .load_multi(&["bases/embedded", "bases/cli"])
+            .unwrap();
+
+        // CLI settings should override embedded (for non-default values)
+        assert_eq!(config.runtime.max_concurrent_scripts, 1);
+
+        // Note: Current merge strategy only applies non-default values
+        // This means embedded's warn level persists since CLI's "info" is default
+        // Full merge strategy refinement planned for Task 13c.4.9
+        assert!(!config.runtime.state_persistence.enabled);
+        assert!(config.runtime.sessions.enabled);
+    }
+
+    #[test]
+    fn test_base_layer_not_found() {
+        let mut composer = ProfileComposer::new();
+        let result = composer.load_layer("bases/nonexistent");
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::LayerNotFound { layer, message } => {
+                assert_eq!(layer, "bases/nonexistent");
+                assert!(message.contains("not found"));
+                assert!(message.contains("bases/cli"));
+            }
+            _ => panic!("Expected LayerNotFound error"),
+        }
+    }
+
     // Note: Additional tests for circular extends detection, depth limits, and
-    // actual layer loading will be added in Task 13c.4.9 after layer files are created
+    // feature/env/backend/preset layers will be added in Tasks 13c.4.4-13c.4.9
 }

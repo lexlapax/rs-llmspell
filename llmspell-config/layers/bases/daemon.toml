@@ -1,0 +1,78 @@
+# Daemon Base Layer
+# Long-running service for production deployments
+
+[profile]
+name = "Daemon Base"
+description = "Production daemon mode with persistence and monitoring"
+
+# High concurrency for multi-user service
+[runtime]
+max_concurrent_scripts = 100
+script_timeout_seconds = 600  # 10 minutes
+enable_streaming = true
+
+# Security: Restricted by default, override in specific features
+[runtime.security]
+allow_file_access = false
+allow_network_access = true
+allow_process_spawn = false
+max_memory_bytes = 2147483648  # 2GB
+max_execution_time_ms = 600000  # 10 minutes
+
+# State: SQLite persistence with backups
+[runtime.state_persistence]
+enabled = true
+backend_type = "sqlite"
+migration_enabled = true
+backup_enabled = true
+backup_on_migration = true
+
+# Sessions: Multi-session support with longer timeouts
+[runtime.sessions]
+enabled = true
+max_sessions = 1000
+max_artifacts_per_session = 100
+session_timeout_seconds = 86400  # 24 hours
+storage_backend = "sqlite"
+
+# Memory: Enable adaptive memory with consolidation daemon
+[runtime.memory]
+enabled = true
+
+[runtime.memory.daemon]
+enabled = true
+fast_interval_secs = 60
+normal_interval_secs = 300
+slow_interval_secs = 3600
+
+# Debug: Structured logging to file
+[debug]
+enabled = true
+level = "info"
+
+[debug.output]
+stdout = false
+colored = false
+format = "json"
+
+[debug.output.file]
+path = "/var/log/llmspell/daemon.log"
+append = true
+max_size = "100MB"
+max_files = 10
+
+[debug.performance]
+enabled = true
+auto_report_interval = 300  # Report every 5 minutes
+include_children = true
+min_duration_ms = 100
+
+# Events: Full event tracking with export
+[events]
+enabled = true
+buffer_size = 10000
+emit_timing_events = true
+emit_state_events = true
+
+[events.export]
+file = "/var/log/llmspell/events.jsonl"

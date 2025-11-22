@@ -1,0 +1,54 @@
+# Testing Base Layer
+# Reproducible test execution with deterministic behavior
+
+[profile]
+name = "Testing Base"
+description = "Deterministic testing mode with minimal side effects"
+
+# Single-threaded for deterministic tests
+[runtime]
+max_concurrent_scripts = 1
+script_timeout_seconds = 30
+enable_streaming = false
+
+# Security: Locked down for test safety
+[runtime.security]
+allow_file_access = false
+allow_network_access = false
+allow_process_spawn = false
+max_memory_bytes = 536870912  # 512MB
+max_execution_time_ms = 30000  # 30 seconds
+
+# State: In-memory only for test isolation
+[runtime.state_persistence]
+enabled = false
+
+# Sessions: Disabled for test simplicity
+[runtime.sessions]
+enabled = false
+
+# Memory: Disabled in test mode
+[runtime.memory]
+enabled = false
+
+# Debug: Warn level only, buffer output for assertions
+[debug]
+enabled = true
+level = "warn"
+
+[debug.output]
+stdout = true
+colored = false
+format = "text"
+
+[debug.output.buffer]
+enabled = true
+max_entries = 1000
+
+# Events: Enabled for test assertions
+[events]
+enabled = true
+buffer_size = 1000
+emit_timing_events = false
+emit_state_events = true
+emit_debug_events = false
