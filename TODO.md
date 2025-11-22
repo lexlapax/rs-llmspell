@@ -7416,60 +7416,55 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 **Critical Dependencies**: Phase 13c.2 (Profiles) - profiles must exist for validation
 **Priority**: CRITICAL (user-facing quality)
 
-### Task 13c.5.1: Top-Level Examples Cleanup ⏹ PENDING
+### Task 13c.5.1: Top-Level Examples Cleanup ✅ COMPLETE
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
 **Assignee**: Examples Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE
 
 **Description**: Move 4 top-level local_llm_*.lua files to script-users/ subdirectories.
 
 **Acceptance Criteria**:
-- [ ] 4 top-level Lua files moved
-- [ ] examples/ directory has <5 items
-- [ ] examples/README.md updated
-- [ ] All moved files have standard headers
-- [ ] Git history preserved (git mv)
+- [x] 4 top-level Lua files moved
+- [x] examples/ directory has <5 items (now 4: README + 3 dirs)
+- [x] examples/README.md updated
+- [x] All moved files have standard headers
+- [x] Git history preserved (git mv)
 
-**Implementation Steps**:
-1. Move files with git mv:
-   ```bash
-   git mv examples/local_llm_status.lua examples/script-users/features/local-llm-status.lua
-   git mv examples/local_llm_model_info.lua examples/script-users/features/local-llm-model-info.lua
-   ```
+**Implementation Completed**:
+1. ✅ Moved with git mv (history preserved):
+   - local_llm_status.lua → features/local-llm-status.lua
+   - local_llm_model_info.lua → features/local-llm-model-info.lua
 
-2. Merge chat examples:
-   ```bash
-   # Combine local_llm_chat.lua + local_llm_comparison.lua
-   # into examples/script-users/cookbook/local-llm-chat-patterns.lua
-   ```
+2. ✅ Merged chat examples:
+   - Combined local_llm_chat.lua + local_llm_comparison.lua
+   - Created cookbook/local-llm-chat-patterns.lua (168 lines)
+   - Includes interactive chat + backend comparison sections
 
-3. Update examples/README.md:
-   - Remove top-level Lua file references
-   - Add navigation to rust-developers/ and script-users/
-   - Add decision matrix: "Rust embedding vs Lua scripting"
+3. ✅ Updated examples/README.md:
+   - Fixed references to moved files
+   - Added decision matrix: "Rust Embedding vs Lua Scripting"
+   - Updated profile link to comprehensive guide (20 profiles)
 
-4. Add standard headers to moved files:
-   ```lua
-   -- ============================================================================
-   -- Example: Local LLM Status Check
-   -- Category: features
-   -- Phase: 13c
-   -- ============================================================================
-   -- Profile: ollama
-   -- Runtime: ~30 seconds
-   -- Prerequisites: Ollama installed and running
-   ```
+4. ✅ Added standard headers to all moved files:
+   - Profile specifications (minimal, ollama)
+   - Runtime estimates (1s, 10s, 5min)
+   - Complexity levels (BEGINNER, INTERMEDIATE)
+   - Prerequisites and usage examples
 
 **Definition of Done**:
-- [ ] Top-level examples/ reduced 10 → <5 items
-- [ ] Zero duplicate examples
-- [ ] Navigation clear in README
-- [ ] Standard headers on all files
+- [x] Top-level examples/ reduced 8 → 4 items (README + 3 dirs) ✅
+- [x] Zero duplicate examples
+- [x] Navigation clear in README with decision matrix
+- [x] Standard headers on all files
 
-**Files to Move/Modify**:
-- Move: `examples/local_llm_*.lua` → `examples/script-users/features/` or `cookbook/`
-- Update: `examples/README.md`
+**Commit**: 7b5a653c - 5 files changed (2 moved, 2 deleted, 1 created, 1 updated)
+
+**Files Modified**:
+- Moved: `examples/local_llm_{status,model_info}.lua` → `script-users/features/`
+- Created: `examples/script-users/cookbook/local-llm-chat-patterns.lua`
+- Deleted: `examples/local_llm_{chat,comparison}.lua`
+- Updated: `examples/README.md`
 
 ---
 
