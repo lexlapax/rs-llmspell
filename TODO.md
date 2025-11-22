@@ -7468,21 +7468,21 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.5.2: Rust Examples Consolidation ⏹ PENDING
+### Task 13c.5.2: Rust Examples Consolidation ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Rust Examples Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE
 
 **Description**: Reduce rust-developers from 6 → 3 examples by converting 2 to doc tests and 1 to developer guide.
 
 **Acceptance Criteria**:
-- [ ] 6 → 3 Rust example projects
-- [ ] async-patterns converted to doc tests in llmspell-core
-- [ ] builder-pattern converted to doc tests in llmspell-tools
-- [ ] extension-pattern moved to docs/developer-guide/extension-architecture.md
-- [ ] rust-developers/README.md updated
-- [ ] Doc tests compile and pass
+- [x] 6 → 3 Rust example projects
+- [x] async-patterns converted to doc tests in llmspell-core
+- [x] builder-pattern converted to doc tests in llmspell-tools
+- [x] extension-pattern moved to docs/developer-guide/extension-architecture.md
+- [x] rust-developers/README.md updated
+- [x] Doc tests compile and pass
 
 **Implementation Steps**:
 1. Keep core 3 examples:
@@ -7547,20 +7547,46 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
    ```
 
 **Definition of Done**:
-- [ ] Rust examples reduced 6 → 3 projects
-- [ ] Doc tests compile and pass
-- [ ] Extension architecture doc comprehensive
-- [ ] Zero functionality lost
-- [ ] rust-developers/README.md current
+- [x] Rust examples reduced 6 → 3 projects ✅
+- [x] Doc tests compile and pass (84 llmspell-core + 2 llmspell-tools) ✅
+- [x] Extension architecture doc comprehensive (500+ lines) ✅
+- [x] Zero functionality lost ✅
+- [x] rust-developers/README.md current ✅
 
-**Files/Directories to Modify**:
-- Remove: `examples/rust-developers/async-patterns-example/`
-- Remove: `examples/rust-developers/builder-pattern-example/`
-- Remove: `examples/rust-developers/extension-pattern-example/`
-- Create: `docs/developer-guide/extension-architecture.md`
-- Update: `examples/rust-developers/README.md`
-- Update: `llmspell-core/src/agent.rs` (doc tests)
-- Update: `llmspell-tools/src/tool.rs` (doc tests)
+**Implementation Completed**:
+1. ✅ Added async pattern doc tests to llmspell-core/src/traits/base_agent.rs:
+   - Concurrent execution with tokio::join! (lines 71-113)
+   - Timeout patterns with tokio::time::timeout (lines 115-156)
+   - Select patterns with tokio::select! (lines 158-198)
+
+2. ✅ Added builder pattern doc tests to llmspell-tools/src/lib.rs:
+   - Basic builder pattern with method chaining (lines 14-143)
+   - Builder validation examples (lines 149-228)
+   - Fixed Result<T, E> type alias usage
+
+3. ✅ Created docs/developer-guide/extension-architecture.md (500+ lines):
+   - Extension trait definition patterns
+   - Plugin registry implementation
+   - Extensible component examples
+   - Best practices and advanced patterns
+   - Integration with Tools and Agents
+
+4. ✅ Removed 3 example directories with git rm:
+   - async-patterns-example → doc tests
+   - builder-pattern-example → doc tests
+   - extension-pattern-example → developer guide
+
+5. ✅ Updated examples/rust-developers/README.md:
+   - Changed from "6 examples" to "3 core examples"
+   - Added "Advanced Patterns" section with doc test links
+   - Updated learning paths and recommendations
+   - Reduced estimated time: 30min → 15min
+
+6. ✅ Updated workspace Cargo.toml:
+   - Removed 3 deleted example workspace members
+   - Fixed workspace compilation
+
+**Commit**: cbc06cdb - 14 files changed (+1058 -2087)
 
 ---
 
