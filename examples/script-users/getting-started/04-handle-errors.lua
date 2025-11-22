@@ -1,19 +1,20 @@
--- Recommended profile: minimal
--- Run with: llmspell -p minimal run 04-handle-errors.lua
--- Basic tools and workflows
-
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Example ID: 04 - Error Handling v0.7.0
+-- Phase: 13c.5.3 - Getting-Started Streamlining
+-- Category: getting-started
+-- Profile: state (recommended)
+-- Example ID: 04 - Error Handling v0.14.0
 -- Complexity Level: BEGINNER
 -- Real-World Use Case: Robust automation with graceful error recovery
 --
 -- Purpose: Learn essential error handling patterns for production scripts.
 --          Demonstrates pcall for error catching, result validation, fallback
 --          strategies, and user-friendly error reporting. Critical for reliability.
+--
 -- Architecture: Defensive programming with error boundaries
 -- Crates Showcased: llmspell-tools, llmspell-agents, llmspell-state, llmspell-bridge
+--
 -- Key Features:
 --   • Safe function wrapping with pcall
 --   • Result validation patterns
@@ -23,12 +24,13 @@
 --
 -- Prerequisites:
 --   • LLMSpell installed and built
---   • Optional: API keys for agent testing (OPENAI_API_KEY or ANTHROPIC_API_KEY)
---   • Optional: Use `-p state` for state persistence testing
+--   • Optional: OPENAI_API_KEY or ANTHROPIC_API_KEY for agent testing
+--   • Optional: Use `-p state` for state persistence demo
 --
 -- HOW TO RUN:
 -- # Basic (no state):
--- ./target/debug/llmspell run examples/script-users/getting-started/04-handle-errors.lua
+-- ./target/debug/llmspell -p minimal \
+--   run examples/script-users/getting-started/04-handle-errors.lua
 --
 -- # With state enabled:
 -- ./target/debug/llmspell -p state \
@@ -40,7 +42,7 @@
 -- State operations with proper scope handling
 -- Best practices demonstrated
 --
--- Time to Complete: <5 seconds
+-- Runtime: ~5 seconds
 -- ============================================================
 
 print("=== LLMSpell: Handling Errors ===")

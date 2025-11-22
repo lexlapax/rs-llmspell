@@ -2,26 +2,28 @@
 
 Progressive examples to learn LLMSpell from scratch. Each example builds on the previous one.
 
+**Total Time**: ~30 minutes | **Examples**: 5 | **Complexity**: BEGINNER → INTERMEDIATE
+
 ## 🚀 Quick Start
 
 ```bash
-# 1. Verify installation
+# 1. Verify installation (2 seconds)
 ./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua
 
-# 2. Try your first tool
+# 2. Try your first tool (5 seconds)
 ./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua
 
-# 3. Create an agent (requires API key)
+# 3. Create an agent (10 seconds, requires API key)
 ./target/debug/llmspell -p providers run examples/script-users/getting-started/02-first-agent.lua
 
-# 4. Build a workflow
+# 4. Build a workflow (20 milliseconds)
 ./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua
 
-# 5. Handle errors properly
+# 5. Handle errors properly (5 seconds)
 ./target/debug/llmspell -p state run examples/script-users/getting-started/04-handle-errors.lua
 
-# 6. Build a RAG system (requires embedding API)
-./target/debug/llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
+# 6. Memory, RAG & Context Assembly (10 minutes, requires API key)
+./target/debug/llmspell -p memory-development run examples/script-users/getting-started/05-memory-rag-advanced.lua
 ```
 
 ## 🎯 Learning Path
@@ -87,19 +89,34 @@ Progressive examples to learn LLMSpell from scratch. Each example builds on the 
 ./target/debug/llmspell -p state run 04-handle-errors.lua
 ```
 
-### Step 6: Your First RAG System (15 seconds)
-**File**: `05-first-rag.lua`
-**Learn**: Document ingestion, vector embeddings, semantic search, RAG with agents
-**Prerequisites**: OpenAI API key (for text-embedding-ada-002)
-**Key Concepts**: RAG.ingest(), RAG.search(), vector similarity, context augmentation
+### Step 6: Memory, RAG & Context Assembly (10 minutes)
+**File**: `05-memory-rag-advanced.lua`
+**Complexity**: INTERMEDIATE
+**Learn**: Complete memory & retrieval system integration
+**Prerequisites**: OpenAI API key (for embeddings), understanding of examples 00-04
+**Key Concepts**:
+- **RAG**: Document ingestion, vector embeddings, semantic search
+- **Memory**: Episodic conversation tracking with session isolation
+- **Context**: Token-budgeted context assembly with reranking
+- **Integration**: End-to-end workflow combining all three systems
 
 ```bash
-./target/debug/llmspell -p rag-dev run 05-first-rag.lua
-# Ingests documents, performs semantic searches, and uses RAG with agents
+./target/debug/llmspell -p memory-development run 05-memory-rag-advanced.lua
+# Comprehensive demo of RAG, Memory, and Context working together
 
-# For production RAG settings:
-./target/debug/llmspell -p rag-prod run 05-first-rag.lua
+# What you'll see:
+# Section 1: RAG - Ingest 5 programming docs, perform semantic searches
+# Section 2: Memory - Track conversation exchanges across sessions
+# Section 3: Context - Assemble context with token budgets
+# Section 4: Integration - Combine RAG + Memory + Agent workflow
+# Section 5: Statistics - View system metrics and performance
 ```
+
+**This example demonstrates**:
+- How to build AI that learns from documents (RAG)
+- How to build AI that remembers conversations (Memory)
+- How to build AI that selects relevant context (Context Assembly)
+- How to integrate all three for production-ready systems
 
 ## 💡 Common Patterns
 

@@ -1,19 +1,20 @@
--- Recommended profile: minimal
--- Run with: llmspell -p minimal run 03-first-workflow.lua
--- Basic tools and workflows
-
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Example ID: 03 - First Workflow v0.7.0
+-- Phase: 13c.5.3 - Getting-Started Streamlining
+-- Category: getting-started
+-- Profile: minimal (recommended)
+-- Example ID: 03 - First Workflow v0.14.0
 -- Complexity Level: BEGINNER
 -- Real-World Use Case: Multi-step automation and process orchestration
 --
 -- Purpose: Learn workflow creation and execution. Demonstrates how to chain
 --          multiple tools together in a sequential workflow, pass data between
 --          steps, and handle workflow results. Foundation for complex automation.
+--
 -- Architecture: Sequential workflow pattern with step chaining
 -- Crates Showcased: llmspell-workflows, llmspell-tools, llmspell-bridge
+--
 -- Key Features:
 --   • Workflow builder pattern
 --   • Sequential step execution
@@ -27,7 +28,8 @@
 --   • No API keys required
 --
 -- HOW TO RUN:
--- ./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua
+-- ./target/debug/llmspell -p minimal \
+--   run examples/script-users/getting-started/03-first-workflow.lua
 --
 -- EXPECTED OUTPUT:
 -- Workflow created with 4 steps
@@ -36,7 +38,7 @@
 -- Step 3: Calculated hash
 -- Step 4: Created summary file at /tmp/workflow_[uuid].txt
 --
--- Time to Complete: <20 milliseconds
+-- Runtime: ~20 milliseconds
 -- ============================================================
 
 print("=== LLMSpell: Your First Workflow ===")

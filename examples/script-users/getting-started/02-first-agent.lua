@@ -1,19 +1,20 @@
--- Recommended profile: development
--- Run with: llmspell -p development run 02-first-agent.lua
--- LLM provider required (OpenAI/Anthropic/Gemini)
-
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Example ID: 02 - First Agent v0.7.0
+-- Phase: 13c.5.3 - Getting-Started Streamlining
+-- Category: getting-started
+-- Profile: providers (recommended)
+-- Example ID: 02 - First Agent v0.14.0
 -- Complexity Level: BEGINNER
 -- Real-World Use Case: Creating AI assistants for automation and support
 --
 -- Purpose: Learn how to create and interact with LLM agents. Demonstrates
 --          agent builder pattern, configuration options, and basic prompting.
 --          This is your gateway to AI-powered automation in LLMSpell.
+--
 -- Architecture: Agent builder pattern with provider abstraction
 -- Crates Showcased: llmspell-agents, llmspell-bridge
+--
 -- Key Features:
 --   • Agent builder pattern
 --   • Provider detection and selection
@@ -23,7 +24,7 @@
 --
 -- Prerequisites:
 --   • LLMSpell installed and built
---   • API key: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable
+--   • Environment: OPENAI_API_KEY or ANTHROPIC_API_KEY
 --   • Network connectivity for API calls
 --
 -- HOW TO RUN:
@@ -36,7 +37,7 @@
 -- Agent response: "2 + 2 equals 4"
 -- Agent info: provider and model details
 --
--- Time to Complete: <10 seconds
+-- Runtime: ~10 seconds
 -- ============================================================
 
 print("=== LLMSpell: Your First Agent ===")
