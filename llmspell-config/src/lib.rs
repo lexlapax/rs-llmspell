@@ -26,6 +26,8 @@ pub mod engines;
 pub mod env;
 pub mod env_registry;
 pub mod memory;
+pub mod merge;
+pub mod profile_composer;
 pub mod providers;
 pub mod rag;
 pub mod tools;
@@ -1621,6 +1623,19 @@ pub enum ConfigError {
 
     #[error("Environment variable parsing error: {message}")]
     Environment { message: String },
+
+    #[error("Circular extends detected in profile '{profile}': {chain:?}")]
+    CircularExtends { profile: String, chain: Vec<String> },
+
+    #[error("Layer not found: {layer} - {message}")]
+    LayerNotFound { layer: String, message: String },
+
+    #[error("Extends chain too deep in profile '{profile}': depth {depth} exceeds maximum {max}")]
+    ExtendsChainTooDeep {
+        profile: String,
+        depth: usize,
+        max: usize,
+    },
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

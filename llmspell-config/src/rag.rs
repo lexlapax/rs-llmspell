@@ -53,7 +53,7 @@ impl Default for VectorStorageConfig {
 }
 
 /// Vector storage backend types
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum VectorBackend {
     /// HNSW (Hierarchical Navigable Small World) index
@@ -229,7 +229,7 @@ impl HNSWConfig {
 }
 
 /// Distance metrics for vector similarity
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum DistanceMetric {
     /// Cosine similarity (most common for embeddings)
@@ -303,7 +303,7 @@ impl Default for ChunkingConfig {
 }
 
 /// Document chunking strategies
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ChunkingStrategy {
     /// Simple sliding window approach

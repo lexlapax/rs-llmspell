@@ -26,7 +26,7 @@ pub enum SecurityLevel {
 }
 
 /// Standard library access level
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 pub enum StdlibLevel {
     None,
     Basic,
