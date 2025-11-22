@@ -1082,47 +1082,17 @@ impl LLMSpellConfig {
     ///
     /// Returns `ConfigError::NotFound` if the profile name is not recognized.
     fn load_builtin_profile(name: &str) -> Result<Self, ConfigError> {
-        let toml_content = match name {
-            // Core profiles
-            "minimal" => include_str!("../builtins/minimal.toml"),
-            "development" => include_str!("../builtins/development.toml"),
-            "default" => include_str!("../builtins/default.toml"),
-
-            // Common workflow profiles
-            "providers" => include_str!("../builtins/providers.toml"),
-            "state" => include_str!("../builtins/state.toml"),
-            "sessions" => include_str!("../builtins/sessions.toml"),
-
-            // Local LLM profiles
-            "ollama" => include_str!("../builtins/ollama.toml"),
-            "candle" => include_str!("../builtins/candle.toml"),
-
-            // Memory system profile
-            "memory" => include_str!("../builtins/memory.toml"),
-
-            // RAG profiles
-            "rag-dev" => include_str!("../builtins/rag-development.toml"),
-            "rag-prod" => include_str!("../builtins/rag-production.toml"),
-            "rag-perf" => include_str!("../builtins/rag-performance.toml"),
-
-            _ => {
-                return Err(ConfigError::NotFound {
-                    path: format!("builtin:{}", name),
-                    message: format!(
-                        "Unknown builtin profile '{}'.\n\
-                         Available profiles:\n\
-                         Core: minimal, development, default\n\
-                         Common: providers, state, sessions\n\
-                         Local LLM: ollama, candle\n\
-                         Memory: memory\n\
-                         RAG: rag-dev, rag-prod, rag-perf",
-                        name
-                    ),
-                });
-            }
-        };
-
-        Self::from_toml(toml_content)
+        // TODO(13c.4): Profile system rearchitecture in progress
+        // Monolithic profiles deleted, layer-based composition system being implemented
+        Err(ConfigError::NotFound {
+            path: format!("builtin:{}", name),
+            message: format!(
+                "Builtin profile '{}' not available - profile system rearchitecture in progress.\n\
+                 Old monolithic profiles have been removed.\n\
+                 Layer-based composition system coming in Task 13c.4.2+",
+                name
+            ),
+        })
     }
 
     /// List available builtin profiles
@@ -1135,30 +1105,15 @@ impl LLMSpellConfig {
     /// ```rust
     /// use llmspell_config::LLMSpellConfig;
     ///
+    /// // TODO(13c.4): Profile system rearchitecture in progress
     /// let profiles = LLMSpellConfig::list_builtin_profiles();
-    /// assert_eq!(profiles.len(), 12);
-    /// assert!(profiles.contains(&"default"));
-    /// assert!(profiles.contains(&"development"));
-    /// assert!(profiles.contains(&"memory"));
-    /// assert!(profiles.contains(&"ollama"));
-    /// assert!(profiles.contains(&"rag-prod"));
+    /// assert_eq!(profiles.len(), 0); // Temporarily empty during rearchitecture
     /// ```
     #[must_use]
     pub fn list_builtin_profiles() -> Vec<&'static str> {
-        vec![
-            "minimal",
-            "development",
-            "default",
-            "providers",
-            "state",
-            "sessions",
-            "ollama",
-            "candle",
-            "memory",
-            "rag-dev",
-            "rag-prod",
-            "rag-perf",
-        ]
+        // TODO(13c.4): Profile system rearchitecture in progress
+        // Old monolithic profiles deleted, layer-based system coming in 13c.4.2+
+        vec![]
     }
 
     /// Get metadata for a specific builtin profile
@@ -1171,191 +1126,16 @@ impl LLMSpellConfig {
     /// ```rust
     /// use llmspell_config::LLMSpellConfig;
     ///
-    /// let metadata = LLMSpellConfig::get_profile_metadata("providers").unwrap();
-    /// assert_eq!(metadata.category, "Common Workflows");
-    /// assert_eq!(metadata.name, "providers");
+    /// // TODO(13c.4): Profile system rearchitecture in progress
+    /// let metadata = LLMSpellConfig::get_profile_metadata("providers");
+    /// assert!(metadata.is_none()); // Temporarily None during rearchitecture
     /// ```
     #[must_use]
-    pub fn get_profile_metadata(name: &str) -> Option<ProfileMetadata> {
-        match name {
-            "minimal" => Some(ProfileMetadata {
-                name: "minimal",
-                category: "Core",
-                description: "Tools only, no LLM providers",
-                use_cases: vec![
-                    "Testing tools",
-                    "Learning workflow patterns",
-                    "Scripts without LLM access",
-                ],
-                features: vec!["Lua stdlib: Basic", "No providers", "No RAG", "No sessions"],
-            }),
-            "development" => Some(ProfileMetadata {
-                name: "development",
-                category: "Core",
-                description: "Dev settings with debug logging",
-                use_cases: vec!["Development", "Debugging", "Learning LLM integration"],
-                features: vec![
-                    "Lua stdlib: All",
-                    "OpenAI + Anthropic",
-                    "Debug logging",
-                    "Small resource limits",
-                ],
-            }),
-            "default" => Some(ProfileMetadata {
-                name: "default",
-                category: "Core",
-                description: "Simple local LLM setup using Ollama",
-                use_cases: vec![
-                    "General purpose scripting",
-                    "Template execution",
-                    "Agent development",
-                ],
-                features: vec![
-                    "Lua stdlib: All",
-                    "Ollama provider (llama3.2:3b)",
-                    "4096 max tokens",
-                    "Sensible defaults",
-                ],
-            }),
-            "providers" => Some(ProfileMetadata {
-                name: "providers",
-                category: "Common Workflows",
-                description: "OpenAI + Anthropic setup",
-                use_cases: vec!["Agent examples", "LLM scripts", "Production agents"],
-                features: vec![
-                    "OpenAI gpt-3.5-turbo",
-                    "Anthropic claude-3-haiku",
-                    "Cost-efficient models",
-                    "No RAG",
-                ],
-            }),
-            "state" => Some(ProfileMetadata {
-                name: "state",
-                category: "Common Workflows",
-                description: "State persistence with memory backend",
-                use_cases: vec![
-                    "State management examples",
-                    "Scripts requiring state",
-                    "Learning persistence",
-                ],
-                features: vec![
-                    "Memory backend",
-                    "10MB max state",
-                    "No providers",
-                    "Migration/backup disabled",
-                ],
-            }),
-            "sessions" => Some(ProfileMetadata {
-                name: "sessions",
-                category: "Common Workflows",
-                description: "Sessions + state + hooks + events",
-                use_cases: vec![
-                    "Conversational apps",
-                    "Session management",
-                    "Event-driven workflows",
-                ],
-                features: vec![
-                    "Session tracking",
-                    "Artifact storage",
-                    "Hooks enabled",
-                    "Events enabled",
-                ],
-            }),
-            "ollama" => Some(ProfileMetadata {
-                name: "ollama",
-                category: "Local LLM",
-                description: "Ollama backend configuration",
-                use_cases: vec!["Local LLM with Ollama", "Offline inference", "GGUF models"],
-                features: vec![
-                    "Ollama provider",
-                    "Local inference",
-                    "No API keys needed",
-                    "Full stdlib",
-                ],
-            }),
-            "candle" => Some(ProfileMetadata {
-                name: "candle",
-                category: "Local LLM",
-                description: "Candle embedded inference",
-                use_cases: vec![
-                    "Local LLM with Candle",
-                    "CPU/GPU inference",
-                    "Rust-native models",
-                ],
-                features: vec![
-                    "Candle provider",
-                    "Rust inference",
-                    "No API keys needed",
-                    "Full stdlib",
-                ],
-            }),
-            "memory" => Some(ProfileMetadata {
-                name: "memory",
-                category: "Memory System",
-                description: "Adaptive memory with LLM consolidation and temporal knowledge graph",
-                use_cases: vec![
-                    "Long-running agents",
-                    "Knowledge accumulation",
-                    "RAG with episodic memory",
-                ],
-                features: vec![
-                    "Episodic memory storage",
-                    "LLM-driven consolidation",
-                    "Bi-temporal knowledge graph",
-                    "Context-aware retrieval",
-                    "Adaptive daemon scheduling",
-                ],
-            }),
-            "rag-dev" => Some(ProfileMetadata {
-                name: "rag-dev",
-                category: "RAG",
-                description: "Development RAG (small dims, fast)",
-                use_cases: vec![
-                    "Learning RAG",
-                    "Prototyping knowledge bases",
-                    "Fast iteration",
-                ],
-                features: vec![
-                    "384-dim vectors",
-                    "HNSW index",
-                    "OpenAI embeddings",
-                    "Small memory footprint",
-                ],
-            }),
-            "rag-prod" => Some(ProfileMetadata {
-                name: "rag-prod",
-                category: "RAG",
-                description: "Production RAG (reliability, monitoring)",
-                use_cases: vec![
-                    "Production RAG deployment",
-                    "Large knowledge bases",
-                    "SaaS platforms",
-                ],
-                features: vec![
-                    "1536-dim vectors",
-                    "Caching enabled",
-                    "Monitoring ready",
-                    "Production settings",
-                ],
-            }),
-            "rag-perf" => Some(ProfileMetadata {
-                name: "rag-perf",
-                category: "RAG",
-                description: "Performance RAG (high memory, cores)",
-                use_cases: vec![
-                    "High-performance RAG",
-                    "Large-scale search",
-                    "Multi-core systems",
-                ],
-                features: vec![
-                    "Optimized HNSW",
-                    "Large caches",
-                    "Multi-threaded",
-                    "High memory limits",
-                ],
-            }),
-            _ => None,
-        }
+    pub fn get_profile_metadata(_name: &str) -> Option<ProfileMetadata> {
+        // TODO(13c.4): Profile system rearchitecture in progress
+        // Old monolithic profile metadata removed
+        // Layer-based metadata coming in 13c.4.2+
+        None
     }
 
     /// List metadata for all builtin profiles
@@ -1368,11 +1148,13 @@ impl LLMSpellConfig {
     /// ```rust
     /// use llmspell_config::LLMSpellConfig;
     ///
+    /// // TODO(13c.4): Profile system rearchitecture in progress
     /// let all_metadata = LLMSpellConfig::list_profile_metadata();
-    /// assert_eq!(all_metadata.len(), 12);
+    /// assert_eq!(all_metadata.len(), 0); // Temporarily empty during rearchitecture
     /// ```
     #[must_use]
     pub fn list_profile_metadata() -> Vec<ProfileMetadata> {
+        // Automatically returns empty vec since list_builtin_profiles() is empty
         Self::list_builtin_profiles()
             .iter()
             .filter_map(|name| Self::get_profile_metadata(name))
@@ -2120,6 +1902,25 @@ timeout_seconds = 300
         assert_eq!(candle.timeout_seconds, Some(300));
     }
 
+    /* TODO(13c.4): Profile system tests temporarily commented out during rearchitecture
+     * These tests will be uncommented and updated in Task 13c.4.9 (Testing & Validation)
+     * Old monolithic profile tests removed, new layer-based tests coming
+     *
+     * Commented out tests (11 total):
+     * - test_list_builtin_profiles
+     * - test_load_builtin_profile_minimal
+     * - test_load_builtin_profile_development
+     * - test_load_builtin_profile_rag_dev
+     * - test_load_builtin_profile_providers
+     * - test_load_builtin_profile_state
+     * - test_load_builtin_profile_sessions
+     * - test_load_builtin_profile_default
+     * - test_load_builtin_profile_memory
+     * - test_load_builtin_profile_unknown
+     * - test_load_with_profile_precedence
+     */
+
+    /* REARCHITECTURE - Profile system tests start here
     // Profile system tests
     #[test]
     fn test_list_builtin_profiles() {
@@ -2455,4 +2256,5 @@ timeout_seconds = 300
         // Should use defaults if no config file found
         assert_eq!(config2.default_engine, "lua");
     }
+    REARCHITECTURE - Profile system tests end here */
 }
