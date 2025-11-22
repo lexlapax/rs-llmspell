@@ -76,24 +76,37 @@ Available for all commands:
 
 ```bash
 -c, --config <CONFIG>      Configuration file
--p, --profile <PROFILE>    Built-in profile (minimal, development, providers, etc.)
+-p, --profile <PROFILE>    Built-in profile name or multi-layer composition
 --trace <LEVEL>            Trace level (off, error, warn, info, debug, trace)
 --output <FORMAT>          Output format (text, json, pretty)
 -h, --help                 Print help
 -V, --version              Print version
 ```
 
-**Built-in Profiles**:
-- `minimal` - Tools only, no LLM providers
-- `development` - Dev settings with debug logging
-- `providers` - OpenAI + Anthropic setup
-- `state` - State persistence with memory backend
-- `sessions` - Sessions + state + hooks + events
-- `ollama` - Ollama backend configuration
-- `candle` - Candle embedded inference
-- `rag-dev` - Development RAG (small dims, fast)
-- `rag-prod` - Production RAG (reliability, monitoring)
-- `rag-perf` - Performance RAG (high memory, cores)
+**Profile Syntax** (v0.14.0):
+```bash
+# Single preset name
+llmspell -p minimal run script.lua
+
+# Multi-layer composition (bases/features/envs/backends)
+llmspell -p bases/cli,features/rag,envs/dev,backends/sqlite run script.lua
+```
+
+**Built-in Presets** (20 total - see [Configuration Guide](03-configuration.md#builtin-profiles)):
+
+**Core**: `minimal`, `development`, `providers`, `state`, `sessions`, `default`
+
+**Local**: `ollama`, `candle`, `full-local-ollama`
+
+**RAG**: `rag-dev`, `rag-prod`, `rag-perf`
+
+**Advanced**: `memory`, `research`
+
+**Production**: `gemini-prod`, `openai-prod`, `claude-prod`, `daemon-dev`, `daemon-prod`, `postgres-prod`
+
+For complete preset documentation and multi-layer composition examples, see:
+- [Configuration Guide](03-configuration.md#builtin-profiles) - All 20 presets with examples
+- [Profile Layers Guide](profile-layers-guide.md) - Complete 4-layer architecture documentation
 
 ## Script Execution Commands
 

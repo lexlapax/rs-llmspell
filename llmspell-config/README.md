@@ -1,20 +1,37 @@
 # llmspell-config
 
-Comprehensive configuration management for Rs-LLMSpell framework with specialized RAG, multi-tenant, and performance tuning support.
+**Version**: 0.14.0
+**Phase**: 13c.4 (Storage Consolidation)
+
+Composable configuration management for LLMSpell using a **4-layer architecture** with 20 builtin presets.
 
 ## Features
 
-### Core Configuration Management
-- **Layered Configuration**: Hierarchical config (defaults → file → environment → runtime)
-- **Type-Safe Validation**: Compile-time configuration validation with serde
-- **Hot-Reloading**: Dynamic configuration updates without service restart
-- **Environment Integration**: Seamless development, staging, production configurations
+### 4-Layer Profile Architecture (v0.14.0)
 
-### RAG Configuration (Phase 8)
-- **HNSW Tuning**: Advanced vector search optimization with preset profiles
-- **Embedding Configuration**: Multi-provider embedding settings with fallback chains
-- **Pipeline Configuration**: End-to-end RAG pipeline tuning with performance profiles
-- **Multi-Tenant Settings**: Tenant-specific configuration with inheritance and overrides
+The configuration system is built on **composable layers** that combine to create complete profiles:
+
+- **18 Reusable Layers** (4 bases + 7 features + 4 envs + 3 backends)
+- **20 Builtin Presets** (12 backward-compatible + 8 new combinations)
+- **Multi-Layer Composition** (`bases/cli,features/rag,envs/dev,backends/sqlite`)
+- **Deep Merge Strategy** with precedence rules
+
+**Layer Types**:
+1. **bases/** - Deployment modes (cli, daemon, embedded, testing)
+2. **features/** - Capabilities (minimal, llm, rag, memory, state, full, local)
+3. **envs/** - Environment tuning (dev, staging, prod, perf)
+4. **backends/** - Storage backends (memory, sqlite, postgres)
+
+See:
+- [Layer Catalog](layers/README.md) - Complete layer documentation
+- [Preset Catalog](presets/README.md) - 20 builtin preset profiles
+- [Profile Layers Guide](../docs/user-guide/profile-layers-guide.md) - Comprehensive user guide
+
+### Core Configuration Management
+- **Type-Safe Validation**: Compile-time configuration validation with serde
+- **Extends Resolution**: Recursive layer composition with circular detection
+- **Deep Merge**: Sophisticated merging with precedence rules
+- **Environment Integration**: Seamless development, staging, production configurations
 
 ## Usage
 

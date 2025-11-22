@@ -58,84 +58,232 @@ export OPENAI_API_KEY="sk-..."
 ./target/release/llmspell --trace debug -p development run script.lua
 ```
 
-See [Builtin Profiles](#builtin-profiles) below for complete list of 10 available profiles.
+See [Builtin Profiles](#builtin-profiles) below for complete list of 20 available profiles, or [Profile Layers Guide](profile-layers-guide.md) for comprehensive documentation.
 
 ---
 
 ## Builtin Profiles
 
-LLMSpell includes **10 builtin configuration profiles** that cover most use cases without requiring custom configuration files.
+**Version 0.14.0**: LLMSpell includes **20 builtin configuration profiles** powered by a composable **4-layer architecture**. Profiles can be used directly by name, or composed from individual layers for custom configurations.
 
-### Core Profiles
+### Three Ways to Use Profiles
+
+**1. Single preset name** (backward compatible):
+```bash
+llmspell -p minimal run script.lua
+```
+
+**2. Explicit preset path**:
+```bash
+llmspell -p presets/rag-dev run script.lua
+```
+
+**3. Multi-layer composition** ⭐ NEW:
+```bash
+llmspell -p bases/cli,features/rag,envs/dev,backends/sqlite run script.lua
+```
+
+The multi-layer syntax uses a **4-layer architecture**:
+- **bases/** - Deployment mode (cli, daemon, embedded, testing)
+- **features/** - Capabilities (minimal, llm, rag, memory, state, full, local)
+- **envs/** - Environment tuning (dev, staging, prod, perf)
+- **backends/** - Storage backend (memory, sqlite, postgres)
+
+### Quick Reference
+
+| Use Case | Preset | Composition Equivalent |
+|----------|--------|----------------------|
+| **Tools only** | `minimal` | `bases/cli,features/minimal` |
+| **Agent dev** | `development` | `bases/cli,features/llm,envs/dev` |
+| **RAG dev** | `rag-dev` | `bases/cli,features/rag,envs/dev,backends/sqlite` |
+| **Production RAG** | `rag-prod` | `bases/cli,features/rag,envs/prod,backends/sqlite` |
+| **Memory system** | `memory` | `bases/cli,features/memory,envs/dev,backends/sqlite` |
+| **Full stack** | `gemini-prod` | `bases/cli,features/full,envs/prod,backends/sqlite` |
+| **Local offline** | `full-local-ollama` | `bases/cli,features/full,envs/dev,backends/sqlite` |
+| **Production daemon** | `daemon-prod` | `bases/daemon,features/full,envs/prod,backends/postgres` |
+
+### Core Profiles (Backward Compatible)
 
 **minimal** - Tools and workflows only, no LLM providers
 ```bash
 llmspell -p minimal run script.lua
 ```
-Use for: Testing tools, learning workflow patterns, scripts that don't need LLM access
+**What's enabled**: Tool execution, basic workflows
+**What's disabled**: LLM providers, RAG, memory, graph
+
+---
 
 **development** - Full development environment with debug logging
 ```bash
 llmspell -p development run script.lua
 ```
-Use for: Development, debugging, comprehensive logging and tracing
+**What's enabled**: All LLM providers, debug logging, in-memory state
+**What's disabled**: Persistence, RAG, memory system
 
-### Common Workflow Profiles
+---
 
-**providers** - Simple OpenAI + Anthropic agent setup
+**providers** - Simple OpenAI + Anthropic + Gemini agent setup
 ```bash
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 llmspell -p providers run script.lua
 ```
-Use for: Agent examples, basic LLM scripts, getting started
+**What's enabled**: All cloud LLM providers
+**What's disabled**: Persistence, RAG, memory
+
+---
 
 **state** - State persistence with memory backend
 ```bash
 llmspell -p state run script.lua
 ```
-Use for: State management examples, data persistence across runs
+**What's enabled**: State persistence, sessions, hooks, events
+**What's disabled**: LLM providers, RAG, disk persistence
+
+---
 
 **sessions** - Full session management (state + hooks + events)
 ```bash
 llmspell -p sessions run script.lua
 ```
-Use for: Conversational applications, session-based workflows
+**What's enabled**: State persistence (SQLite), sessions, hooks, events, artifacts
+
+---
 
 ### Local LLM Profiles
 
 **ollama** - Local LLM via Ollama backend
 ```bash
-llmspell -p ollama run script.lua
+llmspell -p ollama run script.lua  # Requires: ollama serve
 ```
-Use for: Privacy-focused applications, offline LLM usage (requires Ollama running)
+**What's enabled**: Ollama provider, Candle provider, SQLite persistence
 
-**candle** - Local LLM via Candle backend (CPU/GPU)
+---
+
+**candle** - Local LLM via Candle backend
 ```bash
 llmspell -p candle run script.lua
 ```
-Use for: On-device inference, custom model deployment
+**What's enabled**: Candle provider, Ollama provider, SQLite persistence
 
-### RAG Profiles (Phase 8)
+---
 
-**rag-dev** - RAG development with debug features
+**full-local-ollama** ⭐ NEW - Complete local stack (Ollama + all features)
+```bash
+llmspell -p full-local-ollama run offline-app.lua
+```
+**What's enabled**: Graph, RAG, memory, context, Ollama default provider, SQLite
+
+---
+
+### RAG Profiles (Phase 13)
+
+**rag-dev** - RAG development with debug logging
 ```bash
 export OPENAI_API_KEY="sk-..."  # For embeddings
-llmspell -p rag-dev run script.lua
+llmspell -p rag-dev run doc-search.lua
 ```
-Use for: Learning RAG, prototyping knowledge bases, development
+**What's enabled**: Vector storage (HNSW), embeddings, debug logging, SQLite
+
+---
 
 **rag-prod** - RAG production settings
 ```bash
-llmspell -p rag-prod run script.lua
+llmspell -p rag-prod run knowledge-base.lua
 ```
-Use for: Production RAG deployment, enterprise knowledge management
+**What's enabled**: Vector storage, production logging (warn), SQLite
+
+---
 
 **rag-perf** - RAG performance tuning
 ```bash
-llmspell -p rag-perf run script.lua
+llmspell -p rag-perf run benchmark.lua
 ```
-Use for: High-performance RAG, optimized vector search
+**What's enabled**: Vector storage, minimal logging (error), optimized settings
+
+---
+
+### Memory & Advanced Profiles (Phase 13)
+
+**memory** ⭐ NEW - Adaptive memory system
+```bash
+export OPENAI_API_KEY="sk-..."
+llmspell -p memory run chatbot-with-memory.lua
+```
+**What's enabled**: 3-tier memory system, debug logging, SQLite persistence
+
+---
+
+**research** ⭐ NEW - Full features with trace logging
+```bash
+llmspell -p research run experiment.lua 2>&1 | tee research.log
+```
+**What's enabled**: Graph, RAG, memory, context, trace-level logging, SQLite
+
+---
+
+### Production Profiles
+
+**gemini-prod** ⭐ NEW - Full stack with Gemini
+```bash
+export GEMINI_API_KEY="..."
+llmspell -p gemini-prod run app.lua
+```
+**What's enabled**: Graph, RAG, memory, context, Gemini default provider
+
+---
+
+**openai-prod** ⭐ NEW - Full stack with OpenAI
+```bash
+export OPENAI_API_KEY="sk-..."
+llmspell -p openai-prod run app.lua
+```
+**What's enabled**: Graph, RAG, memory, context, OpenAI default provider
+
+---
+
+**claude-prod** ⭐ NEW - Full stack with Claude/Anthropic
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+llmspell -p claude-prod run app.lua
+```
+**What's enabled**: Graph, RAG, memory, context, Anthropic default provider
+
+---
+
+### Daemon Profiles
+
+**daemon-dev** ⭐ NEW - Daemon mode development
+```bash
+llmspell -p daemon-dev kernel start --port 9555
+```
+**What's enabled**: Everything, high concurrency (100), debug logging, SQLite
+
+---
+
+**daemon-prod** ⭐ NEW - Production daemon with PostgreSQL
+```bash
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell"
+llmspell -p daemon-prod kernel start --port 9555
+```
+**What's enabled**: Everything, high concurrency (100), production logging, PostgreSQL
+
+---
+
+**postgres-prod** ⭐ NEW - Alias for daemon-prod
+```bash
+llmspell -p postgres-prod kernel start
+```
+**What's enabled**: Same as daemon-prod
+
+---
+
+### Default Profile
+
+**default** - Minimal CLI setup (same as `minimal`)
+```bash
+llmspell run script.lua  # Uses 'default' profile automatically
+```
 
 ### Profile Precedence
 
