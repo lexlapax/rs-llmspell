@@ -108,30 +108,44 @@ pub struct Cli {
 
     /// Built-in configuration profile (GLOBAL)
     ///
-    /// Available profiles:
+    /// Supports three syntax forms:
+    ///   1. Single preset:      llmspell -p minimal
+    ///   2. Explicit preset:    llmspell -p presets/rag-dev
+    ///   3. Multi-layer:        llmspell -p bases/cli,features/rag,envs/dev
     ///
-    /// Core:
-    ///   minimal      - Tools only, no LLM providers
-    ///   development  - Dev settings with debug logging
+    /// Available presets (20 total):
     ///
-    /// Common Workflows:
-    ///   providers    - OpenAI + Anthropic setup
-    ///   state        - State persistence with memory backend
-    ///   sessions     - Sessions + state + hooks + events
+    /// Backward Compatible (12):
+    ///   minimal              - Tools only, no LLM features
+    ///   development          - Dev environment with cloud LLM providers
+    ///   providers            - All LLM providers (OpenAI, Anthropic, Gemini, Ollama, Candle)
+    ///   state                - State persistence + sessions
+    ///   sessions             - Session management with artifacts
+    ///   ollama               - Local Ollama models
+    ///   candle               - Local Candle ML models
+    ///   memory               - Adaptive memory system
+    ///   rag-dev              - RAG development with trace logging
+    ///   rag-prod             - RAG production with SQLite
+    ///   rag-perf             - RAG performance tuned
+    ///   default              - Minimal CLI setup
     ///
-    /// Local LLM:
-    ///   ollama       - Ollama backend configuration
-    ///   candle       - Candle embedded inference
+    /// New Combinations (8):
+    ///   postgres-prod        - Production PostgreSQL backend
+    ///   daemon-dev           - Daemon mode development
+    ///   daemon-prod          - Daemon mode production
+    ///   gemini-prod          - Full Phase 13 stack + Gemini
+    ///   openai-prod          - Full Phase 13 stack + OpenAI
+    ///   claude-prod          - Full Phase 13 stack + Claude/Anthropic
+    ///   full-local-ollama    - Complete local stack (Ollama + SQLite)
+    ///   research             - Full features + trace logging
     ///
-    /// RAG:
-    ///   rag-dev      - Development RAG (small dims, fast)
-    ///   rag-prod     - Production RAG (reliability, monitoring)
-    ///   rag-perf     - Performance RAG (high memory, cores)
+    /// Multi-layer composition uses 4 layer types:
+    ///   bases/*      - Deployment modes (cli, daemon, embedded, testing)
+    ///   features/*   - Capabilities (minimal, llm, rag, memory, full)
+    ///   envs/*       - Tuning (dev, staging, prod, perf)
+    ///   backends/*   - Storage (memory, sqlite, postgres)
     ///
     /// Use 'llmspell config list-profiles' for detailed information.
-    ///
-    /// Profiles are complete configurations loaded from built-in TOML files.
-    /// Use --profile to select a builtin, or -c for custom config files.
     ///
     /// Precedence: --profile > -c > discovery > default
     #[arg(short = 'p', long, global = true)]

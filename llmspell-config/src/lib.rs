@@ -28,6 +28,7 @@ pub mod env_registry;
 pub mod memory;
 pub mod merge;
 pub mod profile_composer;
+pub mod profile_resolver;
 pub mod providers;
 pub mod rag;
 pub mod tools;
@@ -1063,38 +1064,65 @@ impl LLMSpellConfig {
 
     /// Load a builtin configuration profile
     ///
-    /// Builtin profiles are complete TOML configurations embedded at compile time.
+    /// Builtin profiles support three syntax forms:
     ///
-    /// # Available Profiles
+    /// 1. **Single preset name** (backward compatible): `minimal`, `development`, `rag-prod`
+    /// 2. **Explicit preset path**: `presets/minimal`, `presets/rag-dev`
+    /// 3. **Multi-layer composition**: `bases/cli,features/rag,envs/dev,backends/sqlite`
     ///
-    /// ## Core Profiles
-    /// - `minimal` - Bare minimum settings for basic operation
-    /// - `development` - Development-friendly settings with debug logging
+    /// # Available Presets (20 total)
     ///
-    /// ## Local LLM Profiles
-    /// - `ollama` - Ollama backend configuration
-    /// - `candle` - Candle embedded inference configuration
+    /// ## Backward Compatible (12)
+    /// - `minimal` - CLI-only, no LLM features
+    /// - `development` - Dev environment with cloud LLM providers
+    /// - `providers` - All LLM providers (OpenAI, Anthropic, Gemini, Ollama, Candle)
+    /// - `state` - State persistence + sessions
+    /// - `sessions` - Session management with artifacts
+    /// - `ollama` - Local Ollama models
+    /// - `candle` - Local Candle ML models
+    /// - `memory` - Adaptive memory system
+    /// - `rag-dev` - RAG development with trace logging
+    /// - `rag-prod` - RAG production with SQLite
+    /// - `rag-perf` - RAG performance tuned
+    /// - `default` - Extends minimal (minimal CLI setup)
     ///
-    /// ## RAG Profiles
-    /// - `rag-dev` - Development RAG settings (small dimensions, fast iteration)
-    /// - `rag-prod` - Production RAG settings (reliability, monitoring, security)
-    /// - `rag-perf` - Performance-optimized RAG settings (high memory, many cores)
+    /// ## New Combinations (8)
+    /// - `postgres-prod` - Production PostgreSQL backend
+    /// - `daemon-dev` - Daemon mode development
+    /// - `daemon-prod` - Daemon mode production
+    /// - `gemini-prod` - Full Phase 13 stack + Gemini
+    /// - `openai-prod` - Full Phase 13 stack + OpenAI
+    /// - `claude-prod` - Full Phase 13 stack + Claude/Anthropic
+    /// - `full-local-ollama` - Complete local stack (Ollama + SQLite)
+    /// - `research` - Full features + trace logging
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_config::LLMSpellConfig;
+    ///
+    /// // Single preset name
+    /// let config = LLMSpellConfig::load_builtin_profile("minimal").unwrap();
+    ///
+    /// // Multi-layer composition
+    /// let config = LLMSpellConfig::load_builtin_profile("bases/cli,features/rag,envs/dev").unwrap();
+    /// ```
     ///
     /// # Errors
     ///
     /// Returns `ConfigError::NotFound` if the profile name is not recognized.
     fn load_builtin_profile(name: &str) -> Result<Self, ConfigError> {
-        // TODO(13c.4): Profile system rearchitecture in progress
-        // Monolithic profiles deleted, layer-based composition system being implemented
-        Err(ConfigError::NotFound {
-            path: format!("builtin:{}", name),
-            message: format!(
-                "Builtin profile '{}' not available - profile system rearchitecture in progress.\n\
-                 Old monolithic profiles have been removed.\n\
-                 Layer-based composition system coming in Task 13c.4.2+",
-                name
-            ),
-        })
+        use crate::profile_composer::ProfileComposer;
+        use crate::profile_resolver::resolve_profile_spec;
+
+        // Parse the profile specification (single preset or comma-separated layers)
+        let layers = resolve_profile_spec(name);
+
+        // Use ProfileComposer to load and compose the layers
+        let mut composer = ProfileComposer::new();
+        let config = composer.load_multi(&layers)?;
+
+        Ok(config)
     }
 
     /// List available builtin profiles
@@ -1107,15 +1135,37 @@ impl LLMSpellConfig {
     /// ```rust
     /// use llmspell_config::LLMSpellConfig;
     ///
-    /// // TODO(13c.4): Profile system rearchitecture in progress
     /// let profiles = LLMSpellConfig::list_builtin_profiles();
-    /// assert_eq!(profiles.len(), 0); // Temporarily empty during rearchitecture
+    /// assert_eq!(profiles.len(), 20);
+    /// assert!(profiles.contains(&"minimal"));
+    /// assert!(profiles.contains(&"gemini-prod"));
     /// ```
     #[must_use]
     pub fn list_builtin_profiles() -> Vec<&'static str> {
-        // TODO(13c.4): Profile system rearchitecture in progress
-        // Old monolithic profiles deleted, layer-based system coming in 13c.4.2+
-        vec![]
+        vec![
+            // Backward compatible presets (12)
+            "minimal",
+            "development",
+            "providers",
+            "state",
+            "sessions",
+            "ollama",
+            "candle",
+            "memory",
+            "rag-dev",
+            "rag-prod",
+            "rag-perf",
+            "default",
+            // New combination presets (8)
+            "postgres-prod",
+            "daemon-dev",
+            "daemon-prod",
+            "gemini-prod",
+            "openai-prod",
+            "claude-prod",
+            "full-local-ollama",
+            "research",
+        ]
     }
 
     /// Get metadata for a specific builtin profile
