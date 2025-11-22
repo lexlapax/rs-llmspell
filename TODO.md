@@ -6217,62 +6217,80 @@ Task 13c.2.2: DELETE ENTIRE TASK (marked SUPERSEDED, now obsolete)
 **Architecture**: Base + Features + Environment + Backend composition
 **Pre-1.0 Strategy**: Breaking changes accepted, no migration code needed
 
-### Task 13c.4.1: Delete Old Profile System ⏹ PENDING
+### Task 13c.4.1: Delete Old Profile System ✅ COMPLETE
 **Priority**: CRITICAL
 **Estimated Time**: 2 hours
+**Actual Time**: 1.5 hours
 **Assignee**: Configuration Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE
+**Completion Date**: 2025-11-22
 
 **Description**: Remove all 13 existing monolithic builtin profiles to prepare for layer-based architecture.
 
 **Rationale**: Clean slate approach - pre-1.0 allows breaking changes without migration burden.
 
 **Acceptance Criteria**:
-- [ ] All 13 TOML files deleted from llmspell-config/builtins/
-- [ ] load_builtin_profile() match arms removed
-- [ ] Profile loading tests temporarily commented out
-- [ ] Zero clippy warnings after deletion
-- [ ] Codebase compiles (tests may fail - expected)
+- [x] All 12 TOML files deleted from llmspell-config/builtins/ (was 12, not 13)
+- [x] load_builtin_profile() match arms removed
+- [x] Profile loading tests temporarily commented out
+- [x] Zero clippy warnings after deletion
+- [x] Codebase compiles (tests may fail - expected)
 
-**Files to DELETE**:
-- llmspell-config/builtins/minimal.toml (11 lines)
-- llmspell-config/builtins/default.toml (22 lines)
-- llmspell-config/builtins/development.toml (30 lines)
-- llmspell-config/builtins/providers.toml (31 lines)
-- llmspell-config/builtins/state.toml (19 lines)
-- llmspell-config/builtins/sessions.toml (32 lines)
-- llmspell-config/builtins/ollama.toml (21 lines)
-- llmspell-config/builtins/candle.toml (25 lines)
-- llmspell-config/builtins/memory.toml (54 lines)
-- llmspell-config/builtins/rag-development.toml (75 lines)
-- llmspell-config/builtins/rag-production.toml (91 lines)
-- llmspell-config/builtins/rag-performance.toml (69 lines)
-- Total: 480 lines deleted
+**Files DELETED** (12 files, 480 lines):
+- llmspell-config/builtins/minimal.toml
+- llmspell-config/builtins/default.toml
+- llmspell-config/builtins/development.toml
+- llmspell-config/builtins/providers.toml
+- llmspell-config/builtins/state.toml
+- llmspell-config/builtins/sessions.toml
+- llmspell-config/builtins/ollama.toml
+- llmspell-config/builtins/candle.toml
+- llmspell-config/builtins/memory.toml
+- llmspell-config/builtins/rag-development.toml
+- llmspell-config/builtins/rag-production.toml
+- llmspell-config/builtins/rag-performance.toml
 
-**Files to EDIT**:
+**Files EDITED**:
 - llmspell-config/src/lib.rs:
-  - Remove load_builtin_profile() match arms (lines 1084-1126)
-  - Comment out 10 profile tests (lines 2140-2460)
-  - Add TODO comment: "Profile system rearchitecture in progress"
+  - Simplified load_builtin_profile() to return NotFound with rearchitecture message (40 lines → 12 lines)
+  - Stubbed out list_builtin_profiles() to return empty vec (13 lines → 6 lines)
+  - Stubbed out get_profile_metadata() to return None (180 lines → 8 lines)
+  - Updated list_profile_metadata() doctest
+  - Commented out 11 profile tests (335 lines) with /* REARCHITECTURE */ markers
 
-**Implementation Steps**:
-1. Delete all 13 .toml files from llmspell-config/builtins/
-2. Edit llmspell-config/src/lib.rs - remove match arms
-3. Comment out tests with /* REARCHITECTURE */ markers
-4. Run: cargo clippy --workspace --all-features (expect zero warnings)
+**Implementation Insights**:
+1. **Actual file count**: 12 TOML files (not 13 as estimated) - minor documentation discrepancy
+2. **Test count**: 11 tests commented out (not 10):
+   - test_list_builtin_profiles
+   - test_load_builtin_profile_minimal
+   - test_load_builtin_profile_development
+   - test_load_builtin_profile_rag_dev
+   - test_load_builtin_profile_providers
+   - test_load_builtin_profile_state
+   - test_load_builtin_profile_sessions
+   - test_load_builtin_profile_default
+   - test_load_builtin_profile_memory
+   - test_load_builtin_profile_unknown
+   - test_load_with_profile_precedence
+3. **Zero warnings verified**: cargo clippy --workspace --all-features produced zero warnings
+4. **Breaking change communicated**: Error messages inform users about rearchitecture in progress
 
-**Checkpoint**:
+**Checkpoint Results**:
 ```bash
 cargo clippy --workspace --all-features 2>&1 | grep warning
-# Expected: No output (zero warnings)
+# Output: (empty) ✅ Zero warnings
 ```
 
 **Definition of Done**:
-- [ ] 13 profile files deleted
-- [ ] Match statement simplified (returns NotFound for all)
-- [ ] Tests commented out with clear markers
-- [ ] Zero clippy warnings
-- [ ] Commit: "13c.4.1 Delete old monolithic profile system"
+- [x] 12 profile files deleted (13 files changed in commit)
+- [x] Match statement simplified (returns NotFound for all)
+- [x] Tests commented out with clear /* REARCHITECTURE */ markers
+- [x] Zero clippy warnings
+- [x] Commit: "13c.4.1 Delete old monolithic profile system" (174b30af)
+
+**Git Commit**: 174b30af - "13c.4.1 Delete old monolithic profile system"
+- 13 files changed, 47 insertions(+), 725 deletions(-)
+- Net: -678 lines (excellent cleanup)
 
 ---
 
