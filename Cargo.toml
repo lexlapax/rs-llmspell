@@ -24,11 +24,8 @@ members = [
     "llmspell-tenancy",
     "llmspell-kernel",
     "vectorlite-rs",
-    "examples/rust-developers/extension-pattern-example",
-    "examples/rust-developers/builder-pattern-example",
     "examples/rust-developers/custom-tool-example",
     "examples/rust-developers/custom-agent-example",
-    "examples/rust-developers/async-patterns-example",
     "examples/rust-developers/integration-test-example",
 ]
 
