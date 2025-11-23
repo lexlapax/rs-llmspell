@@ -195,7 +195,7 @@ llmspell -c examples/script-users/applications/webapp-creator/config.toml \
 - API key for at least one provider:
   - OpenAI: Set `OPENAI_API_KEY` environment variable
   - Anthropic: Set `ANTHROPIC_API_KEY` environment variable
-  - Local models: Configure in `llmspell.toml`
+  - Local models: Use `-p ollama-production` (or see [configs/](configs/) for custom patterns)
 
 ### For Advanced Examples
 - Understanding of Lua basics
