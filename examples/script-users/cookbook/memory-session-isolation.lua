@@ -1,12 +1,14 @@
--- Recommended profile: memory
+-- Profile: memory (recommended)
 -- Run with: llmspell -p memory run memory-session-isolation.lua
 -- Adaptive memory system
 
 -- ============================================================
--- LLMSPELL COOKBOOK - MEMORY PATTERNS
+-- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Recipe: Memory Session Isolation
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Multi-user systems, parallel conversations
 --
 -- Purpose: Demonstrates how to manage multiple independent conversation

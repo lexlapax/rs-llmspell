@@ -1,12 +1,14 @@
--- Recommended profile: development
+-- Profile: development (recommended)
 -- Run with: llmspell -p development run webhook-integration.lua
 -- Development environment with debug logging
 
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 05 - Webhook Integration v0.7.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: External system integration via webhooks
 -- Pattern Category: Integration & Event Processing
 --

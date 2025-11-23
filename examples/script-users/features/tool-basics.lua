@@ -1,12 +1,14 @@
--- Recommended profile: minimal
+-- Profile: minimal (recommended)
 -- Run with: llmspell -p minimal run tool-basics.lua
 -- No LLM required
 
 -- ============================================================
 -- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 -- Feature ID: 02 - Tool Basics v0.7.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Automating file operations and data processing
 -- Feature Category: Tools
 --

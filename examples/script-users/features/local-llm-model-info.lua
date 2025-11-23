@@ -1,10 +1,12 @@
--- ============================================================================
+-- Profile: -- ============================================================================ (recommended)
 -- Example: Local LLM Model Information
 -- Category: features
--- Phase: 13c
--- ============================================================================
---
--- Description:
+
+-- ============================================================
+-- LLMSPELL FEATURES SHOWCASE  
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 --   Get detailed model information and test inference with local models.
 --   Demonstrates LocalLLM.info() API and agent creation.
 --

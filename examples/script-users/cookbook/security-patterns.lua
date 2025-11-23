@@ -1,12 +1,14 @@
--- Recommended profile: development
+-- Profile: development (recommended)
 -- Run with: llmspell -p development run security-patterns.lua
 -- Development environment with debug logging
 
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 07 - Security Patterns v0.7.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: Enterprise security patterns for safe automation
 -- Pattern Category: Security & Data Integrity
 --

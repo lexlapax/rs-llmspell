@@ -1,12 +1,14 @@
--- Recommended profile: gemini-prod
+-- Profile: gemini-prod (recommended)
 -- Run with: llmspell -p gemini-prod run main.lua
 -- Full Phase 13 stack with Gemini
 
 -- ============================================================
 -- LLMSPELL APPLICATION SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
 -- Application ID: 06 - Code Review Assistant v3.0.0
--- Complexity Level: 3 [ADVANCED]
+-- Complexity: 3 [ADVANCED]
 -- Real-World Use Case: DevOps automation and code quality assurance (2025 CI/CD trend)
 -- 
 -- Purpose: Automated multi-aspect code review with 7 specialized AI reviewers

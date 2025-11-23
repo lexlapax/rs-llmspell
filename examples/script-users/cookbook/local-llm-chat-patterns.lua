@@ -1,10 +1,12 @@
--- ============================================================================
+-- Profile: -- ============================================================================ (recommended)
 -- Example: Local LLM Chat Patterns
 -- Category: cookbook
--- Phase: 13c
--- ============================================================================
---
--- Description:
+
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 --   Comprehensive local LLM chat patterns including interactive chat and
 --   backend comparison. Demonstrates Ollama and Candle usage patterns.
 --

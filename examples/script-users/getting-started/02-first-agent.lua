@@ -1,11 +1,11 @@
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Phase: 13c.5.3 - Getting-Started Streamlining
+-- Phase: 13c.5.6 - Example Header Standardization
 -- Category: getting-started
 -- Profile: providers (recommended)
 -- Example ID: 02 - First Agent v0.14.0
--- Complexity Level: BEGINNER
+-- Complexity: BEGINNER
 -- Real-World Use Case: Creating AI assistants for automation and support
 --
 -- Purpose: Learn how to create and interact with LLM agents. Demonstrates

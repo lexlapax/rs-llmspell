@@ -1,11 +1,11 @@
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Phase: 13c.5.3 - Getting-Started Streamlining
+-- Phase: 13c.5.6 - Example Header Standardization
 -- Category: getting-started
 -- Profile: minimal (recommended)
 -- Example ID: 01 - First Tool v0.14.0
--- Complexity Level: BEGINNER
+-- Complexity: BEGINNER
 -- Real-World Use Case: File management and basic I/O operations
 --
 -- Purpose: Learn fundamental tool invocation patterns with file-operations tool.

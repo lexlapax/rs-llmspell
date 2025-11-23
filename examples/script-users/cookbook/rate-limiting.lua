@@ -1,12 +1,14 @@
--- Recommended profile: development
+-- Profile: development (recommended)
 -- Run with: llmspell -p development run rate-limiting.lua
 -- Development environment with debug logging
 
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 02 - Rate Limiting Patterns v0.7.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: API rate limit management for enterprise integrations
 -- Pattern Category: Performance & Resource Management
 --

@@ -1,12 +1,14 @@
--- Recommended profile: gemini-prod
+-- Profile: gemini-prod (recommended)
 -- Run with: llmspell -p gemini-prod run main.lua
 -- Full Phase 13 stack with Gemini
 
 -- ============================================================
--- LLMSPELL APPLICATION SHOWCASE - EXPERT CULMINATION
+-- LLMSPELL APPLICATION SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
 -- Application ID: 10 - WebApp Creator v2.0.0
--- Complexity Level: 6 [EXPERT] - Peak Complexity Achievement
+-- Complexity: 6 [EXPERT] - Peak Complexity Achievement
 -- Real-World Use Case: Full-stack application generation (Google Jarvis-like, 2025 AI development trend)
 --
 -- PROGRESSION JOURNEY COMPLETE:

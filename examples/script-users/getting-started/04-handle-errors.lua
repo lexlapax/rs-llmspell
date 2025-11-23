@@ -1,11 +1,11 @@
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Phase: 13c.5.3 - Getting-Started Streamlining
+-- Phase: 13c.5.6 - Example Header Standardization
 -- Category: getting-started
 -- Profile: state (recommended)
 -- Example ID: 04 - Error Handling v0.14.0
--- Complexity Level: BEGINNER
+-- Complexity: BEGINNER
 -- Real-World Use Case: Robust automation with graceful error recovery
 --
 -- Purpose: Learn essential error handling patterns for production scripts.

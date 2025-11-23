@@ -1,12 +1,14 @@
--- Recommended profile: rag-dev
+-- Profile: rag-dev (recommended)
 -- Run with: llmspell -p rag-dev run rag-cost-optimization.lua
 -- RAG features with debug logging
 
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: RAG-03 - RAG Cost Optimization v0.8.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Reducing embedding and API costs in production RAG systems
 -- Pattern Category: RAG & Cost Management
 --

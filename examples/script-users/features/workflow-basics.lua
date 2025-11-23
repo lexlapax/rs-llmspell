@@ -1,12 +1,14 @@
--- Recommended profile: minimal
+-- Profile: minimal (recommended)
 -- Run with: llmspell -p minimal run workflow-basics.lua
 -- No LLM required
 
 -- ============================================================
 -- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 -- Feature ID: 03 - Workflow Basics v0.7.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Automating multi-step data processing pipelines
 -- Feature Category: Workflows
 --

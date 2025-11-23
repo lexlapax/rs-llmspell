@@ -1,10 +1,14 @@
--- Recommended profile: gemini-prod
+-- Profile: gemini-prod (recommended)
 -- Run with: llmspell -p gemini-prod run main.lua
 -- Full Phase 13 stack with Gemini
 
--- Application: Professional Process Orchestrator v1.0 
--- Purpose: Multi-tier business process orchestration with advanced workflow patterns
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
+-- Application ID: 07 - Process Orchestrator v2.0.0
+-- Complexity: ADVANCED
 -- Expected Output: Sophisticated process management with conditional routing and orchestration
 -- Version: 1.0.0
 -- Tags: application, process-orchestrator, professional, workflow, orchestration

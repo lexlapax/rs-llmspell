@@ -1,11 +1,11 @@
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Phase: 13c.5.3 - Getting-Started Streamlining
+-- Phase: 13c.5.6 - Example Header Standardization
 -- Category: getting-started
 -- Profile: minimal (recommended)
 -- Example ID: 03 - First Workflow v0.14.0
--- Complexity Level: BEGINNER
+-- Complexity: BEGINNER
 -- Real-World Use Case: Multi-step automation and process orchestration
 --
 -- Purpose: Learn workflow creation and execution. Demonstrates how to chain

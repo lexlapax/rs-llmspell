@@ -1,12 +1,14 @@
--- Recommended profile: research
+-- Profile: research (recommended)
 -- Run with: llmspell -p research run context-strategy-comparison.lua
 -- Context engineering
 
 -- ============================================================
--- LLMSPELL COOKBOOK - CONTEXT STRATEGY COMPARISON
+-- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Recipe: Comparing Episodic, Semantic, and Hybrid Retrieval
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Choosing optimal retrieval strategy for different query types
 --
 -- Purpose: Compare three context assembly strategies to understand their strengths:

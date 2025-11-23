@@ -1,12 +1,14 @@
--- Recommended profile: memory
+-- Profile: memory (recommended)
 -- Run with: llmspell -p memory run memory-semantic-basic.lua
 -- Adaptive memory system
 
 -- ============================================================
--- LLMSPELL FEATURES - SEMANTIC MEMORY
+-- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 -- Feature: Semantic Memory and Knowledge Graph
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Knowledge management, entity relationship tracking
 --
 -- Purpose: Learn how to use semantic memory for storing structured

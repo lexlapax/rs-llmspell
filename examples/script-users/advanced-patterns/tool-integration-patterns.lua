@@ -1,12 +1,14 @@
--- Recommended profile: research
+-- Profile: research (recommended)
 -- Run with: llmspell -p research run tool-integration-patterns.lua
 -- Full stack with trace logging for complex patterns
 
 -- ============================================================
 -- LLMSPELL ADVANCED PATTERNS SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: advanced-patterns
 -- Pattern ID: 03 - Tool Integration Patterns v0.7.0
--- Complexity Level: ADVANCED
+-- Complexity: ADVANCED
 -- Real-World Use Case: Enterprise system integration and automation
 -- Pattern Category: Tool Integration
 --

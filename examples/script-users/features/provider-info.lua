@@ -1,12 +1,14 @@
--- Recommended profile: minimal
+-- Profile: minimal (recommended)
 -- Run with: llmspell -p minimal run provider-info.lua
 -- No LLM required
 
 -- ============================================================
--- LLMSPELL FEATURES SHOWCASE
+-- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 -- Feature ID: 05 - Provider Information v0.7.0
--- Complexity Level: BEGINNER
+-- Complexity: BEGINNER
 -- Real-World Use Case: Discovering available LLM providers and their capabilities
 -- Feature Category: Providers
 --

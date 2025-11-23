@@ -1,12 +1,14 @@
--- Recommended profile: sessions
+-- Profile: sessions (recommended)
 -- Run with: llmspell -p sessions run state-management.lua
 -- Session management with SQLite
 
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 08 - State Management v0.7.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: Enterprise state management with versioning and persistence
 -- Pattern Category: State & Data Management
 --

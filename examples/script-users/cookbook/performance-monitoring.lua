@@ -1,12 +1,14 @@
--- Recommended profile: development
+-- Profile: development (recommended)
 -- Run with: llmspell -p development run performance-monitoring.lua
 -- Development environment with debug logging
 
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 06 - Performance Monitoring v0.7.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: Production performance monitoring and optimization
 -- Pattern Category: Observability & Metrics
 --

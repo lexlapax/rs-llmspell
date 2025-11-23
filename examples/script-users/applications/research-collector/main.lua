@@ -1,10 +1,14 @@
--- Recommended profile: research
+-- Profile: research (recommended)
 -- Run with: llmspell -p research run main.lua
 -- Full stack with trace logging
 
--- Application: Research Collector v2.0 (Universal Layer with RAG)
--- Purpose: Gather information for everyday research needs with AI assistance and knowledge persistence
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
+-- Application ID: 02 - Research Collector v2.0.0
+-- Complexity: ADVANCED
 -- Expected Output: Organized research results with simple synthesis and knowledge retrieval
 -- Version: 2.0.0
 -- Tags: application, research-collector, universal, parallel, information-gathering, rag

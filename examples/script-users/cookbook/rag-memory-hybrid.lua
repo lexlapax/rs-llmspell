@@ -1,12 +1,14 @@
--- Recommended profile: rag-dev
+-- Profile: rag-dev (recommended)
 -- Run with: llmspell -p rag-dev run rag-memory-hybrid.lua
 -- RAG features with debug logging
 
 -- ============================================================
--- LLMSPELL COOKBOOK - RAG + MEMORY HYBRID RETRIEVAL
+-- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Recipe: Combining Document Search (RAG) with Conversation Memory
--- Complexity Level: ADVANCED
+-- Complexity: ADVANCED
 -- Real-World Use Case: Building context-aware AI assistants with both document knowledge and conversation history
 --
 -- Purpose: Demonstrate hybrid retrieval that combines:

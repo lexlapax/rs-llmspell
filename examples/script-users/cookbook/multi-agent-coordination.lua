@@ -1,12 +1,14 @@
--- Recommended profile: research
+-- Profile: research (recommended)
 -- Run with: llmspell -p research run multi-agent-coordination.lua
 -- Full stack with trace logging
 
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 04 - Multi-Agent Coordination v0.7.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: Enterprise multi-agent systems for complex workflows
 -- Pattern Category: Agent Orchestration & Collaboration
 --

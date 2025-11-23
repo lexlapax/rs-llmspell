@@ -1,11 +1,11 @@
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Phase: 13c.5.3 - Getting-Started Streamlining
+-- Phase: 13c.5.6 - Example Header Standardization
 -- Category: getting-started
 -- Profile: memory-development (recommended)
 -- Example ID: 05 - Memory, RAG & Context Assembly Advanced v0.14.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Building AI with document understanding and conversation memory
 --
 -- Purpose: Comprehensive introduction to LLMSpell's memory and retrieval systems.

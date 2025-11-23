@@ -1,10 +1,12 @@
--- ============================================================================
+-- Profile: -- ============================================================================ (recommended)
 -- Example: Local LLM Status Check
 -- Category: features
--- Phase: 13c
--- ============================================================================
---
--- Description:
+
+-- ============================================================
+-- LLMSPELL FEATURES SHOWCASE  
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 --   Check status and list available models for Ollama and Candle backends.
 --   Demonstrates LocalLLM.status() and LocalLLM.list() APIs.
 --

@@ -1,12 +1,14 @@
--- Recommended profile: memory
+-- Profile: memory (recommended)
 -- Run with: llmspell -p memory run memory-context-workflow.lua
 -- Adaptive memory system
 
 -- ============================================================
--- LLMSPELL COOKBOOK - MEMORY + CONTEXT E2E WORKFLOW
+-- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Recipe: Complete Memory→Context→LLM Pipeline
--- Complexity Level: ADVANCED
+-- Complexity: ADVANCED
 -- Real-World Use Case: Building production AI with context-aware conversations
 --
 -- Purpose: Demonstrate end-to-end workflow from raw interactions to LLM-ready prompts.

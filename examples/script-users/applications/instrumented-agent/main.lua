@@ -1,10 +1,14 @@
--- Recommended profile: gemini-prod
+-- Profile: gemini-prod (recommended)
 -- Run with: llmspell -p gemini-prod run main.lua
 -- Full Phase 13 stack with Gemini
 
--- Application: Instrumented Agent Debugger
--- Purpose: Demonstrate debugging and tracing capabilities for agent applications
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
+-- Application ID: 11 - Instrumented Agent v1.0.0
+-- Complexity: INTERMEDIATE
 -- Expected Output: Demonstrates Debug logging, State persistence, and REPL inspection techniques
 -- Version: 1.0.0
 -- Tags: application, debugging, instrumented-agent, repl, state-inspection

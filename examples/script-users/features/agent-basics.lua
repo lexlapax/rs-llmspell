@@ -1,12 +1,14 @@
--- Recommended profile: providers
+-- Profile: providers (recommended)
 -- Run with: llmspell -p providers run agent-basics.lua
 -- All LLM providers enabled
 
 -- ============================================================
 -- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 -- Feature ID: 01 - Agent Basics v0.7.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Building conversational AI assistants
 -- Feature Category: Agents
 --
