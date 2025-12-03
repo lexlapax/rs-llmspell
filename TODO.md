@@ -8392,18 +8392,18 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-## Phase 13c.7: Documentation Overhaul (Days 6-7) ✅ COMPLETE
+## Phase 13c.7: Documentation Overhaul (Days 6-7) 🚧 IN PROGRESS
 
-**Goal**: Update all docs to Phase 13, create migration guide, profile guide
+**Goal**: Update all docs to Phase 13, clean up stale references
 **Timeline**: 2 days (16 hours total)
 **Critical Dependencies**: Phase 13c.2-13c.5 (Profiles + Examples)
 **Priority**: HIGH (user communication)
-**Status**: ✅ COMPLETE (2025-12-03)
+**Status**: 🚧 IN PROGRESS
 
-**Summary**: All documentation updated to Phase 13:
+**Summary**: Documentation updates for Phase 13:
 - 13c.7.1: User guide (01-getting-started.md, 08-deployment.md) ✅
 - 13c.7.2: Profile guide (profile-layers-guide.md) ✅
-- 13c.7.3: Migration guide - SKIP (not needed pre-1.0)
+- 13c.7.3: Stale example reference cleanup ⏹ PENDING
 - 13c.7.4: Examples READMEs (examples/, script-users/, rust-developers/) ✅
 - 13c.7.5: README-DEVEL.md (CI/CD, deps, examples) ✅
 
@@ -8690,137 +8690,72 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.7.3: Migration Guide Creation ⏭️ SKIP
-**Priority**: LOW
-**Estimated Time**: N/A
+### Task 13c.7.3: Stale Example Reference Cleanup ⏹ PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 1 hour
 **Assignee**: Documentation Team
-**Status**: ⏭️ SKIP
+**Status**: ⏹ PENDING
 
-**Description**: ~~Create `docs/user-guide/migration-to-v0.14.md` comprehensive migration guide for v0.13 → v0.14.~~
+**Description**: Clean up stale references to old example files (05-first-rag.lua, 06-episodic-memory-basic.lua, 07-context-assembly-basic.lua) that were merged into 05-memory-rag-advanced.lua.
 
-**Skip Rationale**:
-- Project is pre-1.0 experimental platform
-- Breaking changes are expected and acceptable until 1.0
-- No external users requiring migration support
-- RELEASE_NOTES.md provides sufficient change documentation
-- Focus resources on user-facing docs (getting-started, profile guide)
+**Research Findings**:
+- Old examples merged: 05-first-rag.lua + 06-episodic-memory-basic.lua + 07-context-assembly-basic.lua → 05-memory-rag-advanced.lua
+- 10+ stale references found in user-facing docs
+- 7 Lua files have stale prerequisite comments
 
-**Acceptance Criteria**: N/A - Task skipped
+**Acceptance Criteria**:
+- [ ] All docs updated to reference 05-memory-rag-advanced.lua
+- [ ] All Lua file comments updated
+- [ ] Zero references to non-existent example files
+- [ ] examples-validation.sh runs successfully
 
 **Implementation Steps**:
-1. Create `docs/user-guide/migration-to-v0.14.md` (see design doc lines 1970-2130)
+1. Update user-guide docs:
+   - `docs/user-guide/appendix/lua-api-reference.md` (2 refs)
+   - `docs/user-guide/04-lua-scripting.md` (1 ref)
 
-2. Structure:
-   ```markdown
-   # Migration Guide: v0.13 → v0.14
+2. Update developer-guide docs:
+   - `docs/developer-guide/01-getting-started.md` (1 ref)
+   - `docs/developer-guide/README.md` (1 ref)
+   - `docs/developer-guide/examples-reference.md` (3 refs)
 
-   **Phase 13c: Usability & Cohesion Refinement**
+3. Update project root docs:
+   - `README.md` (1 ref)
+   - `examples/script-users/README.md` (1 ref)
 
-   ## Summary of Changes
+4. Update Lua file prerequisite comments:
+   - `getting-started/04-handle-errors.lua`
+   - `features/memory-stats.lua`
+   - `features/memory-semantic-basic.lua`
+   - `cookbook/context-strategy-comparison.lua`
+   - `cookbook/rag-memory-hybrid.lua`
+   - `cookbook/memory-session-isolation.lua`
+   - `cookbook/memory-context-workflow.lua`
 
-   **Examples**: Consolidated 75 → <50 files, 8 → 5 getting-started
-   **Profiles**: Added postgres, ollama-production, memory-development
-   **Documentation**: All references updated to Phase 13
-   **Quality**: 100% validated examples, zero broken examples policy
-
-   ## Breaking Changes
-
-   ### 1. Top-Level Examples Moved
-
-   **What Changed**: Top-level `examples/local_llm_*.lua` files moved to `script-users/`
-
-   **Before (v0.13)**:
+5. Validate cleanup:
    ```bash
-   llmspell run examples/local_llm_status.lua
-   ```
+   # Verify no stale references remain
+   grep -r "05-first-rag\.lua\|06-episodic-memory\|07-context-assembly" docs/ examples/ README.md --include="*.md" --include="*.lua" | grep -v "in-progress\|archives"
 
-   **After (v0.14)**:
-   ```bash
-   llmspell run examples/script-users/features/local-llm-status.lua
-   # OR use builtin profile:
-   llmspell -p ollama run examples/script-users/features/local-llm-status.lua
-   ```
-
-   **Migration**: Update paths in scripts/docs to new locations
-
-   ### 2. Getting-Started Examples Reduced
-
-   **What Changed**: 8 → 5 examples, memory examples merged
-
-   **Before (v0.13)**:
-   - 05-first-rag.lua
-   - 06-episodic-memory-basic.lua
-   - 07-context-assembly-basic.lua
-
-   **After (v0.14)**:
-   - 05-memory-rag-advanced.lua (combines all three)
-
-   **Migration**: Use 05-memory-rag-advanced.lua for integrated Phase 13 features
-
-   ### 3. Rust Examples Reduced
-
-   **What Changed**: 6 → 3 Rust example projects
-
-   **Removed**:
-   - async-patterns-example/ → See llmspell-core doc tests
-   - builder-pattern-example/ → See llmspell-tools doc tests
-   - extension-pattern-example/ → See docs/developer-guide/extension-architecture.md
-
-   **Migration**: Use doc tests (`cargo test --doc`) or developer guide
-
-   ## New Features
-
-   ### 1. New Builtin Profiles
-
-   **postgres.toml** - PostgreSQL backend:
-   ```bash
-   export LLMSPELL_POSTGRES_URL="postgresql://..."
-   llmspell -p postgres run script.lua
-   ```
-
-   **ollama-production.toml** - Production local LLM:
-   ```bash
-   ollama serve
-   ollama pull llama3.2:3b
-   ollama pull nomic-embed-text
-   llmspell -p ollama-production run script.lua
-   ```
-
-   **memory-development.toml** - Phase 13 memory debugging:
-   ```bash
-   export OPENAI_API_KEY="sk-..."
-   llmspell -p memory-development run script.lua
-   ```
-
-   ### 2. Example Validation
-
-   All examples now validated automatically:
-   ```bash
-   ./scripts/testing/examples-validation.sh all
-   ```
-
-   ### 3. Profile Decision Matrix
-
-   See [profiles-guide.md](profiles-guide.md) for comprehensive guide
-
-   ## Migration Checklist
-
-   - [ ] Update hardcoded example paths
-   - [ ] Switch to builtin profiles where possible
-   - [ ] Review 05-memory-rag-advanced.lua for Phase 13 features
-   - [ ] Update docs/scripts referencing old examples
-   - [ ] Test with examples-validation.sh
+   # Run validation
+   ./scripts/testing/examples-validation.sh getting-started
    ```
 
 **Definition of Done**:
-- [ ] migration-to-v0.14.md complete
-- [ ] All breaking changes documented
-- [ ] Migration steps clear
-- [ ] Examples provided
-- [ ] Checklist helpful
+- [ ] All docs updated to reference 05-memory-rag-advanced.lua
+- [ ] All Lua prerequisite comments updated
+- [ ] Zero stale references in user-facing docs
+- [ ] examples-validation.sh getting-started passes
 
-**Files to Create**:
-- `docs/user-guide/migration-to-v0.14.md`
+**Files to Modify**:
+- `docs/user-guide/appendix/lua-api-reference.md`
+- `docs/user-guide/04-lua-scripting.md`
+- `docs/developer-guide/01-getting-started.md`
+- `docs/developer-guide/README.md`
+- `docs/developer-guide/examples-reference.md`
+- `README.md`
+- `examples/script-users/README.md`
+- 7 Lua example files
 
 ---
 
