@@ -172,13 +172,15 @@ end
 print("\n8. Error Handling")
 print("-" .. string.rep("-", 16))
 
--- Intentionally cause an error
-local error_result = use_tool("file-operations", {
-    operation = "read",
-    path = "/nonexistent/file.txt"
-})
+-- Intentionally cause an error - use pcall to catch thrown errors
+local ok, error_result = pcall(function()
+    return use_tool("file-operations", {
+        operation = "read",
+        path = "/nonexistent/file.txt"
+    })
+end)
 
-if error_result.success == false or error_result.error then
+if not ok or (error_result and (error_result.success == false or error_result.error)) then
     print("   Error handling: ✓ (caught expected error)")
 else
     print("   Error handling: ✗ (should have failed)")

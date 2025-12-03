@@ -8883,39 +8883,46 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 - Rust examples: 3 projects
 - CI: Removed in 13c.6.3 (local quality scripts only)
 
-### Task 13c.8.1: Comprehensive Example Validation ⏹ PENDING
+### Task 13c.8.1: Comprehensive Example Validation ✅ COMPLETE
 **Priority**: CRITICAL
 **Estimated Time**: 2 hours
 **Assignee**: QA Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE (2025-12-03)
 
 **Description**: Run examples-validation.sh on no-API-key examples, document which examples require API keys.
 
 **Acceptance Criteria**:
-- [ ] 100% getting-started examples pass (that don't need API keys)
-- [ ] All API-key-requiring examples documented in headers
-- [ ] All failures analyzed and documented
-- [ ] Validation report created
+- [x] 100% getting-started examples pass (that don't need API keys) - 4/4 no-API pass
+- [x] All API-key-requiring examples documented in headers
+- [x] All failures analyzed and documented
+- [x] Validation report created
 
-**Implementation Steps**:
-1. Run validation on no-API-key examples:
-   ```bash
-   ./scripts/testing/examples-validation.sh getting-started
-   ```
+**Validation Results** (2025-12-03):
 
-2. Analyze which examples require API keys:
-   ```bash
-   # Check example headers for API key requirements
-   grep -l "API_KEY\|OPENAI\|ANTHROPIC" examples/script-users/**/*.lua
-   ```
+**Getting-started (6 examples)**:
+- 4 PASSED: 00-hello-world, 01-first-tool, 03-first-workflow, 04-handle-errors
+- 2 FAILED: 02-first-agent, 05-memory-rag-advanced (Gemini API quota 429, not code bugs)
 
-3. Document results in TODO.md completion notes
+**Features (9 examples)**:
+- 6 PASSED: memory-semantic-basic, memory-stats, provider-info, state-persistence, tool-basics, workflow-basics
+- 2 SKIPPED: local-llm-model-info, local-llm-status (Ollama not running)
+- 1 FAILED: agent-basics (Gemini API quota 429)
+
+**Cookbook (17 examples)**:
+- 15 PASSED
+- 1 SKIPPED: local-llm-chat-patterns (Ollama not running)
+- 1 FAILED: multi-agent-coordination (Gemini API quota 429)
+
+**Summary**:
+- No-API-key examples: 25/28 tested passed (89%), 3 skipped (Ollama)
+- All 4 failures due to Gemini free tier quota exhausted (429), not code bugs
+- Fixed: tool-basics.lua error handling (pcall for thrown errors)
 
 **Definition of Done**:
-- [ ] Validation script runs successfully
-- [ ] No-API-key examples pass
-- [ ] API-key-requiring examples identified
-- [ ] Results documented in completion notes
+- [x] Validation script runs successfully
+- [x] No-API-key examples pass
+- [x] API-key-requiring examples identified
+- [x] Results documented in completion notes
 
 ---
 
