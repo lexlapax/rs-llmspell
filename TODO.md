@@ -8121,21 +8121,28 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.6.1: Validation Script Creation ⏹ PENDING
+### Task 13c.6.1: Validation Script Creation 🚧 IN PROGRESS
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Assignee**: Testing Team Lead
-**Status**: ⏹ PENDING
+**Status**: 🚧 IN PROGRESS (getting-started 100%, cookbook pending)
 
 **Description**: Create `scripts/testing/examples-validation.sh` to test all examples with specified profiles.
 
 **Acceptance Criteria**:
-- [ ] examples-validation.sh created with executable permissions
-- [ ] Tests 100% of getting-started examples
-- [ ] Tests 90%+ of cookbook (API key aware)
-- [ ] Colored output for readability
-- [ ] Profile + example combination validation
-- [ ] API key skip logic functional
+- [x] examples-validation.sh created with executable permissions
+- [x] Tests 100% of getting-started examples (6/6 PASSED)
+- [ ] Tests 90%+ of cookbook (API key aware) - currently <50%, needs fixes
+- [x] Colored output for readability (GREEN/RED/YELLOW)
+- [x] Profile + example combination validation (reads `-- Profile:` header)
+- [x] API key skip logic functional (checks OPENAI/ANTHROPIC env vars)
+
+**Progress Notes**:
+- Script created: `scripts/testing/examples-validation.sh` (5103 bytes, executable)
+- getting-started: 6/6 PASSED (100%) ✅
+- cookbook: ~7/17 PASSED (~41%) - many examples need profile/API fixes
+- Added TIMEOUT_API_SECONDS=180 for API-dependent examples
+- Fixed bash arithmetic bug with `((VAR++)) || true`
 
 **Implementation Steps**:
 1. Create `scripts/testing/examples-validation.sh` (see design doc lines 1268-1419 for full content)
