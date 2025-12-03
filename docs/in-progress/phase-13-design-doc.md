@@ -1,22 +1,35 @@
 # Phase 13: Adaptive Memory & Context Engineering System
 
-**Document Version:** 2.0.0 (Updated with Implementation Results)
-**Date:** 2025-01-31 (Implementation Complete)
-**Status:** **IMPLEMENTED** - Experimental Infrastructure with Production-Quality Engineering Memory System
-**Phase Duration:** 5 weeks (Completed)
+**Document Version:** 3.0.0 (Updated with Phase 13c Storage Consolidation)
+**Date:** 2025-12-03 (v0.14.0 Release)
+**Status:** **COMPLETE** - Production-Ready with Unified SQLite/PostgreSQL Storage
+**Phase Duration:** Phase 13 (5 weeks) + Phase 13c (6 weeks) = 11 weeks total
 **Predecessor:** Phase 12 (Production Template System)
 **Dependencies:** Phase 8 (Vector Storage/HNSW), Phase 10 (IDE Integration), Phase 11 (Local LLM), Phase 12 (Templates)
 
 ---
 
-**IMPLEMENTATION STATUS:**
-- ✅ **llmspell-memory**: 3,500+ LOC with InMemory & HNSW backends, 68 tests passing
-- ✅ **llmspell-graph**: 2,200+ LOC with SurrealDB backend, 34 tests passing
+**IMPLEMENTATION STATUS (v0.14.0):**
+- ✅ **llmspell-memory**: 3,500+ LOC with unified SqliteBackend (libsql)
+- ✅ **llmspell-graph**: 2,200+ LOC with SqliteGraphStorage (SurrealDB REMOVED in 13c.2)
 - ✅ **llmspell-context**: Basic assembly strategies (episodic, semantic, hybrid)
-- ✅ **llmspell-bridge**: MemoryBridge + ContextBridge integration, 149 total tests passing
-- ✅ **E2E Integration**: 6/6 tests passing with zero clippy warnings
-- ⏸️ **Phase 13.15 (Accuracy Validation)**: DEFERRED to post-release (baseline metrics established)
-- ⏸️ **Advanced Features**: DeBERTa reranking, LLM-driven consolidation (simplified for v0.12)
+- ✅ **llmspell-storage**: Unified storage layer - 10 backends (SQLite + PostgreSQL parity)
+- ✅ **vectorlite-rs**: Pure Rust HNSW (1,098 LOC, replaced hnsw_rs in 13c.2.2a)
+- ✅ **llmspell-bridge**: MemoryBridge + ContextBridge integration
+- ✅ **Total Tests**: 5540 tests passing (zero clippy warnings)
+- ✅ **Profile System**: 21 preset profiles (4-layer architecture)
+- ✅ **Examples**: 56 Lua examples with standardized headers
+- ⏸️ **Phase 13.15 (Accuracy Validation)**: DEFERRED to post-release
+
+**PHASE 13c CONSOLIDATION (v0.14.0):**
+- ✅ **13c.1**: 13 dependencies removed (lazy_static, once_cell, surrealdb, sled, hnsw_rs, etc.)
+- ✅ **13c.2**: Unified SQLite storage (4 backends → 1 libsql-based solution)
+- ✅ **13c.3**: Centralized traits in llmspell-core, PostgreSQL/SQLite data portability
+- ✅ **13c.4**: 21 preset profiles (4-layer: bases → backends → features → envs → presets)
+- ✅ **13c.5**: 56 standardized Lua examples with profile recommendations
+- ✅ **13c.6**: examples-validation.sh, quality-check-*.sh automation
+- ✅ **13c.7**: Documentation overhaul (Phase 13 references throughout)
+- ✅ **13c.8**: v0.14.0 release with 5540 tests, 44MB binary
 
 ---
 
@@ -25,32 +38,48 @@
 **Phase 13 was completed with a pragmatic, experimental infrastructure with production-quality engineering foundation** that prioritizes:
 1. **Correctness over features**: Simplified LLM-driven consolidation to regex-based patterns
 2. **Performance over perfection**: HNSW delivers 8.47x speedup, <2ms overhead maintained
-3. **Testability over complexity**: 149 tests passing, >90% coverage, zero clippy warnings
+3. **Testability over complexity**: 5540 tests passing, >90% coverage, zero clippy warnings
 4. **Foundations over completion**: Core memory/context infrastructure ready for future enhancements
 
-### What Was Built vs Designed
+### What Was Built vs Designed (Updated for v0.14.0)
 
-| Component | Original Design | Actual Implementation | Status |
-|-----------|----------------|----------------------|--------|
-| **Episodic Memory** | ChromaDB/Qdrant vector DB | InMemory (testing) + HNSW (production) | ✅ COMPLETE |
-| **Semantic Memory** | petgraph temporal KG | SurrealDB embedded bi-temporal graph | ✅ 71% FUNCTIONAL |
-| **Consolidation** | Full LLM-driven (Mem0 pattern) | Regex-based ManualConsolidationEngine | ✅ SIMPLIFIED |
-| **Context Reranking** | DeBERTa cross-encoder | Not implemented | ⏸️ DEFERRED |
-| **Context Compression** | Extractive + Abstractive | Not implemented | ⏸️ DEFERRED |
-| **Context Assembly** | 4-stage pipeline | Simplified strategies (episodic/semantic/hybrid) | ✅ BASIC |
-| **Accuracy Validation** | Full DMR/NDCG benchmarks | Baseline metrics established | ⏸️ DEFERRED (Phase 13.15) |
+| Component | Original Design | v0.13 Implementation | v0.14.0 (Phase 13c) | Status |
+|-----------|----------------|---------------------|---------------------|--------|
+| **Episodic Memory** | ChromaDB/Qdrant | InMemory + HNSW | SqliteVectorStorage + vectorlite-rs | ✅ COMPLETE |
+| **Semantic Memory** | petgraph TKG | SurrealDB embedded | SqliteGraphStorage (bi-temporal) | ✅ COMPLETE |
+| **Procedural Memory** | K-V rules | SqliteProceduralStorage | SqliteProceduralStorage (unchanged) | ✅ COMPLETE |
+| **Vector Search** | hnsw_rs crate | hnsw_rs file-based | vectorlite-rs pure Rust (1,098 LOC) | ✅ COMPLETE |
+| **State Storage** | Sled K-V | Sled file-based | SqliteStateStorage (unified) | ✅ COMPLETE |
+| **Consolidation** | LLM-driven (Mem0) | Regex-based | Regex-based (unchanged) | ✅ SIMPLIFIED |
+| **Context Reranking** | DeBERTa | Not implemented | Not implemented | ⏸️ DEFERRED |
+| **Context Compression** | Extractive + Abstractive | Not implemented | Not implemented | ⏸️ DEFERRED |
+| **Context Assembly** | 4-stage pipeline | Simplified strategies | Simplified strategies | ✅ BASIC |
+| **Profile System** | 14 profiles | 14 profiles | 21 presets (4-layer architecture) | ✅ COMPLETE |
+| **Data Portability** | N/A | N/A | SQLite ↔ PostgreSQL bidirectional | ✅ NEW |
 
-### Architectural Wins
+### Architectural Wins (Phase 13 + 13c)
 
-1. **Hot-Swappable Backends**: `MemoryConfig::for_testing()` vs `::for_production()` enables seamless InMemory ↔ HNSW transitions
-2. **SurrealDB Embedded**: Zero external dependencies, 71% functional graph database with bi-temporal support
-3. **Parallel Retrieval**: `tokio::join!` optimization delivers ~2x speedup for hybrid context assembly
-4. **Zero Breaking Changes**: All Phase 1-12 APIs preserved, memory/context fully opt-in
+**Phase 13 Wins (v0.13):**
+1. **Hot-Swappable Backends**: `MemoryConfig::for_testing()` vs `::for_production()` enables seamless transitions
+2. **Parallel Retrieval**: `tokio::join!` optimization delivers ~2x speedup for hybrid context assembly
+3. **Zero Breaking Changes**: All Phase 1-12 APIs preserved, memory/context fully opt-in
+
+**Phase 13c Wins (v0.14.0):**
+1. **Unified Storage Architecture**: 4 disparate backends → 1 unified libsql-based SqliteBackend
+   - Eliminated: HNSW files, SurrealDB, Sled, filesystem artifacts
+   - Result: Single-file backup (storage.db) vs 4 separate procedures
+2. **Pure Rust HNSW**: vectorlite-rs replaces hnsw_rs with 3-100x speedup, zero native dependencies
+3. **Centralized Traits**: All storage traits in llmspell-core (zero circular dependencies)
+4. **100% Backend Parity**: PostgreSQL and SQLite implement identical trait sets
+5. **Data Portability**: Bidirectional export/import between SQLite ↔ PostgreSQL
+6. **Dependency Reduction**: 13 dependencies removed (~60MB reduction)
+7. **Profile Rearchitecture**: 21 presets via 4-layer composition (bases → backends → features → envs)
+8. **Validation Infrastructure**: examples-validation.sh, quality-check-*.sh automated testing
 
 ### Deferred for Future Releases
 
 - **DeBERTa Reranking**: Complex Candle/ONNX integration deferred (BM25 fallback available)
-- **LLM Consolidation**: Full Mem0-style ADD/UPDATE/DELETE automation (regex patterns sufficient for v0.12)
+- **LLM Consolidation**: Full Mem0-style ADD/UPDATE/DELETE automation (regex patterns sufficient)
 - **Compression Pipeline**: Extractive + abstractive summarization (basic token budgeting implemented)
 - **Phase 13.15 Accuracy**: DMR >90%, NDCG@10 >0.85 full validation (baseline benchmarks established)
 
@@ -93,7 +122,7 @@ Together, these systems deliver **intelligent context management** that scales b
 | **HNSW Backend Speedup** | 10-100x at scale | **8.47x at 10K** entries | Integrated from llmspell-kernel/storage |
 | **Context Assembly** | <100ms | **<2ms** (50x target) | Parallel retrieval ~2x speedup |
 | **Multi-Tenant Isolation** | 100% | **100%** | Session-scoped memory, zero leakage |
-| **Test Coverage** | >90% | **>90%** (68 memory + 34 graph + 6 E2E tests) | 149 total tests, zero warnings |
+| **Test Coverage** | >90% | **>90%** (5540 workspace tests) | 5540 total tests, zero warnings |
 | **Template Integration** | 10/10 templates | **Zero breaking changes** | Opt-in via MemoryBridge/ContextBridge |
 | **API Documentation** | >95% | **>95%** | Comprehensive inline docs + examples |
 | **DMR Accuracy** | >90% | **DEFERRED** (Phase 13.15) | Baseline benchmark established |
@@ -105,8 +134,8 @@ Together, these systems deliver **intelligent context management** that scales b
 
 **What Changed**:
 - **3 New Crates**:
-  - `llmspell-memory` (3,500+ LOC, 68 tests) - InMemory + HNSW backends
-  - `llmspell-graph` (2,200+ LOC, 34 tests) - SurrealDB backend, regex extraction
+  - `llmspell-memory` (3,500+ LOC) - SqliteBackend (libsql) with vectorlite-rs HNSW
+  - `llmspell-graph` (2,200+ LOC) - SqliteGraphStorage (bi-temporal, replaced SurrealDB in v0.14.0)
   - `llmspell-context` (simplified) - Basic assembly strategies (episodic/semantic/hybrid)
 - **Bridge Integration**: MemoryBridge + ContextBridge for Lua/JS API access
 - **CLI Commands**: `memory {add,search,consolidate,stats}`, `context {assemble,strategies}`
@@ -409,8 +438,8 @@ local results = Memory.episodic.search({
 - **Capability**: Query at any point in time, track belief evolution
 
 **Actual Phase 13 Implementation**:
-- **Graph Engine**: **SurrealDB** embedded mode (RocksDB backend, not petgraph)
-- **Storage**: `<data_dir>/llmspell-graph.db` (self-contained, no external server)
+- **Graph Engine**: **SqliteGraphStorage** (libsql, SurrealDB removed in v0.14.0/Phase 13c.2)
+- **Storage**: `<data_dir>/storage.db` (unified single-file storage, all backends consolidated)
 - **Extraction**: **RegexExtractor** for entity/relationship patterns (simplified vs LLM-driven)
 - **Consolidation**: **NoopConsolidationEngine** default (manual consolidation via `ManualConsolidationEngine` available)
 - **Bi-Temporal Support**: Full event_time + ingestion_time tracking
@@ -821,20 +850,20 @@ This section presents the high-level architecture, design decisions, and system 
 │                   INFRASTRUCTURE LAYER                              │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                       │
-│  3 New Crates:                                                      │
+│  3 New Crates (v0.14.0 - Unified Storage):                        │
 │  ┌──────────────────────────────────────────────────────────┐      │
 │  │ llmspell-memory (3,500 LOC)                              │      │
-│  │ ├─ EpisodicMemory (SQLite + pgvector + HNSW)           │      │
-│  │ ├─ SemanticMemory (Temporal KG + petgraph)             │      │
-│  │ ├─ ProceduralMemory (K-V rules)                        │      │
-│  │ └─ Consolidator (LLM-driven ADD/UPDATE/DELETE)         │      │
+│  │ ├─ EpisodicMemory (SqliteBackend + vectorlite-rs HNSW) │      │
+│  │ ├─ SemanticMemory (SqliteGraphStorage + bi-temporal)   │      │
+│  │ ├─ ProceduralMemory (SqliteProceduralStorage)          │      │
+│  │ └─ Consolidator (regex-based ADD/UPDATE/DELETE)        │      │
 │  └──────────────────────────────────────────────────────────┘      │
 │  ┌──────────────────────────────────────────────────────────┐      │
-│  │ llmspell-graph (2,800 LOC)                               │      │
-│  │ ├─ TemporalGraph (petgraph + bi-temporal edges)        │      │
-│  │ ├─ EntityExtractor (LLM-driven)                        │      │
-│  │ ├─ RelationshipExtractor (LLM-driven)                  │      │
-│  │ └─ QueryEngine (point-in-time, traversal)              │      │
+│  │ llmspell-graph (2,200 LOC)                               │      │
+│  │ ├─ SqliteGraphStorage (recursive CTEs, bi-temporal)    │      │
+│  │ ├─ RegexExtractor (entity/relationship patterns)       │      │
+│  │ ├─ GraphBackend (trait, PostgreSQL + SQLite parity)    │      │
+│  │ └─ QueryEngine (point-in-time, multi-hop traversal)    │      │
 │  └──────────────────────────────────────────────────────────┘      │
 │  ┌──────────────────────────────────────────────────────────┐      │
 │  │ llmspell-context (4,200 LOC)                             │      │
@@ -1115,7 +1144,7 @@ provider_name = "consolidation-llm"  # References provider
 **Options**:
 1. **SQLite**: File-based, simple, no server (current `llmspell-state-persistence` backend)
 2. **Postgres**: Full ACID, `pgvector` extension, production-grade
-3. **Custom**: Rust-native K-V store (e.g., sled, redb)
+3. **Custom**: Rust-native K-V store (e.g., redb) - Note: sled was removed in v0.14.0
 
 **Decision**: **SQLite for Single-User, Postgres for Multi-Tenant**
 
@@ -4466,7 +4495,7 @@ CREATE POLICY tenant_isolation ON episodic_memory
 
 **Days 3-4: Temporal Knowledge Graph**
 - `llmspell-graph` crate scaffold
-- Bi-temporal graph schema (SurrealDB/Neo4j integration)
+- Bi-temporal graph schema (SqliteGraphStorage, SurrealDB removed in v0.14.0)
 - Entity/relationship extraction (regex-based v1)
 - Unit tests: 20+ tests for graph operations
 - **Validation**: `cargo test -p llmspell-graph --lib` passes
@@ -4599,7 +4628,7 @@ cargo bench -p llmspell-context
 
 **Week 1 Risks**:
 - **ChromaDB/Qdrant integration complexity** → Fallback: In-memory vector store with FAISS
-- **SurrealDB/Neo4j learning curve** → Fallback: SQLite with JSON graph representation
+- **Graph storage complexity** → v0.14.0: SqliteGraphStorage with recursive CTEs (SurrealDB removed)
 
 **Week 2 Risks**:
 - **DeBERTa Candle model size (500MB+)** → Fallback: ONNX quantized model or BM25 reranking
@@ -5181,7 +5210,7 @@ embedding_model = "all-MiniLM-L6-v2"
 max_entries_per_session = 10000
 
 [memory.semantic]
-graph_store = "surrealdb"  # or "neo4j", "sqlite"
+graph_store = "sqlite"  # unified storage in v0.14.0+ (SurrealDB removed)
 consolidation_interval_seconds = 300  # 5 minutes
 
 [memory.consolidation]
@@ -5760,7 +5789,7 @@ prune_interval_hours = 24
 - **Retrieval Strategy**: Method for fetching relevant context (episodic, semantic, hybrid, BM25)
 - **SELF-RAG**: Self-reflective RAG with retrieval critique
 - **Semantic Memory**: Consolidated knowledge graph (entities, relationships, facts)
-- **SurrealDB**: Multi-model database for knowledge graph storage
+- **SqliteGraphStorage**: Unified SQLite-based knowledge graph (SurrealDB removed in v0.14.0)
 - **UPDATE Decision**: Consolidation decision to modify existing entity/relationship
 
 ### Appendix E: Performance Tuning Cheat Sheet
@@ -5805,7 +5834,7 @@ Phase 13 components include comprehensive tracing instrumentation for production
 
 | Crate | Coverage | Calls Added | Key Modules |
 |-------|----------|-------------|-------------|
-| **llmspell-graph** | 95% | 35 | `surrealdb.rs` (27), `regex.rs` (8) |
+| **llmspell-graph** | 95% | 35 | `sqlite.rs` (27), `regex.rs` (8) |
 | **llmspell-memory** | 85% | 42 | `manager.rs` (12), `in_memory.rs` (18), `semantic.rs` (12) |
 | **llmspell-context** | 65% | 16 | `analyzer.rs` (7), `strategy.rs` (9) |
 
@@ -5814,7 +5843,7 @@ Phase 13 components include comprehensive tracing instrumentation for production
 ### Tracing Level Guidelines
 
 **`info!`** - High-level operations:
-- Component initialization (`DefaultMemoryManager`, `SurrealDB`, `GraphSemanticMemory`)
+- Component initialization (`DefaultMemoryManager`, `SqliteGraphStorage`, `GraphSemanticMemory`)
 - Consolidation triggers (`session_id`, `mode`, `entities_added`, `entries_processed`)
 - Query analysis completion (`intent`, `entities`, `keywords`)
 - Entity extraction results (`count`, `filtered_count`)
@@ -5867,7 +5896,7 @@ RUST_LOG=llmspell_context::query::analyzer=trace,llmspell_context::retrieval=deb
 
 **Debugging graph operations**:
 ```bash
-RUST_LOG=llmspell_graph::storage::surrealdb=debug,llmspell_graph::extraction=trace llmspell
+RUST_LOG=llmspell_graph::storage::sqlite=debug,llmspell_graph::extraction=trace llmspell
 ```
 
 **Full trace (verbose, use sparingly)**:
