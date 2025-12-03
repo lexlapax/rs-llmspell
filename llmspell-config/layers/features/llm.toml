@@ -23,15 +23,15 @@ name = "anthropic"
 provider_type = "anthropic"
 enabled = true
 api_key_env = "ANTHROPIC_API_KEY"
-default_model = "claude-3-5-sonnet-20240620"
+default_model = "claude-3-5-sonnet-latest"
 max_tokens = 8192
 timeout_seconds = 120
 
 [providers.gemini]
 name = "gemini"
 provider_type = "gemini"
-enabled = false  # Gemini not yet implemented in rig.rs
+enabled = true
 api_key_env = "GEMINI_API_KEY"
-default_model = "gemini-1.5-pro"
+default_model = "gemini-2.5-flash"
 max_tokens = 8192
 timeout_seconds = 120

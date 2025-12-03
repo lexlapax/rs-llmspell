@@ -7129,7 +7129,7 @@ cargo clippy --workspace (zero warnings)
 - Created 20 preset TOML files in llmspell-config/presets/
   - 12 backward compatible presets (minimal, development, providers, state, sessions, ollama, candle, memory, rag-dev, rag-prod, rag-perf, default)
   - 8 new combination presets (postgres-prod, daemon-dev, daemon-prod, gemini-prod ⭐, openai-prod ⭐, claude-prod ⭐, full-local-ollama, research)
-- Updated features/llm.toml to add Gemini provider configuration (gemini-1.5-pro default model)
+- Updated features/llm.toml to add Gemini provider configuration (gemini-2.5-flash default model)
 - Wired up all 20 presets with include_str!() in profile_composer.rs load_layer_toml()
 - Added 10 comprehensive tests (test_all_presets_load + 9 specific preset tests)
 - 132 tests passed, zero clippy warnings
@@ -7997,6 +7997,111 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 **Timeline**: 1 day (8 hours total)
 **Critical Dependencies**: Phase 13c.5 (Examples) - examples must be finalized
 **Priority**: CRITICAL (quality assurance)
+
+### Task 13c.6.0.1: Enable Gemini Provider Support 🚧 IN PROGRESS
+**Priority**: HIGH (blocks validation)
+**Estimated Time**: 2 hours
+**Assignee**: Core Team
+**Status**: 🚧 IN PROGRESS
+
+**Description**: Add Gemini provider support to `llmspell-providers/src/rig.rs`. The upstream `rig-core 0.21` already supports Gemini via `rig::providers::gemini`, but our implementation only wraps OpenAI, Anthropic, Cohere, and Ollama.
+
+**Root Cause Analysis**:
+- `rig-core 0.21` has full Gemini support in `rig::providers::gemini` module
+- Our `rig.rs` implementation only has 4 providers in `RigModel` enum
+- The `"gemini"` case falls through to `_ =>` returning "Unsupported provider type"
+- Config layer `llm.toml` has Gemini enabled but runtime fails
+
+**Acceptance Criteria**:
+- [ ] Add `Gemini` variant to `RigModel` enum
+- [ ] Add `"gemini"` match arm in `RigProvider::new()`
+- [ ] Add Gemini handling in `execute_completion()`
+- [ ] Add Gemini capabilities (context size, multimodal support)
+- [ ] Add Gemini cost estimation
+- [ ] Re-enable Gemini in `llm.toml` (enabled = true)
+- [ ] All getting-started examples pass with providers profile
+
+**Implementation Steps**:
+1. Update `RigModel` enum (line ~18):
+   ```rust
+   enum RigModel {
+       OpenAI(providers::openai::responses_api::ResponsesCompletionModel),
+       Anthropic(providers::anthropic::completion::CompletionModel),
+       Cohere(providers::cohere::CompletionModel),
+       Ollama(providers::ollama::CompletionModel),
+       Gemini(providers::gemini::completion::CompletionModel),  // NEW
+   }
+   ```
+
+2. Add `"gemini"` match arm in `RigProvider::new()` (after line ~148):
+   ```rust
+   "gemini" => {
+       trace!("Initializing Gemini client via rig");
+       let api_key = config.api_key.as_ref().ok_or_else(|| LLMSpellError::Configuration {
+           message: "Gemini API key required".to_string(),
+           source: None,
+       })?;
+       let client = providers::gemini::Client::new(api_key);
+       let model = client.completion_model(&config.model);
+       info!("Gemini client created successfully for model: {}", config.model);
+       RigModel::Gemini(model)
+   }
+   ```
+
+3. Add Gemini to `execute_completion()` match (after Ollama case):
+   ```rust
+   RigModel::Gemini(model) => model
+       .completion_request(&prompt)
+       .max_tokens(self.max_tokens)
+       .send()
+       .await
+       .map_err(|e| LLMSpellError::Provider { ... })
+       .and_then(|response| { ... })
+   ```
+
+4. Update capabilities match (line ~167):
+   ```rust
+   "gemini" => match config.model.as_str() {
+       "gemini-2.5-flash" | "gemini-2.5-flash-latest" => 1000000,  // 1M context
+       "gemini-2.5-pro" => 1000000,
+       "gemini-3.0-pro" => 32768,
+       _ => 32768,
+   },
+   ```
+
+5. Add Gemini cost estimation in `estimate_cost_cents()`:
+   ```rust
+   "gemini" => {
+       // Gemini 1.5 Pro: $0.00125/1K input, $0.005/1K output (under 128K)
+       let input_cost = (input_tokens as f64 / 1000.0) * 0.125;
+       let output_cost = (output_tokens as f64 / 1000.0) * 0.5;
+       ((input_cost + output_cost) * 100.0).round() as u64
+   }
+   ```
+
+6. Re-enable Gemini in `llmspell-config/layers/features/llm.toml`
+
+7. Build and test:
+   ```bash
+   cargo build --bin llmspell
+   ./scripts/testing/examples-validation.sh getting-started
+   ```
+
+**Definition of Done**:
+- [ ] Gemini provider compiles without warnings
+- [ ] `./target/debug/llmspell -p providers run examples/script-users/getting-started/02-first-agent.lua` succeeds
+- [ ] All 6 getting-started examples pass validation
+- [ ] No clippy warnings in llmspell-providers
+
+**Files to Modify**:
+- `llmspell-providers/src/rig.rs` (main implementation)
+- `llmspell-config/layers/features/llm.toml` (re-enable Gemini)
+
+**References**:
+- [rig-core 0.21 Gemini docs](https://docs.rs/rig-core/0.21.0/rig/providers/gemini/index.html)
+- [Gemini Client](https://docs.rs/rig-core/0.21.0/rig/providers/gemini/client/struct.Client.html)
+
+---
 
 ### Task 13c.6.1: Validation Script Creation ⏹ PENDING
 **Priority**: CRITICAL

@@ -17,6 +17,7 @@ serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 rig-core.workspace = true
+reqwest = { version = "0.12", default-features = false }  # For rig-core 0.23 Ollama type parameter
 ollama-rs = "0.3.2"
 url = "2"
 chrono.workspace = true

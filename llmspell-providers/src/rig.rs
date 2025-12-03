@@ -19,7 +19,8 @@ enum RigModel {
     OpenAI(providers::openai::responses_api::ResponsesCompletionModel),
     Anthropic(providers::anthropic::completion::CompletionModel),
     Cohere(providers::cohere::CompletionModel),
-    Ollama(providers::ollama::CompletionModel),
+    Ollama(providers::ollama::CompletionModel<reqwest::Client>),
+    Gemini(providers::gemini::completion::CompletionModel),
 }
 
 /// Rig provider implementation with cost tracking and tracing
@@ -134,18 +135,34 @@ impl RigProvider {
                     .unwrap_or("http://localhost:11434");
                 debug!("Ollama base URL: {}", base_url);
 
+                // rig-core 0.23+ - build() no longer returns Result
                 let client = providers::ollama::Client::builder()
                     .base_url(base_url)
-                    .build()
-                    .map_err(|e| LLMSpellError::Configuration {
-                        message: format!("Failed to create Ollama client: {}", e),
-                        source: Some(Box::new(e)),
-                    })?;
+                    .build();
 
                 let model = client.completion_model(&config.model);
 
                 info!("Ollama client created successfully");
                 RigModel::Ollama(model)
+            }
+            "gemini" => {
+                trace!("Initializing Gemini client via rig");
+                let api_key =
+                    config
+                        .api_key
+                        .as_ref()
+                        .ok_or_else(|| LLMSpellError::Configuration {
+                            message: "Gemini API key required".to_string(),
+                            source: None,
+                        })?;
+
+                let client = providers::gemini::Client::new(api_key);
+                let model = client.completion_model(&config.model);
+                info!(
+                    "Gemini client created successfully for model: {}",
+                    config.model
+                );
+                RigModel::Gemini(model)
             }
             _ => {
                 warn!(
@@ -163,7 +180,10 @@ impl RigProvider {
         // Set capabilities based on provider type and model
         let capabilities = ProviderCapabilities {
             supports_streaming: false, // Rig doesn't expose streaming yet
-            supports_multimodal: matches!(config.provider_type.as_str(), "openai" | "anthropic"),
+            supports_multimodal: matches!(
+                config.provider_type.as_str(),
+                "openai" | "anthropic" | "gemini"
+            ),
             max_context_tokens: Some(match config.provider_type.as_str() {
                 "openai" => match config.model.as_str() {
                     "gpt-4" | "gpt-4-turbo" => 128000,
@@ -174,6 +194,12 @@ impl RigProvider {
                     "claude-3-opus" | "claude-3-sonnet" => 200000,
                     "claude-2.1" => 100000,
                     _ => 100000,
+                },
+                "gemini" => match config.model.as_str() {
+                    "gemini-2.5-flash" | "gemini-2.5-flash-latest" => 1000000, // 1M context
+                    "gemini-2.5-pro" | "gemini-2.5-pro-latest" => 1000000,
+                    "gemini-3.0-pro" | "gemini-pro" => 32768,
+                    _ => 32768,
                 },
                 "cohere" => 4096,
                 "ollama" => 8192, // Default, model-dependent
@@ -276,6 +302,28 @@ impl RigProvider {
             "ollama" => {
                 // Ollama is local/self-hosted, zero API cost
                 0
+            }
+            "gemini" => {
+                match self.config.model.as_str() {
+                    "gemini-2.5-flash" | "gemini-2.5-flash-latest" => {
+                        // Gemini 2.5 flash: $0.00125/1K input, $0.005/1K output (under 128K)
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.125;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 0.5;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                    "gemini-2.5-pro" | "gemini-2.5-pro-latest" => {
+                        // Gemini 2.5 pro: $0.000075/1K input, $0.0003/1K output
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.0075;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 0.03;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                    _ => {
+                        // Default to Gemini Pro pricing
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.125;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 0.5;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                }
             }
             _ => {
                 // Unknown provider, use conservative estimate
@@ -516,6 +564,63 @@ impl RigProvider {
                                     self.config.provider_type,
                                     reasoning.reasoning.len()
                                 );
+                                Ok(reasoning.reasoning.join("\n\n"))
+                            }
+                        }
+                    })
+            }
+            RigModel::Gemini(model) => {
+                info!("Gemini completion via rig");
+                model
+                    .completion_request(&prompt)
+                    .max_tokens(self.max_tokens)
+                    .send()
+                    .await
+                    .map_err(|e| LLMSpellError::Provider {
+                        message: format!("Gemini completion failed: {}", e),
+                        provider: Some(self.config.name.clone()),
+                        source: None,
+                    })
+                    .and_then(|response| {
+                        use rig::completion::AssistantContent;
+                        trace!(
+                            "{} response received, processing variant",
+                            self.config.provider_type
+                        );
+                        match response.choice.first() {
+                            AssistantContent::Text(text) => {
+                                debug!(
+                                    "{} returned Text response: {} chars",
+                                    self.config.provider_type,
+                                    text.text.len()
+                                );
+                                Ok(text.text.clone())
+                            }
+                            AssistantContent::ToolCall(call) => {
+                                debug!(
+                                    "{} returned ToolCall response: function={}, id={}",
+                                    self.config.provider_type, call.function.name, call.id
+                                );
+                                warn!(
+                                    "Unexpected tool call in non-tool context: {}",
+                                    call.function.name
+                                );
+                                Err(LLMSpellError::Provider {
+                                    message: format!(
+                                        "Unexpected tool call response: {}",
+                                        call.function.name
+                                    ),
+                                    provider: Some(self.config.name.clone()),
+                                    source: None,
+                                })
+                            }
+                            AssistantContent::Reasoning(reasoning) => {
+                                debug!(
+                                    "Received reasoning response from {} with {} steps",
+                                    self.config.provider_type,
+                                    reasoning.reasoning.len()
+                                );
+                                trace!("Reasoning steps: {:?}", reasoning.reasoning);
                                 Ok(reasoning.reasoning.join("\n\n"))
                             }
                         }
