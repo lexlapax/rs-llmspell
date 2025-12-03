@@ -8,6 +8,7 @@ set -euo pipefail
 # Configuration
 EXAMPLES_DIR="examples/script-users"
 TIMEOUT_SECONDS=30
+TIMEOUT_API_SECONDS=180  # Longer timeout for examples requiring API calls
 FAILED=0
 SKIPPED=0
 PASSED=0
@@ -51,16 +52,24 @@ validate_example() {
     echo -n "Testing: $basename with profile '$profile' ... "
 
     # Skip if requires API key and not available
+    local use_api_timeout=false
     if requires_api_key "$example"; then
         if [[ -z "${OPENAI_API_KEY:-}" ]] && [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
             echo -e "${YELLOW}SKIPPED${NC} (API key required)"
             ((SKIPPED++)) || true
             return 0
         fi
+        use_api_timeout=true
+    fi
+
+    # Use longer timeout for API-dependent examples
+    local timeout_secs=$TIMEOUT_SECONDS
+    if [[ "$use_api_timeout" == "true" ]]; then
+        timeout_secs=$TIMEOUT_API_SECONDS
     fi
 
     # Run example with timeout
-    if timeout ${TIMEOUT_SECONDS}s $LLMSPELL_BIN -p "$profile" run "$example" &>/dev/null; then
+    if timeout ${timeout_secs}s $LLMSPELL_BIN -p "$profile" run "$example" &>/dev/null; then
         echo -e "${GREEN}PASSED${NC}"
         ((PASSED++)) || true
     else

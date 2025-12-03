@@ -486,83 +486,108 @@ print("4.1. Creating agent with RAG augmentation...")
 if not Agent then
     print("⚠️ Agent not available, skipping integration workflow")
 else
-    local model = os.getenv("MODEL") or "gpt-3.5-turbo"
-
-    local agent_success, agent = pcall(Agent.create, {
-        model = model,
-        system_prompt = "You are a helpful programming assistant with access to documentation. Use the provided context to answer questions accurately.",
-        use_rag = true
-    })
-
-    if not agent_success then
-        print("   ⚠️ Agent creation failed: " .. tostring(agent))
-        print("   Continuing without agent integration...")
+    -- Use the first available provider (from Provider.list at start)
+    local providers = Provider.list()
+    if #providers == 0 then
+        print("   ⚠️ No providers available, skipping agent integration")
     else
-        print("   ✅ Agent created with RAG integration\n")
-
-        -- Step 4.2: Query Agent with Context
-        print("4.2. Querying agent with context from memory...")
-
-        local user_query = "Based on our conversation, explain the relationship between ownership and borrowing in Rust"
-
-        print("   User query: " .. user_query)
-        print("   Retrieving relevant context from memory...")
-
-        -- Assemble context for this query
-        local ctx_success, ctx_result = pcall(Context.assemble,
-            user_query,
-            "episodic",
-            1500,
-            session_id
-        )
-
-        if ctx_success and ctx_result.formatted then
-            print(string.format("   Retrieved %d chunks (%d tokens)",
-                #ctx_result.chunks, ctx_result.token_count))
-
-            -- Combine context with query
-            local augmented_query = ctx_result.formatted .. "\n\nQuestion: " .. user_query
-
-            print("\n   Sending augmented query to agent...")
-            local response_success, response = pcall(agent.complete, agent, augmented_query)
-
-            if response_success then
-                print("\n📨 Agent Response:")
-                print("   " .. string.gsub(response, "\n", "\n   "))
-            else
-                print("   ⚠️ Agent query failed: " .. tostring(response))
-            end
-        else
-            print("   ⚠️ Context assembly failed for agent query")
+        -- Parse provider/model from name like "rig/openai/gpt-4"
+        local provider_full = providers[1].name
+        local parts = {}
+        for part in string.gmatch(provider_full, "[^/]+") do
+            table.insert(parts, part)
         end
+        local provider_name = parts[2] or "openai"
+        local model_name = parts[3] or "gpt-4"
 
-        print()
+        local agent_success, agent = pcall(function()
+            return Agent.builder()
+                :provider(provider_name)
+                :model(model_name)
+                :system_prompt("You are a helpful programming assistant with access to documentation. Use the provided context to answer questions accurately.")
+                :build()
+        end)
 
-        -- Step 4.3: Add Response to Memory
-        print("4.3. Adding agent response to episodic memory...")
+        if not agent_success then
+            print("   ⚠️ Agent creation failed: " .. tostring(agent))
+            print("   Continuing without agent integration...")
+        else
+            print("   ✅ Agent created with RAG integration\n")
 
-        if response_success then
-            local mem_success, mem_result = pcall(Memory.episodic.add,
-                session_id,
-                "user",
+            -- Step 4.2: Query Agent with Context
+            print("4.2. Querying agent with context from memory...")
+
+            local user_query = "Based on our conversation, explain the relationship between ownership and borrowing in Rust"
+
+            print("   User query: " .. user_query)
+            print("   Retrieving relevant context from memory...")
+
+            -- Assemble context for this query
+            local ctx_success, ctx_result = pcall(Context.assemble,
                 user_query,
-                {topic = "programming", subtopic = "rust-integration"}
+                "episodic",
+                1500,
+                session_id
             )
 
-            if mem_success then
-                print("   ✓ User query added to memory")
+            local response_text = nil
+            local response_success = false
+
+            if ctx_success and ctx_result.formatted then
+                print(string.format("   Retrieved %d chunks (%d tokens)",
+                    #ctx_result.chunks, ctx_result.token_count))
+
+                -- Combine context with query
+                local augmented_query = ctx_result.formatted .. "\n\nQuestion: " .. user_query
+
+                print("\n   Sending augmented query to agent...")
+                -- Use execute() with {text = ...} input format
+                local exec_success, response = pcall(function()
+                    return agent:execute({ text = augmented_query })
+                end)
+
+                if exec_success and response then
+                    response_text = response.text
+                    response_success = true
+                    print("\n📨 Agent Response:")
+                    print("   " .. string.gsub(response_text or "No response", "\n", "\n   "))
+                else
+                    print("   ⚠️ Agent query failed: " .. tostring(response))
+                end
+            else
+                print("   ⚠️ Context assembly failed for agent query")
             end
 
-            local mem_success2, mem_result2 = pcall(Memory.episodic.add,
-                session_id,
-                "assistant",
-                response,
-                {topic = "programming", subtopic = "rust-integration"}
-            )
+            print()
 
-            if mem_success2 then
-                print("   ✓ Agent response added to memory")
-                print("   💡 This creates a feedback loop: conversation → memory → context → agent → memory")
+            -- Step 4.3: Add Response to Memory
+            print("4.3. Adding agent response to episodic memory...")
+
+            if response_success and response_text then
+                local mem_success, mem_result = pcall(Memory.episodic.add,
+                    session_id,
+                    "user",
+                    user_query,
+                    {topic = "programming", subtopic = "rust-integration"}
+                )
+
+                if mem_success then
+                    print("   ✓ User query added to memory")
+                end
+
+                local mem_success2, mem_result2 = pcall(Memory.episodic.add,
+                    session_id,
+                    "assistant",
+                    response_text,
+                    {topic = "programming", subtopic = "rust-integration"}
+                )
+
+                if mem_success2 then
+                    print("   ✓ Agent response added to memory")
+                    print("   💡 This creates a feedback loop: conversation → memory → context → agent → memory")
+                end
+            else
+                print("   ⚠️ No response to add to memory")
             end
         end
     end
@@ -579,8 +604,9 @@ print("━━━━━━━━━━━━━━━━━━━━━━━━�
 
 -- Step 5.1: RAG Statistics
 print("5.1. RAG Statistics...")
-local rag_stats = RAG.stats()
-if rag_stats then
+-- RAG has get_stats() method, not stats()
+local rag_stats_success, rag_stats = pcall(RAG.get_stats)
+if rag_stats_success and rag_stats then
     print("📊 RAG Status:")
     for key, value in pairs(rag_stats) do
         print(string.format("   %s: %s", key, tostring(value)))

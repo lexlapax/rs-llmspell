@@ -7998,28 +7998,28 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 **Critical Dependencies**: Phase 13c.5 (Examples) - examples must be finalized
 **Priority**: CRITICAL (quality assurance)
 
-### Task 13c.6.0.1: Enable Gemini Provider Support 🚧 IN PROGRESS
+### Task 13c.6.0.1: Enable Gemini Provider Support ✅ COMPLETE
 **Priority**: HIGH (blocks validation)
-**Estimated Time**: 2 hours
+**Estimated Time**: 2 hours (Actual: 4 hours - rig-core upgrade required)
 **Assignee**: Core Team
-**Status**: 🚧 IN PROGRESS
+**Status**: ✅ COMPLETE
 
-**Description**: Add Gemini provider support to `llmspell-providers/src/rig.rs`. The upstream `rig-core 0.21` already supports Gemini via `rig::providers::gemini`, but our implementation only wraps OpenAI, Anthropic, Cohere, and Ollama.
+**Description**: Add Gemini provider support to `llmspell-providers/src/rig.rs`. Required upgrading `rig-core` from 0.21 to 0.25 to fix upstream Gemini serialization bug.
 
 **Root Cause Analysis**:
-- `rig-core 0.21` has full Gemini support in `rig::providers::gemini` module
-- Our `rig.rs` implementation only has 4 providers in `RigModel` enum
-- The `"gemini"` case falls through to `_ =>` returning "Unsupported provider type"
-- Config layer `llm.toml` has Gemini enabled but runtime fails
+- `rig-core 0.21` had Gemini support but bug in request serialization (`missing field 'generationConfig'`)
+- PR #1060 fix merged Nov 18, 2025 - after 0.23.1 release, available in 0.25.0
+- Our `rig.rs` implementation only had 4 providers in `RigModel` enum
+- Config layer `llm.toml` had Gemini enabled but runtime failed
 
 **Acceptance Criteria**:
-- [ ] Add `Gemini` variant to `RigModel` enum
-- [ ] Add `"gemini"` match arm in `RigProvider::new()`
-- [ ] Add Gemini handling in `execute_completion()`
-- [ ] Add Gemini capabilities (context size, multimodal support)
-- [ ] Add Gemini cost estimation
-- [ ] Re-enable Gemini in `llm.toml` (enabled = true)
-- [ ] All getting-started examples pass with providers profile
+- [x] Add `Gemini` variant to `RigModel` enum
+- [x] Add `"gemini"` match arm in `RigProvider::new()`
+- [x] Add Gemini handling in `execute_completion()`
+- [x] Add Gemini capabilities (context size, multimodal support)
+- [x] Add Gemini cost estimation
+- [x] Re-enable Gemini in `llm.toml` (enabled = true)
+- [x] All getting-started examples pass with providers profile
 
 **Implementation Steps**:
 1. Update `RigModel` enum (line ~18):
@@ -8088,18 +8088,36 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
    ```
 
 **Definition of Done**:
-- [ ] Gemini provider compiles without warnings
-- [ ] `./target/debug/llmspell -p providers run examples/script-users/getting-started/02-first-agent.lua` succeeds
-- [ ] All 6 getting-started examples pass validation
-- [ ] No clippy warnings in llmspell-providers
+- [x] Gemini provider compiles without warnings
+- [x] `./target/debug/llmspell -p providers run examples/script-users/getting-started/02-first-agent.lua` succeeds
+- [x] All 6 getting-started examples pass validation
+- [x] No clippy warnings in llmspell-providers
 
-**Files to Modify**:
-- `llmspell-providers/src/rig.rs` (main implementation)
-- `llmspell-config/layers/features/llm.toml` (re-enable Gemini)
+**Files Modified**:
+- `llmspell-providers/src/rig.rs` - Added Gemini variant, rig-core 0.25 builder pattern, reqwest type param
+- `llmspell-providers/Cargo.toml` - Added reqwest dependency for Ollama generic
+- `Cargo.toml` - Upgraded rig-core 0.21 → 0.25
+- `llmspell-config/layers/features/llm.toml` - Updated model names (claude-sonnet-4-5, gemini-2.5-flash)
+- `llmspell-config/presets/memory-development.toml` - Created new preset for memory+RAG
+- `llmspell-config/src/profile_composer.rs` - Registered memory-development preset
+- `scripts/testing/examples-validation.sh` - Fixed bash arithmetic bug, added API timeout
+- `examples/script-users/getting-started/02-first-agent.lua` - Fixed Provider.list(), Agent.builder() syntax
+- `examples/script-users/getting-started/05-memory-rag-advanced.lua` - Fixed RAG/Memory API calls
+
+**Completion Insights**:
+- **rig-core 0.25 breaking changes**: New builder pattern, `Client::builder().api_key(key).build()` returns Result
+- **Ollama generic type**: `CompletionModel<reqwest::Client>` now required, added reqwest dependency
+- **AssistantContent::Image**: New variant added, requires handling in all match statements
+- **Gemini PR #1060**: Fixed `generationConfig` serialization, merged after 0.23.1 release
+- **Model aliases**: Use `claude-sonnet-4-5` (not claude-3-5-sonnet-*), `gemini-2.5-flash` for current models
+- **Lua API patterns**: Provider.list() returns `[{name, enabled, capabilities}]`, not strings
+- **Agent.builder() syntax**: Must use colon notation `:method()` not dot `.method()` in Lua
+- **RAG.search() returns**: `{success, total, results}` table, not array directly
+- **Validation timeout**: API-dependent examples need 180s (not 30s default)
 
 **References**:
-- [rig-core 0.21 Gemini docs](https://docs.rs/rig-core/0.21.0/rig/providers/gemini/index.html)
-- [Gemini Client](https://docs.rs/rig-core/0.21.0/rig/providers/gemini/client/struct.Client.html)
+- [rig-core 0.25 Gemini docs](https://docs.rs/rig-core/0.25.0/rig/providers/gemini/index.html)
+- [rig-core PR #1060](https://github.com/0xPlaygrounds/rig/pull/1060) - Gemini fix
 
 ---
 
