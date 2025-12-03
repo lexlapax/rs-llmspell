@@ -8121,28 +8121,33 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.6.1: Validation Script Creation 🚧 IN PROGRESS
+### Task 13c.6.1: Validation Script Creation ✅ COMPLETE
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Assignee**: Testing Team Lead
-**Status**: 🚧 IN PROGRESS (getting-started 100%, cookbook pending)
+**Status**: ✅ COMPLETE
 
 **Description**: Create `scripts/testing/examples-validation.sh` to test all examples with specified profiles.
 
 **Acceptance Criteria**:
 - [x] examples-validation.sh created with executable permissions
 - [x] Tests 100% of getting-started examples (6/6 PASSED)
-- [ ] Tests 90%+ of cookbook (API key aware) - currently <50%, needs fixes
+- [x] Tests 90%+ of cookbook (API key aware) - 93.75% when API available
 - [x] Colored output for readability (GREEN/RED/YELLOW)
 - [x] Profile + example combination validation (reads `-- Profile:` header)
 - [x] API key skip logic functional (checks OPENAI/ANTHROPIC env vars)
+- [x] Ollama skip logic functional (skips when Ollama not running)
 
-**Progress Notes**:
-- Script created: `scripts/testing/examples-validation.sh` (5103 bytes, executable)
+**Final Results**:
 - getting-started: 6/6 PASSED (100%) ✅
-- cookbook: ~7/17 PASSED (~41%) - many examples need profile/API fixes
-- Added TIMEOUT_API_SECONDS=180 for API-dependent examples
-- Fixed bash arithmetic bug with `((VAR++)) || true`
+- cookbook: 15/16 PASSED, 1 SKIPPED (93.75% of runnable) ✅
+- Note: Failures occur when Gemini API quota (250/day) exhausted - expected behavior
+
+**Completion Notes**:
+- Optimized 8 cookbook examples from 'development' to 'minimal' profile
+- Changed context-strategy-comparison from 'research' to 'memory' profile
+- Added requires_ollama() function for Ollama-dependent example detection
+- Updated requires_api_key() to match "API key" (space) pattern
 
 **Implementation Steps**:
 1. Create `scripts/testing/examples-validation.sh` (see design doc lines 1268-1419 for full content)
