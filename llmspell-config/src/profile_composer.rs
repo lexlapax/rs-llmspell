@@ -263,6 +263,7 @@ impl ProfileComposer {
             "claude-prod" => include_str!("../presets/claude-prod.toml"),
             "full-local-ollama" => include_str!("../presets/full-local-ollama.toml"),
             "research" => include_str!("../presets/research.toml"),
+            "memory-development" => include_str!("../presets/memory-development.toml"),
 
             // Layer not found
             _ => {
@@ -274,7 +275,7 @@ impl ProfileComposer {
                          Available feature layers: features/minimal, features/llm, features/llm-local, features/state, features/rag, features/memory, features/full\n\
                          Available environment layers: envs/dev, envs/staging, envs/prod, envs/perf\n\
                          Available backend layers: backends/memory, backends/sqlite, backends/postgres\n\
-                         Available presets: minimal, development, providers, state, sessions, ollama, candle, memory, rag-dev, rag-prod, rag-perf, default, postgres-prod, daemon-dev, daemon-prod, gemini-prod, openai-prod, claude-prod, full-local-ollama, research",
+                         Available presets: minimal, development, providers, state, sessions, ollama, candle, memory, memory-development, rag-dev, rag-prod, rag-perf, default, postgres-prod, daemon-dev, daemon-prod, gemini-prod, openai-prod, claude-prod, full-local-ollama, research",
                         layer_path
                     ),
                 })
