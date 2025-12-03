@@ -10,6 +10,7 @@ use base64::Engine;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
+use tracing::info;
 
 // ============================================================================
 // PostgreSQL Exporter
@@ -39,7 +40,7 @@ impl PostgresExporter {
         let migrations = self.detect_migrations().await?;
         let mut export = ExportFormat::new("postgresql".to_string(), migrations.clone());
 
-        tracing::info!("Starting PostgreSQL export");
+        info!("Starting PostgreSQL export");
 
         // Export each data type
         if migrations.contains(&"V3".to_string()) {
@@ -73,7 +74,7 @@ impl PostgresExporter {
             export.data.hook_history = self.export_hook_history().await?;
         }
 
-        tracing::info!("PostgreSQL export completed");
+        info!("PostgreSQL export completed");
         Ok(export)
     }
 
@@ -564,7 +565,7 @@ impl PostgresExporter {
         let export = self.export_all().await?;
         let json = serde_json::to_string_pretty(&export)?;
         std::fs::write(output_path.as_ref(), json)?;
-        tracing::info!("Export written to: {}", output_path.as_ref().display());
+        info!("Export written to: {}", output_path.as_ref().display());
         Ok(())
     }
 
@@ -602,7 +603,7 @@ impl SqliteExporter {
         let migrations = self.detect_migrations().await?;
         let mut export = ExportFormat::new("sqlite".to_string(), migrations.clone());
 
-        tracing::info!("Starting SQLite export");
+        info!("Starting SQLite export");
 
         // Export each data type
         if migrations.contains(&"V3".to_string()) {
@@ -636,7 +637,7 @@ impl SqliteExporter {
             export.data.hook_history = self.export_hook_history().await?;
         }
 
-        tracing::info!("SQLite export completed");
+        info!("SQLite export completed");
         Ok(export)
     }
 
@@ -1070,7 +1071,7 @@ impl SqliteExporter {
         let export = self.export_all().await?;
         let json = serde_json::to_string_pretty(&export)?;
         std::fs::write(output_path.as_ref(), json)?;
-        tracing::info!("Export written to: {}", output_path.as_ref().display());
+        info!("Export written to: {}", output_path.as_ref().display());
         Ok(())
     }
 
