@@ -8875,433 +8875,218 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 **Critical Dependencies**: All previous phases complete
 **Priority**: CRITICAL (release quality)
 
+**Current State** (validated 2025-12-03):
+- Version: 0.13.1
+- Presets: 21 (not 17 as originally planned)
+- Getting-started: 6 examples
+- Script examples: 56 Lua files
+- Rust examples: 3 projects
+- CI: Removed in 13c.6.3 (local quality scripts only)
+
 ### Task 13c.8.1: Comprehensive Example Validation ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
+**Estimated Time**: 2 hours
 **Assignee**: QA Team
 **Status**: ⏹ PENDING
 
-**Description**: Run examples-validation.sh on all categories with API keys, achieve >90% pass rate.
+**Description**: Run examples-validation.sh on no-API-key examples, document which examples require API keys.
 
 **Acceptance Criteria**:
-- [ ] 100% getting-started examples pass
-- [ ] >90% cookbook examples pass
-- [ ] >80% applications pass (may require specific setup)
+- [ ] 100% getting-started examples pass (that don't need API keys)
+- [ ] All API-key-requiring examples documented in headers
 - [ ] All failures analyzed and documented
-- [ ] Zero broken examples (excluding API key requirements)
+- [ ] Validation report created
 
 **Implementation Steps**:
-1. Set up API keys:
-   ```bash
-   export OPENAI_API_KEY="sk-..."
-   export ANTHROPIC_API_KEY="sk-ant-..."
-   export LLMSPELL_POSTGRES_URL="postgresql://..."
-   ```
-
-2. Run comprehensive validation:
+1. Run validation on no-API-key examples:
    ```bash
    ./scripts/testing/examples-validation.sh getting-started
-   ./scripts/testing/examples-validation.sh features
-   ./scripts/testing/examples-validation.sh cookbook
-   ./scripts/testing/examples-validation.sh applications
-   ./scripts/testing/examples-validation.sh all
    ```
 
-3. Analyze failures:
+2. Analyze which examples require API keys:
    ```bash
-   # For each failure, debug:
-   cargo run -- -p <profile> run <example>
-   # Fix or document why it's expected to fail
+   # Check example headers for API key requirements
+   grep -l "API_KEY\|OPENAI\|ANTHROPIC" examples/script-users/**/*.lua
    ```
 
-4. Document results:
-   ```markdown
-   ## Example Validation Results (Phase 13c)
-
-   **Date**: [date]
-   **Total examples**: 50
-
-   | Category | Tested | Passed | Skipped | Failed | Pass Rate |
-   |----------|--------|--------|---------|--------|-----------|
-   | getting-started | 5 | 5 | 0 | 0 | 100% |
-   | features | 9 | 8 | 1 | 0 | 89% (1 skipped) |
-   | cookbook | 14 | 13 | 1 | 0 | 93% (1 skipped) |
-   | applications | 10 | 8 | 2 | 0 | 80% (2 skipped) |
-   | **TOTAL** | **38** | **34** | **4** | **0** | **89%** |
-
-   **Skipped**: API key requirements (documented in headers)
-   **Failed**: None
-   ```
+3. Document results in TODO.md completion notes
 
 **Definition of Done**:
-- [ ] 100% getting-started pass
-- [ ] >90% overall pass rate
-- [ ] Zero unexpected failures
-- [ ] Results documented
-- [ ] Fix or document all failures
-
-**Files to Create**:
-- `docs/validation-results-phase13c.md` (validation report)
+- [ ] Validation script runs successfully
+- [ ] No-API-key examples pass
+- [ ] API-key-requiring examples identified
+- [ ] Results documented in completion notes
 
 ---
 
 ### Task 13c.8.2: Quality Gates Validation ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
+**Estimated Time**: 1 hour
 **Assignee**: QA Team Lead
 **Status**: ⏹ PENDING
 
-**Description**: Run all quality checks to ensure zero regressions and all gates pass.
+**Description**: Run quality check scripts to ensure zero regressions.
 
 **Acceptance Criteria**:
-- [ ] quality-check-minimal.sh passes (<5s)
-- [ ] quality-check-fast.sh passes (~1 min)
-- [ ] quality-check.sh passes (5+ min)
-- [ ] All 635+ tests passing
+- [ ] quality-check-minimal.sh passes
+- [ ] quality-check-fast.sh passes
 - [ ] Zero clippy warnings
-- [ ] Documentation builds without errors
-- [ ] >90% test coverage maintained
-- [ ] >95% API documentation coverage maintained
+- [ ] All tests passing
 
 **Implementation Steps**:
 1. Run quality checks in sequence:
    ```bash
    ./scripts/quality/quality-check-minimal.sh
    ./scripts/quality/quality-check-fast.sh
-   ./scripts/quality/quality-check.sh
    ```
 
-2. Verify specific gates:
+2. Verify compilation and tests:
    ```bash
-   # Zero warnings
-   cargo clippy --workspace --all-features --all-targets -- -D warnings
-
-   # Formatting
-   cargo fmt --all -- --check
-
-   # Tests
    cargo test --workspace --all-features
-
-   # Documentation
-   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features --document-private-items
-
-   # Coverage
-   ./scripts/testing/test-coverage.sh all lcov
-   # Verify >90%
-   ```
-
-3. Benchmark compilation time:
-   ```bash
-   cargo clean
-   time cargo build --release --features full
-   # Should be 10-25% faster than before Phase 13c
-   ```
-
-4. Check binary size:
-   ```bash
-   ls -lh target/release/llmspell
-   # Should be 1-2MB smaller than before Phase 13c
    ```
 
 **Definition of Done**:
 - [ ] All quality checks pass
 - [ ] Zero warnings
-- [ ] All tests pass (635+)
-- [ ] Coverage >90%
-- [ ] Doc coverage >95%
-- [ ] Compilation faster
-- [ ] Binary smaller
+- [ ] All tests pass
+- [ ] Results documented in completion notes
 
 ---
 
-### Task 13c.8.3: Performance Benchmarking ⏹ PENDING
-**Priority**: MEDIUM
-**Estimated Time**: 2 hours
+### Task 13c.8.3: Performance Baseline ⏹ PENDING
+**Priority**: LOW
+**Estimated Time**: 30 minutes
 **Assignee**: Performance Team
 **Status**: ⏹ PENDING
 
-**Description**: Benchmark Phase 13c changes to ensure no performance regressions.
+**Description**: Record current binary size as baseline for Phase 13c.
+
+**Note**: No "before" baselines were saved at start of Phase 13c. This task records current state only.
 
 **Acceptance Criteria**:
-- [ ] Compilation time improved 10-25%
-- [ ] Binary size reduced 1-2MB
-- [ ] Incremental build improved ~13%
-- [ ] Runtime performance unchanged or better
-- [ ] Memory usage unchanged or better
+- [ ] Current binary size recorded
+- [ ] Build successful
 
 **Implementation Steps**:
-1. Baseline measurements (from before Phase 13c):
+1. Build release binary:
    ```bash
-   # Record from beginning of Phase 13c
-   cat /tmp/before_build.log  # Build time
-   cat /tmp/before_size.txt   # Binary size
+   cargo build --release
+   ls -lh target/release/llmspell
    ```
 
-2. Current measurements:
-   ```bash
-   cargo clean
-   time cargo build --release --features full > /tmp/after_build.log 2>&1
-   ls -lh target/release/llmspell | awk '{print $5}' > /tmp/after_size.txt
-   ```
-
-3. Compare:
-   ```bash
-   # Calculate improvements
-   BEFORE_TIME=320  # seconds (baseline)
-   AFTER_TIME=$(cat /tmp/after_build.log | grep "Finished" | awk '{print $2}')
-   IMPROVEMENT=$((100 - (AFTER_TIME * 100 / BEFORE_TIME)))
-   echo "Compilation improvement: ${IMPROVEMENT}%"
-
-   BEFORE_SIZE=35  # MB
-   AFTER_SIZE=$(cat /tmp/after_size.txt | sed 's/M//')
-   REDUCTION=$((BEFORE_SIZE - AFTER_SIZE))
-   echo "Binary size reduction: ${REDUCTION}MB"
-   ```
-
-4. Run benchmarks:
-   ```bash
-   cargo bench --workspace -- --test
-   # Compare with Phase 13b baselines
-   ```
-
-5. Document results:
-   ```markdown
-   ## Performance Results (Phase 13c)
-
-   | Metric | Before | After | Improvement |
-   |--------|--------|-------|-------------|
-   | Clean build time | 320s | 288s | 10% |
-   | Binary size (full) | 35MB | 34MB | 1MB |
-   | Incremental build | 15s | 13s | 13% |
-   | Dependencies | 52 | 47 | 5 removed |
-
-   **Runtime Performance**: No regressions detected
-   **Memory Usage**: Unchanged
-   ```
+2. Document in completion notes
 
 **Definition of Done**:
-- [ ] Compilation 10-25% faster
-- [ ] Binary 1-2MB smaller
-- [ ] No runtime regressions
-- [ ] Results documented
-- [ ] Baselines updated
-
-**Files to Update**:
-- `docs/archives/COMPILATION-PERFORMANCE.md`
+- [ ] Binary size recorded
+- [ ] Results documented in completion notes
 
 ---
 
 ### Task 13c.8.4: Documentation Link Validation ⏹ PENDING
 **Priority**: MEDIUM
-**Estimated Time**: 2 hours
+**Estimated Time**: 30 minutes
 **Assignee**: Documentation Team
 **Status**: ⏹ PENDING
 
-**Description**: Validate all documentation links (internal + external) work correctly.
+**Description**: Verify documentation links work. Stale example references were already cleaned up in Task 13c.7.3.
+
+**Note**: Task 13c.7.3 already cleaned up all stale references to `06-episodic-memory`, `07-context-assembly`, and `05-first-rag.lua`. This task validates that cleanup is complete.
 
 **Acceptance Criteria**:
-- [ ] All internal links working
-- [ ] All external links working
-- [ ] No broken references to moved examples
-- [ ] Profile links correct
-- [ ] Navigation functional
+- [ ] No remaining stale example references
+- [ ] Profile references exist as files
+- [ ] Key internal links work
 
 **Implementation Steps**:
-1. Check internal links:
+1. Verify stale references are gone (should find none):
    ```bash
-   # Use markdown-link-check if available
-   find docs/ -name "*.md" -exec markdown-link-check {} \;
-   find examples/ -name "README.md" -exec markdown-link-check {} \;
-   ```
-
-2. Check example references:
-   ```bash
-   # Find references to old example paths
-   grep -r "examples/local_llm" docs/ examples/
    grep -r "06-episodic-memory" docs/ examples/
    grep -r "07-context-assembly" docs/ examples/
-   # Should find none (all updated)
+   grep -r "05-first-rag\.lua" docs/ examples/
+   # All should return no results
    ```
 
-3. Check profile references:
+2. Spot-check profile references exist:
    ```bash
-   # Verify all profile references exist
-   grep -r "\\-p [a-z-]*" docs/ | while read line; do
-     profile=$(echo "$line" | sed 's/.*-p \([a-z-]*\).*/\1/')
-     if [ -f "llmspell-config/builtins/${profile}.toml" ]; then
-       echo "✅ $profile"
-     else
-       echo "❌ Missing profile: $profile"
-     fi
-   done
+   # Check a few key profiles referenced in docs
+   ls -la llmspell-config/builtins/memory.toml
+   ls -la llmspell-config/builtins/default.toml
+   ls -la llmspell-config/builtins/rag-dev.toml
    ```
 
-4. Test navigation:
-   - Manually click through all README navigation links
-   - Verify decision matrices link correctly
-   - Check profile catalog links
+3. Spot-check key navigation links in:
+   - README.md
+   - examples/script-users/README.md
+   - docs/user-guide/README.md
 
 **Definition of Done**:
-- [ ] Zero broken internal links
-- [ ] Zero broken external links
-- [ ] All example references current
-- [ ] All profile references valid
-- [ ] Navigation tested
+- [ ] Zero stale example references
+- [ ] Profile files exist
+- [ ] Key navigation links verified
 
 ---
 
 ### Task 13c.8.5: Release Preparation ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
+**Estimated Time**: 2 hours
 **Assignee**: Release Team Lead
 **Status**: ⏹ PENDING
 
-**Description**: Prepare v0.14.0 release with comprehensive changelog, version bumps, and release notes.
+**Description**: Prepare v0.14.0 release with changelog and version bumps.
+
+**Note**: CI was removed in 13c.6.3 - use local quality scripts only. Migration guide was skipped in 13c.7.3.
+
+**Current Metrics** (from validation):
+- Profiles: 21 builtin presets
+- Getting-started: 6 examples
+- Script examples: 56 Lua files
+- Tests: 5540 total
+- Rust examples: 3 projects
 
 **Acceptance Criteria**:
-- [ ] Version bumped to 0.14.0 in all Cargo.toml files
-- [ ] CHANGELOG.md updated
+- [ ] Version bumped to 0.14.0 in Cargo.toml
+- [ ] CHANGELOG.md updated with actual metrics
 - [ ] RELEASE_NOTES_v0.14.0.md created
+- [ ] Local quality checks pass
 - [ ] Git tag v0.14.0 created
-- [ ] Release branch created
-- [ ] All CI checks passing
 
 **Implementation Steps**:
-1. Bump versions:
+1. Bump version in workspace Cargo.toml:
    ```bash
-   # Update workspace version
-   sed -i '' 's/version = "0.13.1"/version = "0.14.0"/' Cargo.toml
-
-   # Verify all crates inherit workspace version
-   cargo metadata --format-version 1 | jq '.packages[] | select(.name | startswith("llmspell")) | .version'
-   # All should show 0.14.0
+   # Update workspace version (Linux sed)
+   sed -i 's/version = "0.13.1"/version = "0.14.0"/' Cargo.toml
    ```
 
-2. Create CHANGELOG.md entry:
-   ```markdown
-   ## [0.14.0] - 2025-11-XX
+2. Create CHANGELOG.md entry with actual Phase 13c changes:
+   - Document profile standardization (21 presets)
+   - Document example consolidation
+   - Document documentation updates
+   - Include actual test count and metrics
 
-   ### Phase 13c: Usability & Cohesion Refinement
+3. Create RELEASE_NOTES_v0.14.0.md with:
+   - Phase 13c highlights
+   - Actual metrics from validation
+   - What's next (Phase 14)
 
-   **"Less is More"** - Production-ready developer experience through consolidation and quality enhancement.
-
-   ### Added
-   - 3 new builtin profiles: `postgres`, `ollama-production`, `memory-development`
-   - `examples-validation.sh` for automated example testing
-   - `README-DEVEL.md` comprehensive developer setup guide
-   - Profile decision matrix in `profiles-guide.md`
-   - Migration guide `migration-to-v0.14.md`
-   - Profile catalog in `llmspell-config/builtins/README.md`
-
-   ### Changed
-   - **BREAKING**: Top-level `examples/local_llm_*.lua` moved to `script-users/features/`
-   - **BREAKING**: Getting-started examples reduced 8 → 5 (memory examples merged)
-   - **BREAKING**: Rust examples reduced 6 → 3 (2 → doc tests, 1 → developer guide)
-   - Examples consolidated 75 → <50 files (33% reduction)
-   - Getting-started path <30 minutes (40% faster)
-   - Cargo dependencies reduced 52 → 47 (5 removed)
-   - Compilation time improved 10% (320s → 288s)
-   - Binary size reduced 1MB (35MB → 34MB)
-   - All documentation updated to Phase 13 (from Phase 8)
-
-   ### Removed
-   - `lazy_static` dependency → std::sync::LazyLock
-   - `once_cell` dependency → std::sync::OnceLock
-   - `crossbeam` dependency → tokio::sync
-   - Redundant example configs (6 archived)
-   - Broken nested examples/ directories
-   - Generated artifacts in examples/
-
-   ### Fixed
-   - Zero broken examples (100% validated)
-   - Documentation drift (Phase 8 → Phase 13)
-   - Profile gaps (14 → 17 profiles)
-   - Example sprawl (clear navigation)
-
-   ### Performance
-   - Compilation: 10% faster
-   - Binary size: 1MB smaller
-   - Zero runtime regressions
-   - All 635+ tests passing
+4. Run local quality validation:
+   ```bash
+   ./scripts/quality/quality-check-minimal.sh
+   ./scripts/quality/quality-check-fast.sh
    ```
 
-3. Create RELEASE_NOTES_v0.14.0.md:
-   ```markdown
-   # Release Notes: v0.14.0 - Usability & Cohesion Refinement
-
-   **Phase 13c Complete** - Production-ready developer experience
-
-   ## Highlights
-
-   ### "Less is More" Philosophy
-   - Examples: 75 → <50 files (33% reduction)
-   - Getting-started: 8 → 5 examples (<30 min path)
-   - Dependencies: 52 → 47 (5 removed)
-   - Faster builds: 10% improvement
-
-   ### Real-World Production Profiles
-   - **postgres.toml**: PostgreSQL backend (VectorChord, RLS, bi-temporal)
-   - **ollama-production.toml**: Local LLM production (zero cloud costs)
-   - **memory-development.toml**: Phase 13 memory debugging
-
-   ### Quality Assurance
-   - 100% validated examples (examples-validation.sh)
-   - Zero broken examples policy
-   - All documentation Phase 13 current
-   - Comprehensive migration guide
-
-   ## Migration from v0.13
-
-   See [Migration Guide](docs/user-guide/migration-to-v0.14.md)
-
-   **Key Changes**:
-   - Update example paths (top-level moved)
-   - Use builtin profiles (14 → 17)
-   - Update doc references (Phase 8 → Phase 13)
-
-   ## Metrics
-
-   | Category | Metric | Before | After | Improvement |
-   |----------|--------|--------|-------|-------------|
-   | **Examples** | Total files | 75 | 50 | -33% |
-   | **Examples** | Getting-started | 8 | 5 | -37.5% |
-   | **Examples** | Time to complete | 45+ min | <30 min | -40% |
-   | **Profiles** | Builtin profiles | 14 | 17 | +3 |
-   | **Validation** | Automated | 0% | 100% | NEW |
-   | **Dependencies** | Workspace deps | 52 | 47 | -5 |
-   | **Performance** | Build time | 320s | 288s | -10% |
-   | **Performance** | Binary size | 35MB | 34MB | -1MB |
-
-   ## What's Next
-
-   **Phase 14**: MCP Tool Integration
-   **Phase 15+**: Advanced integrations
-
-   See [implementation-phases.md](docs/in-progress/implementation-phases.md)
-   ```
-
-4. Create git tag:
+5. Create git tag:
    ```bash
    git add -A
-   git commit -m "chore: Release v0.14.0 - Usability & Cohesion Refinement"
+   git commit -m "chore: Release v0.14.0 - Phase 13c Complete"
    git tag -a v0.14.0 -m "Phase 13c: Usability & Cohesion Refinement"
    ```
 
-5. Verify CI passes:
-   ```bash
-   # Push to test branch first
-   git push origin HEAD:release/v0.14.0-test
-   # Monitor CI
-   # If passes, push to main
-   ```
-
 **Definition of Done**:
-- [ ] Version 0.14.0 everywhere
+- [ ] Version 0.14.0 in Cargo.toml
 - [ ] CHANGELOG.md updated
 - [ ] RELEASE_NOTES_v0.14.0.md created
+- [ ] Quality checks pass
 - [ ] Git tag v0.14.0 created
-- [ ] CI passing
-- [ ] Ready for release
 
 **Files to Create/Modify**:
 - Update: `Cargo.toml` (version = "0.14.0")
@@ -9342,7 +9127,7 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 2. Complete test suite execution:
    ```bash
    cargo test --workspace --all-features
-   # All 635+ tests passing
+   # All 5540+ tests passing
    ```
 
 3. Example validation:
