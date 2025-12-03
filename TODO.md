@@ -8399,11 +8399,11 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 **Critical Dependencies**: Phase 13c.2-13c.5 (Profiles + Examples)
 **Priority**: HIGH (user communication)
 
-### Task 13c.7.1: User Guide Updates 🚧 IN PROGRESS
+### Task 13c.7.1: User Guide Updates ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
-**Status**: 🚧 IN PROGRESS
+**Status**: ✅ COMPLETE
 
 **Description**: Update docs/user-guide/01-getting-started.md and 08-deployment.md to Phase 13.
 
@@ -8416,11 +8416,24 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 - 08-deployment.md needs profile section update
 
 **Acceptance Criteria**:
-- [ ] 01-getting-started.md references 6-example path (corrected from 5)
-- [ ] Completion time updated to realistic estimate
-- [ ] 08-deployment.md has profile recommendations
-- [ ] All references to Phase 8 removed
-- [ ] Links to profile-layers-guide.md added
+- [x] 01-getting-started.md references 6-example path (corrected from 5)
+- [x] Completion time updated to realistic estimate
+- [x] 08-deployment.md has profile recommendations
+- [x] All references to Phase 8 removed
+- [x] Links to profile-layers-guide.md added
+
+**Files Modified**:
+- `docs/user-guide/01-getting-started.md` - Updated Phase 8 → Phase 13, 6-example path with profiles
+- `docs/user-guide/08-deployment.md` - Added profile selection section, version update
+
+**Completion Notes**:
+- Removed all "Phase 8.10.6" references from getting-started.md
+- Updated Progressive Learning Path to use builtin profiles (`-p minimal`, `-p providers`, etc.)
+- Fixed file reference: `05-first-rag.lua` → `05-memory-rag-advanced.lua`
+- Added Profile Quick Reference section with 4 key profiles
+- Added full Profile Selection by Environment section to deployment.md
+- Updated TOC in deployment.md with new section
+- Fixed broken link references (concepts.md → 02-core-concepts.md)
 
 **Implementation Steps**:
 1. Update `docs/user-guide/01-getting-started.md`:
