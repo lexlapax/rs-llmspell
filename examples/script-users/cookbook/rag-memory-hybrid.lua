@@ -25,8 +25,7 @@
 --   • Session-aware context assembly
 --
 -- Prerequisites:
---   • Completed 06-episodic-memory-basic.lua
---   • Completed 07-context-assembly-basic.lua
+--   • Completed 05-memory-rag-advanced.lua
 --   • Understanding of RAG and Context globals
 --   • RAG pipeline configured (see config)
 --

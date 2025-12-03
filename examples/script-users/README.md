@@ -170,7 +170,7 @@ Custom configuration files for unique patterns and advanced scenarios.
 # Run with appropriate builtin profile
 llmspell -p minimal run examples/script-users/getting-started/00-hello-world.lua
 llmspell -p providers run examples/script-users/features/agent-basics.lua
-llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
+llmspell -p rag-dev run examples/script-users/getting-started/05-memory-rag-advanced.lua
 llmspell -p development run examples/script-users/applications/knowledge-base/main.lua
 ```
 

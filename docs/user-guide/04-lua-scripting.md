@@ -420,7 +420,7 @@ local all_config = Config.get_all()
 # Run examples
 llmspell run examples/script-users/getting-started/01-hello-world.lua
 llmspell run examples/script-users/getting-started/02-first-agent.lua
-llmspell run examples/script-users/getting-started/05-first-rag.lua
+llmspell run examples/script-users/getting-started/05-memory-rag-advanced.lua
 ```
 
 ### Advanced Topics

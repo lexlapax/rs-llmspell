@@ -24,7 +24,7 @@
 --   • Integration with consolidation
 --
 -- Prerequisites:
---   • Completed getting-started/06-episodic-memory-basic.lua
+--   • Completed getting-started/05-memory-rag-advanced.lua
 --   • Understanding of semantic vs episodic memory
 --
 -- HOW TO RUN:

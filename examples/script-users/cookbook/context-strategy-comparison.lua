@@ -24,8 +24,7 @@
 --   • When to use each approach
 --
 -- Prerequisites:
---   • Completed 06-episodic-memory-basic.lua
---   • Completed 07-context-assembly-basic.lua
+--   • Completed 05-memory-rag-advanced.lua
 --
 -- HOW TO RUN:
 -- ./target/debug/llmspell \

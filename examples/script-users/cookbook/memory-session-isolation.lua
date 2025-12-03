@@ -24,7 +24,7 @@
 --   • Session lifecycle management
 --
 -- Prerequisites:
---   • Completed getting-started/06-episodic-memory-basic.lua
+--   • Completed getting-started/05-memory-rag-advanced.lua
 --   • Understanding of session IDs and memory scoping
 --
 -- HOW TO RUN:

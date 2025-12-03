@@ -293,7 +293,7 @@ async fn test_my_feature() {
 ```
 1. This guide (01-getting-started.md)
 2. [03-extending-components.md](03-extending-components.md) → Part 5 (RAG)
-3. examples/script-users/getting-started/05-first-rag.lua
+3. examples/script-users/getting-started/05-memory-rag-advanced.lua
 4. examples/script-users/cookbook/rag-multi-tenant.lua
 5. Build RAG features
 ```

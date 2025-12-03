@@ -331,7 +331,7 @@ Every example should:
 | `02-first-agent.lua` | Creating an LLM agent | Agent creation, providers | 10 min |
 | `03-first-workflow.lua` | Sequential workflow | Workflow patterns | 15 min |
 | `04-handle-errors.lua` | Error handling patterns | Try-catch, recovery | 10 min |
-| `05-first-rag.lua` | RAG basics (Phase 8) | Vectors, search, embeddings | 20 min |
+| `05-memory-rag-advanced.lua` | Memory & RAG (Phase 13) | Vectors, search, embeddings | 20 min |
 
 #### Features (5 Core Demonstrations)
 | File | Purpose | Key APIs |
@@ -434,7 +434,7 @@ Every example should:
 
 ### 🚀 RAG Developer Path (4-5 hours)
 ```
-1. 05-first-rag.lua           (30 min)
+1. 05-memory-rag-advanced.lua (30 min)
    ↓
 2. rag-multi-tenant.lua       (45 min)
    ↓
@@ -553,8 +553,8 @@ end
 ./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua
 
 # With configuration
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/getting-started/05-first-rag.lua
+./target/debug/llmspell -p rag-dev \
+  run examples/script-users/getting-started/05-memory-rag-advanced.lua
 
 # Application with arguments
 cd examples/script-users/applications/webapp-creator

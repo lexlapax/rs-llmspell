@@ -200,7 +200,7 @@ export OPENAI_API_KEY="sk-..."  # Optional for cloud models
   --param model="ollama/llama3.2:3b"
 
 # Memory exploration
-./target/release/llmspell exec examples/script-users/getting-started/06-episodic-memory-basic.lua
+./target/release/llmspell exec examples/script-users/getting-started/05-memory-rag-advanced.lua
 ```
 
 ### Explore More

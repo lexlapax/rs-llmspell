@@ -238,7 +238,7 @@ cargo build --release                       # Minimal (19MB, core only)
 ```
 1. 01-getting-started.md → Architecture
 2. 03-extending-components.md → Part 5 (RAG)
-3. examples/script-users/getting-started/05-first-rag.lua
+3. examples/script-users/getting-started/05-memory-rag-advanced.lua
 4. examples/script-users/cookbook/rag-multi-tenant.lua
 5. Build RAG features
 ```

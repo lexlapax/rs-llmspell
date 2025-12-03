@@ -1286,7 +1286,7 @@ The `Memory` global provides access to LLMSpell's adaptive memory system with th
 - **Semantic**: Knowledge graph with entities and relationships (conceptual memory)
 - **Consolidation**: LLM-driven extraction of knowledge from conversations
 
-**Examples**: See `examples/script-users/getting-started/06-episodic-memory-basic.lua`
+**Examples**: See `examples/script-users/getting-started/05-memory-rag-advanced.lua`
 
 ### Episodic Memory
 
@@ -1439,7 +1439,7 @@ print(string.format("Pending: %d sessions", stats.sessions_with_unprocessed))
 
 The `Context` global provides intelligent context assembly from memory using retrieval strategies.
 
-**Examples**: See `examples/script-users/getting-started/07-context-assembly-basic.lua`
+**Examples**: See `examples/script-users/getting-started/05-memory-rag-advanced.lua`
 
 ### Context Assembly
 

@@ -23,8 +23,7 @@
 --   • Memory growth monitoring
 --
 -- Prerequisites:
---   • Completed 06-episodic-memory-basic.lua
---   • Completed 07-context-assembly-basic.lua
+--   • Completed 05-memory-rag-advanced.lua
 --   • Understanding of both Memory and Context globals
 --
 -- HOW TO RUN:
