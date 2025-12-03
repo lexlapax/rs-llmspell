@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2025-12-03 - Usability & Cohesion Refinement
+
+Phase 13c: Usability improvements, example consolidation, and quality validation. See [RELEASE_NOTES_v0.14.0.md](RELEASE_NOTES_v0.14.0.md) for full details.
+
+### Added
+
+#### Profile System Standardization (Phase 13c.4)
+- **21 Preset Profiles**: 4-layer architecture (bases, backends, features, envs)
+- **Profile README**: Comprehensive guide at `llmspell-config/presets/README.md`
+- **Decision Matrix**: Profile selection guide for different use cases
+
+#### Example Validation (Phase 13c.5-13c.6)
+- **examples-validation.sh**: Automated example testing script
+- **Standardized Headers**: All 56 Lua examples with consistent format
+- **Profile Recommendations**: Every example specifies optimal profile
+
+#### Quality Infrastructure (Phase 13c.8)
+- **Comprehensive Validation**: All quality gates passing
+- **5540 Tests**: 100% passing across all crates
+- **Zero Clippy Warnings**: Clean codebase
+
+### Changed
+- **Example Organization**: Consolidated from scattered locations to `examples/script-users/`
+- **Getting-Started Path**: 6 progressive examples for <30 minute onboarding
+- **Documentation Links**: All stale references cleaned up
+
+### Fixed
+- **tool-basics.lua**: Error handling uses pcall for thrown errors
+- **Documentation Drift**: Updated from Phase 8 to Phase 13 references
+
+### Statistics
+- **Presets**: 21 profiles (bases: 3, backends: 7, features: 4, envs: 1, presets: 21)
+- **Examples**: 56 Lua scripts, 3 Rust examples
+- **Tests**: 5540 total (100% passing)
+- **Binary Size**: 44MB release (46,002,840 bytes)
+- **Build Time**: 11m 34s release build
+
 ## [0.13.1] - 2025-01-20 - Production Storage Infrastructure & Documentation Consolidation
 
 Production-ready PostgreSQL storage backend and comprehensive documentation consolidation. See [RELEASE_NOTES_v0.13.1.md](RELEASE_NOTES_v0.13.1.md) for full details.
