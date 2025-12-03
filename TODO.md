@@ -8544,11 +8544,11 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.7.2: Profile Guide Update ⏹ PENDING
+### Task 13c.7.2: Profile Guide Update ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Assignee**: Documentation Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE
 
 **Description**: Update existing `docs/user-guide/profile-layers-guide.md` to Phase 13 and ensure preset catalog is current.
 
@@ -8560,14 +8560,23 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
   - ollama, openai-prod, postgres-prod, providers, rag-dev, rag-perf
   - rag-prod, research, sessions, state
 - 4-layer architecture: bases (4), backends (3), features (7), envs (4) = 18 layers
-- Document version shows "0.14.0" - may already be updated
+- Document version shows "0.14.0" - already updated
 
 **Acceptance Criteria**:
-- [ ] Verify profile-layers-guide.md is current
-- [ ] All 21 presets documented in preset catalog
-- [ ] Decision matrix reflects actual presets
-- [ ] Environment progression guide accurate
-- [ ] Links to layer files working
+- [x] Verify profile-layers-guide.md is current
+- [x] All 21 presets documented in preset catalog
+- [x] Decision matrix reflects actual presets
+- [x] Environment progression guide accurate
+- [x] Links to layer files working
+
+**Files Modified**:
+- `docs/user-guide/profile-layers-guide.md` - Added memory-development preset, updated count to 21
+
+**Completion Notes**:
+- Document was already largely up-to-date (version 0.14.0)
+- Added missing `memory-development` preset documentation
+- Updated preset count from "20 presets" → "21 presets"
+- Backward-Compatible Presets section: 12 → 13 (added memory-development)
 
 **Implementation Steps**:
 1. Create `docs/user-guide/profiles-guide.md` (see design doc lines 1688-1777)

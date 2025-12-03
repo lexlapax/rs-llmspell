@@ -76,7 +76,7 @@ llmspell -p minimal run script.lua
 llmspell -p presets/minimal run script.lua
 ```
 
-Available presets combine layers for common use cases. See [Preset Catalog](#preset-catalog) for the full list of 20 presets.
+Available presets combine layers for common use cases. See [Preset Catalog](#preset-catalog) for the full list of 21 presets.
 
 ### Using Multi-Layer Composition
 
@@ -559,9 +559,9 @@ llmspell -p bases/daemon,features/full,envs/prod,backends/postgres kernel start
 
 ## Preset Catalog
 
-LLMSpell includes **20 builtin presets** that combine layers for common use cases.
+LLMSpell includes **21 builtin presets** that combine layers for common use cases.
 
-### Backward-Compatible Presets (12)
+### Backward-Compatible Presets (13)
 
 These presets maintain backward compatibility with v0.13.0 and earlier.
 
@@ -662,6 +662,18 @@ llmspell -p candle run ml-inference.lua
 
 ```bash
 llmspell -p memory run chatbot-with-memory.lua
+```
+
+#### `memory-development`
+
+**Extends**: `bases/cli`, `features/llm`, `features/memory`, `features/rag`, `envs/dev`, `backends/sqlite`
+
+**Description**: Full memory + RAG stack for development
+
+**Use Case**: Memory system debugging, RAG development with LLM integration
+
+```bash
+llmspell -p memory-development run memory-debug.lua
 ```
 
 #### `rag-dev`
