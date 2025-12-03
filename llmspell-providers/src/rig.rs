@@ -93,8 +93,7 @@ impl RigProvider {
                         })?;
 
                 // rig-core 0.25+ uses builder pattern
-                let mut client_builder = providers::anthropic::Client::builder()
-                    .api_key(api_key);
+                let mut client_builder = providers::anthropic::Client::builder().api_key(api_key);
 
                 if let Some(base_url) = config.endpoint.as_deref() {
                     debug!("Using custom Anthropic endpoint: {}", base_url);
@@ -443,7 +442,8 @@ impl RigProvider {
                             Ok(reasoning.reasoning.join("\n\n"))
                         }
                         AssistantContent::Image(_) => Err(LLMSpellError::Provider {
-                            message: "Unexpected image response in text completion context".to_string(),
+                            message: "Unexpected image response in text completion context"
+                                .to_string(),
                             provider: Some(self.config.name.clone()),
                             source: None,
                         }),
@@ -505,7 +505,8 @@ impl RigProvider {
                             Ok(reasoning.reasoning.join("\n\n"))
                         }
                         AssistantContent::Image(_) => Err(LLMSpellError::Provider {
-                            message: "Unexpected image response in text completion context".to_string(),
+                            message: "Unexpected image response in text completion context"
+                                .to_string(),
                             provider: Some(self.config.name.clone()),
                             source: None,
                         }),
@@ -567,7 +568,8 @@ impl RigProvider {
                             Ok(reasoning.reasoning.join("\n\n"))
                         }
                         AssistantContent::Image(_) => Err(LLMSpellError::Provider {
-                            message: "Unexpected image response in text completion context".to_string(),
+                            message: "Unexpected image response in text completion context"
+                                .to_string(),
                             provider: Some(self.config.name.clone()),
                             source: None,
                         }),
@@ -609,7 +611,8 @@ impl RigProvider {
                                 Ok(reasoning.reasoning.join("\n\n"))
                             }
                             AssistantContent::Image(_) => Err(LLMSpellError::Provider {
-                                message: "Unexpected image response in text completion context".to_string(),
+                                message: "Unexpected image response in text completion context"
+                                    .to_string(),
                                 provider: Some(self.config.name.clone()),
                                 source: None,
                             }),
@@ -671,7 +674,8 @@ impl RigProvider {
                                 Ok(reasoning.reasoning.join("\n\n"))
                             }
                             AssistantContent::Image(_) => Err(LLMSpellError::Provider {
-                                message: "Unexpected image response in text completion context".to_string(),
+                                message: "Unexpected image response in text completion context"
+                                    .to_string(),
                                 provider: Some(self.config.name.clone()),
                                 source: None,
                             }),
