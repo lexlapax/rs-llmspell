@@ -1,4 +1,4 @@
--- Profile: development (recommended)
+-- Profile: minimal
 -- Run with: llmspell -p development run webhook-integration.lua
 -- Development environment with debug logging
 

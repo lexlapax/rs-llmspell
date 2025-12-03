@@ -1,10 +1,7 @@
--- Profile: -- ============================================================================ (recommended)
--- Example: Local LLM Chat Patterns
--- Category: cookbook
-
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Example: Local LLM Chat Patterns
 -- Phase: 13c.5.6 - Example Header Standardization
 -- Category: cookbook
 --   Comprehensive local LLM chat patterns including interactive chat and

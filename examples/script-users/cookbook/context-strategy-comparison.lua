@@ -1,6 +1,6 @@
--- Profile: research (recommended)
--- Run with: llmspell -p research run context-strategy-comparison.lua
--- Context engineering
+-- Profile: memory
+-- Run with: llmspell -p memory run context-strategy-comparison.lua
+-- Context engineering (memory/context features only - no LLM API calls)
 
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE

@@ -1,4 +1,4 @@
--- Profile: development (recommended)
+-- Profile: minimal
 -- Run with: llmspell -p development run security-patterns.lua
 -- Development environment with debug logging
 

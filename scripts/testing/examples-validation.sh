@@ -39,8 +39,16 @@ get_profile() {
 requires_api_key() {
     local file="$1"
     # Check for API KEY mentions in comments (API keys are usually in Prerequisites section)
-    # Use grep with -- to prevent -- in pattern from being interpreted as option
-    grep -q -- "API_KEY" "$file" 2>/dev/null
+    # Match: API_KEY, API key, api_key (case insensitive)
+    grep -qi "API_KEY\|API key" "$file" 2>/dev/null
+}
+
+# Function to check if example requires Ollama
+requires_ollama() {
+    local file="$1"
+    local profile=$(get_profile "$file")
+    # Check if profile is ollama or file mentions Ollama requirement
+    [[ "$profile" == "ollama" ]] || grep -qi "ollama running\|pull.*llama" "$file" 2>/dev/null
 }
 
 # Function to validate single example
@@ -50,6 +58,15 @@ validate_example() {
     local basename=$(basename "$example")
 
     echo -n "Testing: $basename with profile '$profile' ... "
+
+    # Skip if requires Ollama and not available
+    if requires_ollama "$example"; then
+        if ! command -v ollama &>/dev/null || ! ollama list &>/dev/null 2>&1; then
+            echo -e "${YELLOW}SKIPPED${NC} (Ollama not running)"
+            ((SKIPPED++)) || true
+            return 0
+        fi
+    fi
 
     # Skip if requires API key and not available
     local use_api_timeout=false
