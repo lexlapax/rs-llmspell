@@ -143,7 +143,8 @@ local documents = {
 
 local ingested_count = 0
 for i, doc in ipairs(documents) do
-    local success, result = pcall(RAG.ingest, doc.id, doc.content, doc.metadata)
+    -- RAG.ingest expects a table with {id, content, metadata} fields
+    local success, result = pcall(RAG.ingest, doc)
 
     if success then
         ingested_count = ingested_count + 1
@@ -176,21 +177,30 @@ local search_queries = {
 for i, query in ipairs(search_queries) do
     print(string.format("\n🔍 Query %d: '%s'", i, query))
 
-    local success, results = pcall(RAG.search, query, 3)
+    -- RAG.search expects (query, options_table) - options include top_k/k
+    -- Returns {success=true, total=N, results=[...]}
+    local success, response = pcall(RAG.search, query, { top_k = 3 })
 
-    if success and results then
+    if success and response then
+        local results = response.results or {}
         if #results > 0 then
             print(string.format("   Found %d relevant documents:", #results))
 
             for j, result in ipairs(results) do
-                local snippet = string.sub(result.content, 1, 60)
-                if #result.content > 60 then
+                local content = result.content or result.text or ""
+                local snippet = string.sub(content, 1, 60)
+                if #content > 60 then
                     snippet = snippet .. "..."
+                end
+
+                local lang = "unknown"
+                if result.metadata and result.metadata.language then
+                    lang = result.metadata.language
                 end
 
                 print(string.format("   %d. [%s] %s (score: %.3f)",
                     j,
-                    result.metadata.language or "unknown",
+                    lang,
                     snippet,
                     result.score or 0
                 ))
@@ -199,7 +209,7 @@ for i, query in ipairs(search_queries) do
             print("   No results found")
         end
     else
-        print("   ✗ Search error: " .. tostring(results))
+        print("   ✗ Search error: " .. tostring(response))
     end
 end
 

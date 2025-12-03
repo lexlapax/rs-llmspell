@@ -23,7 +23,7 @@ name = "anthropic"
 provider_type = "anthropic"
 enabled = true
 api_key_env = "ANTHROPIC_API_KEY"
-default_model = "claude-3-5-sonnet-latest"
+default_model = "claude-sonnet-4-5"
 max_tokens = 8192
 timeout_seconds = 120
 
