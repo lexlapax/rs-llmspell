@@ -8644,7 +8644,7 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.7.3: Migration Guide Creation ⏹ PENDING
+### Task 13c.7.3: Migration Guide Creation ⏹ DEFER or delete - don't need migration guide
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
