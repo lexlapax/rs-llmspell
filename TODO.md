@@ -9097,7 +9097,7 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 - Created: Git tag `v0.14.0` ✅
 
 **Completion Insights**:
-- **Version Bump**: Single-line change in workspace Cargo.toml
+- **Version Bump**: Single-line change in workspace Cargo.toml (0.13.1 → 0.14.0)
 - **CHANGELOG.md**: Added comprehensive v0.14.0 entry documenting:
   - Profile System Standardization (21 presets, 4-layer architecture)
   - Example Validation (56 Lua examples, 6 getting-started)
@@ -9112,6 +9112,10 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
   - Line 27: Current Status → v0.14.0 achievements
   - Line 50: Test count → 5540 (was 784)
   - Lines 327-341: Latest Release section rewritten
+- **Git Tag v0.14.0**: Created annotated tag with:
+  - Phase 13c: Usability & Cohesion Refinement
+  - Key achievements: 21 Presets, 56 Examples, 5540 Tests, 13 Dependencies Removed
+  - Reference to RELEASE_NOTES_v0.14.0.md
 - **Quality Validation**: quality-check-minimal.sh and quality-check-fast.sh pass
 - **Binary Size**: 44MB release build (46,002,840 bytes)
 
