@@ -189,6 +189,33 @@ else
     print_warning "cargo-audit not installed (install with: cargo install cargo-audit)"
 fi
 
+# 9. Example Validation (Phase 13c.6.2)
+echo ""
+echo "9. Running example validation..."
+if [[ -x "scripts/testing/examples-validation.sh" ]]; then
+    # Run getting-started validation (must pass 100%)
+    if ./scripts/testing/examples-validation.sh getting-started > /tmp/examples_validation_$$.log 2>&1; then
+        print_status 0 "Example validation passed (getting-started: 100%)"
+        # Optionally try cookbook (non-blocking)
+        if ./scripts/testing/examples-validation.sh cookbook > /tmp/cookbook_validation_$$.log 2>&1; then
+            print_info "Cookbook examples also passed"
+        else
+            print_warning "Some cookbook examples skipped/failed (API rate limits or missing infrastructure)"
+        fi
+    else
+        # Check if it's due to API rate limits
+        if grep -q "rate limit\|quota\|429" /tmp/examples_validation_$$.log 2>/dev/null; then
+            print_warning "Example validation skipped due to API rate limits"
+        else
+            print_status 1 "Example validation failed (getting-started must pass)"
+            print_info "Debug: ./scripts/testing/examples-validation.sh getting-started"
+            OVERALL_SUCCESS=1
+        fi
+    fi
+else
+    print_warning "examples-validation.sh not found, skipping example validation"
+fi
+
 # Summary
 echo ""
 echo "================================="
