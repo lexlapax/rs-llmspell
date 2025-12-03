@@ -8149,6 +8149,27 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 - Added requires_ollama() function for Ollama-dependent example detection
 - Updated requires_api_key() to match "API key" (space) pattern
 
+**Files Modified**:
+- `scripts/testing/examples-validation.sh` - Main validation script with profile detection, API/Ollama skip logic
+- `examples/script-users/cookbook/caching.lua` - Profile: development → minimal
+- `examples/script-users/cookbook/error-handling.lua` - Profile: development → minimal
+- `examples/script-users/cookbook/rate-limiting.lua` - Profile: development → minimal
+- `examples/script-users/cookbook/sandbox-permissions.lua` - Profile: development → minimal
+- `examples/script-users/cookbook/security-patterns.lua` - Profile: development → minimal
+- `examples/script-users/cookbook/performance-monitoring.lua` - Profile: development → minimal
+- `examples/script-users/cookbook/webhook-integration.lua` - Profile: development → minimal
+- `examples/script-users/cookbook/context-strategy-comparison.lua` - Profile: research → memory
+- `examples/script-users/cookbook/local-llm-chat-patterns.lua` - Fixed malformed header
+
+**Completion Insights**:
+- **Profile selection critical**: Examples using 'development' profile make LLM API calls at startup, causing rate limit issues
+- **Minimal profile for non-LLM examples**: Pure Lua examples (caching, rate-limiting) don't need LLM features
+- **Memory profile for Context/Memory examples**: context-strategy-comparison only uses Memory/Context APIs, not Agent
+- **Ollama detection**: `ollama list` command checks both installation and running state
+- **API key pattern matching**: Examples use both "API_KEY" and "API key" formats in prerequisites
+- **Timeout strategy**: 30s for simple examples, 180s for API-dependent examples
+- **Rate limit handling**: Gemini free tier (250 req/day) exhaustion is expected in heavy testing
+
 **Implementation Steps**:
 1. Create `scripts/testing/examples-validation.sh` (see design doc lines 1268-1419 for full content)
 
@@ -8251,6 +8272,17 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 - [x] Fails only if getting-started fails
 - [x] Clear output (✅ passed, ⚠️ skipped, ❌ failed)
 - [x] Rate limit detection (skips gracefully on quota exhaustion)
+
+**Files Modified**:
+- `scripts/quality/quality-check.sh` - Added Step 9: Example Validation
+
+**Completion Insights**:
+- **Two-tier validation**: getting-started must pass (blocks), cookbook is advisory (warns)
+- **Log-based rate limit detection**: Checks `/tmp/examples_validation_$$.log` for "rate limit", "quota", "429" patterns
+- **Graceful degradation**: If API quota exhausted, warns instead of failing entire quality check
+- **Temp file cleanup**: Uses `$$` (PID) in log filenames for parallel execution safety
+- **Cookbook as advisory**: Cookbook failures logged but don't block CI/CD pipeline
+- **Print helpers reused**: Uses existing `print_status`, `print_info`, `print_warning` functions
 
 **Implementation Steps**:
 1. Update `scripts/quality/quality-check.sh` (see design doc lines 1446-1478):
