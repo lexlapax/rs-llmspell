@@ -9046,6 +9046,7 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 - [x] Version bumped to 0.14.0 in Cargo.toml
 - [x] CHANGELOG.md updated with actual metrics
 - [x] RELEASE_NOTES_v0.14.0.md created
+- [x] README.md updated with v0.14.0 references
 - [x] Local quality checks pass
 - [ ] Git tag v0.14.0 created (PENDING USER APPROVAL)
 
