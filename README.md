@@ -334,7 +334,7 @@ Production-ready PostgreSQL storage backend with 10 unified backends, Row-Level 
 - 🗄️ 1 new crate (llmspell-storage) with 10 PostgreSQL backends
 - 🐘 PostgreSQL 18 + VectorChord (5x faster than pgvector, 26x cheaper)
 - 🔒 Row-Level Security with <5% overhead (4.9% measured)
-- 🐧 Cross-platform support (Linux + macOS validated in CI)
+- 🐧 Cross-platform support (Linux + macOS)
 - 🏗️ Self-contained kernel (630+ lines deleted, 82% fewer API methods)
 - 📖 52% documentation consolidation (111 → 53 files)
 - 📊 379 PostgreSQL tests passing (100% pass rate, zero warnings)

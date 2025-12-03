@@ -8341,60 +8341,54 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.6.3: CI/CD Pipeline Update ⏹ DEFER - DO NOT IMPLEMENT
-**Priority**: MEDIUM
-**Estimated Time**: 2 hours
-**Assignee**: CI/CD Team
-**Status**: ⏹ PENDING
+### Task 13c.6.3: Remove CI/CD Pipeline ✅ COMPLETE
+**Priority**: HIGH
+**Estimated Time**: 30 minutes
+**Assignee**: Core Team
+**Status**: ✅ COMPLETE
 
-**Description**: Update `.github/workflows/ci.yml` to include example validation in test job.
+**Description**: Remove all CI/CD workflows from `.github/` directory. The workflows are causing issues and not being used for this experimental project. Local quality checks via `scripts/quality/` are sufficient.
+
+**Rationale**:
+- CI/CD workflows breaking and not being maintained
+- Project is experimental - local validation sufficient
+- `scripts/quality/quality-check.sh` provides comprehensive local validation
+- Simplifies project structure
 
 **Acceptance Criteria**:
-- [ ] Example validation added to CI
-- [ ] Runs as part of test job
-- [ ] Non-blocking for API key skips
-- [ ] Results visible in CI logs
-- [ ] Quality gate enforced for getting-started
+- [x] All workflow files removed from `.github/workflows/`
+- [x] dependabot.yml.disabled removed
+- [x] CI validation reports archived/removed
+- [x] README/docs updated if they reference CI badges
 
 **Implementation Steps**:
-1. Update `.github/workflows/ci.yml`:
-   ```yaml
-   - name: Validate Examples
-     run: |
-       chmod +x scripts/testing/examples-validation.sh
-       # Always validate getting-started (required)
-       ./scripts/testing/examples-validation.sh getting-started
-
-       # Validate other categories if API keys available (optional)
-       if [ -n "$OPENAI_API_KEY" ]; then
-         ./scripts/testing/examples-validation.sh all || echo "Some examples skipped"
-       fi
-     env:
-       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-     continue-on-error: false  # Fail if getting-started fails
-   ```
-
-2. Add to GitHub step summary:
-   ```yaml
-   - name: Report Example Validation
-     if: always()
-     run: |
-       echo "## Example Validation Results" >> $GITHUB_STEP_SUMMARY
-       echo "See logs for detailed results" >> $GITHUB_STEP_SUMMARY
-   ```
-
-3. Test in CI (create test PR)
+1. Remove `.github/workflows/` directory (ci.yml, rust.yml, scheduled-tests.yml, test.yml)
+2. Remove `.github/dependabot.yml.disabled`
+3. Remove `.github/CI_VALIDATION_REPORT.md`
+4. Keep `.github/ISSUE_TEMPLATE/` and `.github/pull_request_template.md` (still useful)
+5. Keep `.github/QUALITY_GATES.md` (documents local quality gates)
+6. Keep `.github/PHASE0_COMPLETION_REPORT.md` (historical reference)
 
 **Definition of Done**:
-- [ ] CI runs example validation
-- [ ] getting-started failures block PR
-- [ ] API key skips non-blocking
-- [ ] Results in CI summary
-- [ ] Quality gate enforced
+- [x] Workflow files removed
+- [x] No CI/CD configuration remains
+- [x] Local quality checks still work
 
-**Files to Modify**:
+**Files Removed**:
 - `.github/workflows/ci.yml`
+- `.github/workflows/rust.yml`
+- `.github/workflows/scheduled-tests.yml`
+- `.github/workflows/test.yml`
+- `.github/dependabot.yml.disabled`
+- `.github/CI_VALIDATION_REPORT.md`
+
+**Files Modified**:
+- `README.md` - Removed "validated in CI" from cross-platform line
+
+**Completion Notes**:
+- Retained `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md`, `.github/QUALITY_GATES.md`, `.github/PHASE0_COMPLETION_REPORT.md`
+- Local quality-check.sh verified working (tests format, clippy, compile, tracing patterns)
+- Project relies on `scripts/quality/quality-check.sh` for all validation
 
 ---
 
