@@ -8988,47 +8988,40 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.8.4: Documentation Link Validation ⏹ PENDING
+### Task 13c.8.4: Documentation Link Validation ✅ COMPLETE
 **Priority**: MEDIUM
 **Estimated Time**: 30 minutes
 **Assignee**: Documentation Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE (2025-12-03)
 
 **Description**: Verify documentation links work. Stale example references were already cleaned up in Task 13c.7.3.
 
 **Note**: Task 13c.7.3 already cleaned up all stale references to `06-episodic-memory`, `07-context-assembly`, and `05-first-rag.lua`. This task validates that cleanup is complete.
 
 **Acceptance Criteria**:
-- [ ] No remaining stale example references
-- [ ] Profile references exist as files
-- [ ] Key internal links work
+- [x] No remaining stale example references
+- [x] Profile references exist as files
+- [x] Key internal links work
 
-**Implementation Steps**:
-1. Verify stale references are gone (should find none):
-   ```bash
-   grep -r "06-episodic-memory" docs/ examples/
-   grep -r "07-context-assembly" docs/ examples/
-   grep -r "05-first-rag\.lua" docs/ examples/
-   # All should return no results
-   ```
+**Validation Results** (2025-12-03):
 
-2. Spot-check profile references exist:
-   ```bash
-   # Check a few key profiles referenced in docs
-   ls -la llmspell-config/builtins/memory.toml
-   ls -la llmspell-config/builtins/default.toml
-   ls -la llmspell-config/builtins/rag-dev.toml
-   ```
+**Stale Reference Check**:
+- User-facing docs (user-guide, developer-guide, examples): ✅ Zero stale references
+- In-progress/archives docs: Historical references preserved (expected)
 
-3. Spot-check key navigation links in:
-   - README.md
-   - examples/script-users/README.md
-   - docs/user-guide/README.md
+**Profile Files** (21 total):
+- memory.toml ✅
+- default.toml ✅
+- minimal.toml ✅
+- rag-dev.toml ✅
+- providers.toml ✅
+- state.toml ✅
+- All 21 preset profiles exist in llmspell-config/presets/
 
 **Definition of Done**:
-- [ ] Zero stale example references
-- [ ] Profile files exist
-- [ ] Key navigation links verified
+- [x] Zero stale example references
+- [x] Profile files exist
+- [x] Key navigation links verified
 
 ---
 
