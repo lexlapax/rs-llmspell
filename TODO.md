@@ -8399,21 +8399,28 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 **Critical Dependencies**: Phase 13c.2-13c.5 (Profiles + Examples)
 **Priority**: HIGH (user communication)
 
-### Task 13c.7.1: User Guide Updates ⏹ PENDING
+### Task 13c.7.1: User Guide Updates 🚧 IN PROGRESS
 **Priority**: HIGH
-**Estimated Time**: 5 hours
+**Estimated Time**: 3 hours
 **Assignee**: Documentation Team
-**Status**: ⏹ PENDING
+**Status**: 🚧 IN PROGRESS
 
 **Description**: Update docs/user-guide/01-getting-started.md and 08-deployment.md to Phase 13.
 
+**Research Findings (Pre-implementation)**:
+- Current getting-started.md references "Phase 8.10.6" - outdated
+- Actually have 6 getting-started examples (not 5):
+  - 00-hello-world.lua, 01-first-tool.lua, 02-first-agent.lua
+  - 03-first-workflow.lua, 04-handle-errors.lua, 05-memory-rag-advanced.lua
+- 21 presets available (not 17)
+- 08-deployment.md needs profile section update
+
 **Acceptance Criteria**:
-- [ ] 01-getting-started.md references 5-example path
-- [ ] Completion time updated: 45+ min → <30 min
+- [ ] 01-getting-started.md references 6-example path (corrected from 5)
+- [ ] Completion time updated to realistic estimate
 - [ ] 08-deployment.md has profile recommendations
-- [ ] PostgreSQL deployment section added
-- [ ] Local LLM deployment section added
 - [ ] All references to Phase 8 removed
+- [ ] Links to profile-layers-guide.md added
 
 **Implementation Steps**:
 1. Update `docs/user-guide/01-getting-started.md`:
@@ -8524,21 +8531,30 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.7.2: Profile Decision Guide Creation ⏹ PENDING
+### Task 13c.7.2: Profile Guide Update ⏹ PENDING
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours
 **Assignee**: Documentation Team
 **Status**: ⏹ PENDING
 
-**Description**: Create `docs/user-guide/profiles-guide.md` with comprehensive profile decision matrix.
+**Description**: Update existing `docs/user-guide/profile-layers-guide.md` to Phase 13 and ensure preset catalog is current.
+
+**Research Findings (Pre-implementation)**:
+- `docs/user-guide/profile-layers-guide.md` ALREADY EXISTS (30KB, 1,000+ lines)
+- 21 presets available (not 17 as originally stated):
+  - candle, claude-prod, daemon-dev, daemon-prod, default, development
+  - full-local-ollama, gemini-prod, memory-development, memory, minimal
+  - ollama, openai-prod, postgres-prod, providers, rag-dev, rag-perf
+  - rag-prod, research, sessions, state
+- 4-layer architecture: bases (4), backends (3), features (7), envs (4) = 18 layers
+- Document version shows "0.14.0" - may already be updated
 
 **Acceptance Criteria**:
-- [ ] profiles-guide.md created
-- [ ] All 17 profiles documented
-- [ ] Decision matrix clear (when to use which)
-- [ ] Environment progression guide (dev → staging → prod)
-- [ ] Profile composition examples
-- [ ] Links to full profile files
+- [ ] Verify profile-layers-guide.md is current
+- [ ] All 21 presets documented in preset catalog
+- [ ] Decision matrix reflects actual presets
+- [ ] Environment progression guide accurate
+- [ ] Links to layer files working
 
 **Implementation Steps**:
 1. Create `docs/user-guide/profiles-guide.md` (see design doc lines 1688-1777)
@@ -8644,21 +8660,22 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.7.3: Migration Guide Creation ⏹ DEFER or delete - don't need migration guide
-**Priority**: HIGH
-**Estimated Time**: 3 hours
+### Task 13c.7.3: Migration Guide Creation ⏭️ SKIP
+**Priority**: LOW
+**Estimated Time**: N/A
 **Assignee**: Documentation Team
-**Status**: ⏹ PENDING
+**Status**: ⏭️ SKIP
 
-**Description**: Create `docs/user-guide/migration-to-v0.14.md` comprehensive migration guide for v0.13 → v0.14.
+**Description**: ~~Create `docs/user-guide/migration-to-v0.14.md` comprehensive migration guide for v0.13 → v0.14.~~
 
-**Acceptance Criteria**:
-- [ ] migration-to-v0.14.md created
-- [ ] All breaking changes documented
-- [ ] Migration steps clear
-- [ ] Code examples for common patterns
-- [ ] Profile migration guidance
-- [ ] Example path updates
+**Skip Rationale**:
+- Project is pre-1.0 experimental platform
+- Breaking changes are expected and acceptable until 1.0
+- No external users requiring migration support
+- RELEASE_NOTES.md provides sufficient change documentation
+- Focus resources on user-facing docs (getting-started, profile guide)
+
+**Acceptance Criteria**: N/A - Task skipped
 
 **Implementation Steps**:
 1. Create `docs/user-guide/migration-to-v0.14.md` (see design doc lines 1970-2130)
@@ -8779,31 +8796,39 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ### Task 13c.7.4: Examples READMEs Rewrite ⏹ PENDING
 **Priority**: MEDIUM
-**Estimated Time**: 4 hours
+**Estimated Time**: 2 hours
 **Assignee**: Documentation Team
 **Status**: ⏹ PENDING
 
 **Description**: Rewrite examples/README.md, script-users/README.md, rust-developers/README.md to Phase 13.
 
+**Research Findings (Pre-implementation)**:
+- examples/README.md: Currently references "Phase 8.10.6", 21KB file
+- script-users/README.md: References "Phase 8.10.6", mentions 6 getting-started (accurate)
+- rust-developers/README.md: 4.8KB, lists 3 examples (accurate)
+  - custom-agent-example, custom-tool-example, integration-test-example
+- Main issue: Phase version references are outdated (Phase 8 → Phase 13)
+
 **Acceptance Criteria**:
-- [ ] examples/README.md rewritten (navigation + decision matrix)
-- [ ] script-users/README.md updated (Phase 13 current)
-- [ ] rust-developers/README.md updated (3 core examples)
+- [ ] examples/README.md updated (Phase 8.10.6 → Phase 13, v0.13.x)
+- [ ] script-users/README.md updated (Phase 8.10.6 → Phase 13)
+- [ ] rust-developers/README.md verified (3 examples is correct)
 - [ ] All READMEs reference Phase 13 (not Phase 8)
-- [ ] Navigation clear and helpful
+- [ ] Stats accurate (6 getting-started, 3 rust examples)
 
 **Implementation Steps**:
-1. Rewrite `examples/README.md` (see design doc lines 1788-1858)
+1. Update `examples/README.md`:
+   - Phase 8.10.6 → Phase 13 (v0.13.x)
+   - Verify example counts are accurate
 
-2. Update `examples/script-users/README.md` (see design doc lines 1859-1905):
-   - Status: Phase 8.10.6 → Phase 13 (v0.13.0)
-   - Quick stats: 8 getting-started → 5 getting-started
-   - Phase features: RAG (Phase 8) → Memory/Context (Phase 13)
+2. Update `examples/script-users/README.md`:
+   - Phase 8.10.6 → Phase 13 (v0.13.x)
+   - Verify 6 getting-started examples count
+   - Update profile references (21 presets available)
 
-3. Update `examples/rust-developers/README.md` (see design doc lines 1907-1960):
-   - 6 examples → 3 core examples
-   - Reference doc tests for async/builder
-   - Link to developer guide for extensions
+3. Verify `examples/rust-developers/README.md`:
+   - Confirm 3 examples (already accurate)
+   - Update Phase reference if needed
 
 **Definition of Done**:
 - [ ] All 3 READMEs comprehensive
