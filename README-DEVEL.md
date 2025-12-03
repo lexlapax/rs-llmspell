@@ -160,15 +160,23 @@ echo 'export SCCACHE_DIR=$HOME/.cache/sccache' >> ~/.bashrc
 
 ### Build Performance & Memory Optimization
 
-**⚠️ Important for systems with <16GB RAM**: This workspace has 20 crates with deep dependency trees (400+ transitive dependencies including surrealdb, aws-sdk-*, candle-*, arrow, parquet, rocksdb). Running `cargo test --workspace --all-features` can require **4-8GB RAM just for linking test binaries**. On limited-RAM systems, the linker may get OOM-killed by the kernel (signal 9 / "ld terminated with signal 9").
+**⚠️ Important for systems with <16GB RAM**: This workspace has 21 crates with deep dependency trees (800+ transitive dependencies including surrealdb, aws-sdk-*, candle-*, arrow, parquet, rocksdb). Running `cargo test --workspace --all-features` can require **4-8GB RAM just for linking test binaries**. On limited-RAM systems, the linker may get OOM-killed by the kernel (signal 9 / "ld terminated with signal 9").
 
 #### Understanding the Problem
 
 **Dependency Graph Characteristics:**
-- 20 workspace crates
-- 400+ transitive dependencies with deep trees
+- 21 workspace crates (Phase 13c.2.2a added vectorlite-rs)
+- 800+ transitive dependencies with deep trees
 - Heavy dependencies: surrealdb (100+ deps), aws-sdk-* (200+ deps), candle-* (50+ deps), arrow/parquet (80+ deps)
 - Test dependencies add more weight: mockall, proptest, criterion, quickcheck
+
+**Phase 13c.1 Dependency Cleanup** (completed):
+- Replaced lazy_static + once_cell → std::sync::LazyLock (Rust 1.80+)
+- Removed MySQL support and crypto dependencies (num-bigint-dig, rsa)
+- Removed blake3 (test-only, replaced with sha2)
+- Removed quickjs_runtime, serde_yaml (unused)
+- Removed tokio-stream/tokio-util from non-essential crates
+- Removed crossbeam from non-critical crates (kept in kernel for lock-free structures)
 
 **Linker Memory Requirements:**
 - Default linker must resolve ALL symbols for entire dependency graph in memory
@@ -896,28 +904,31 @@ This workspace has 400+ dependencies with deep trees. With `--all-features`, tes
 
 ---
 
-## CI/CD Integration
+## Quality Validation
 
-### GitHub Actions Workflow
+### Local Validation (Replaces CI)
 
-Configured in [.github/workflows/ci.yml](.github/workflows/ci.yml):
+**Note**: CI/CD pipelines have been removed in Phase 13c.6.3. Use local quality scripts for validation.
 
-**Jobs:**
-1. **quality** - Format, clippy, docs (ubuntu-latest)
-2. **test** - Build + test matrix (ubuntu-latest, macos-latest)
-3. **coverage** - Code coverage >90% (ubuntu-latest)
-4. **security** - Security audit (ubuntu-latest)
-5. **benchmarks** - Performance benchmarks (informational)
-6. **quality-gates** - Final validation gate
-7. **docs** - Documentation build + deployment
-
-**Local CI simulation:**
+**Quality Scripts:**
 ```bash
-# Run exact CI quality checks
-./scripts/quality/ci-test.sh
+# Minimal check (seconds) - format, clippy, compile
+./scripts/quality/quality-check-minimal.sh
 
-# Run tests with same configuration as CI
+# Fast check (~1 min) - adds unit tests + docs
+./scripts/quality/quality-check-fast.sh
+
+# Full validation (5+ min) - required before PR
+./scripts/quality/quality-check.sh
+```
+
+**Full Test Suite:**
+```bash
+# Run all tests
 cargo test --workspace --all-features
+
+# Run comprehensive tests
+./scripts/testing/run-llmspell-tests.sh all
 ```
 
 ---
@@ -937,8 +948,8 @@ cargo test --workspace --all-features
 - **Bridge Developer**: 01-getting-started → 04-bridge-patterns
 
 ### Examples
-- [Rust Developers](examples/rust-developers/) - 6 patterns
-- [Script Users](examples/script-users/) - 60+ Lua examples
+- [Rust Developers](examples/rust-developers/) - 3 patterns
+- [Script Users](examples/script-users/) - 40+ Lua examples
 - [Templates](examples/templates/) - 10 workflow templates
 
 ### Performance Targets
