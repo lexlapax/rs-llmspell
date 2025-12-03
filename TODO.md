@@ -8816,11 +8816,11 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 
 ---
 
-### Task 13c.7.4: Examples READMEs Rewrite ⏹ PENDING
+### Task 13c.7.4: Examples READMEs Rewrite ✅ COMPLETE
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: Documentation Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE
 
 **Description**: Rewrite examples/README.md, script-users/README.md, rust-developers/README.md to Phase 13.
 
@@ -8832,11 +8832,23 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
 - Main issue: Phase version references are outdated (Phase 8 → Phase 13)
 
 **Acceptance Criteria**:
-- [ ] examples/README.md updated (Phase 8.10.6 → Phase 13, v0.13.x)
-- [ ] script-users/README.md updated (Phase 8.10.6 → Phase 13)
-- [ ] rust-developers/README.md verified (3 examples is correct)
-- [ ] All READMEs reference Phase 13 (not Phase 8)
-- [ ] Stats accurate (6 getting-started, 3 rust examples)
+- [x] examples/README.md updated (Phase 8.10.6 → Phase 13, v0.13.x)
+- [x] script-users/README.md updated (Phase 8.10.6 → Phase 13)
+- [x] rust-developers/README.md verified (3 examples is correct - no Phase 8 refs)
+- [x] All READMEs reference Phase 13 (not Phase 8)
+- [x] Stats accurate (6 getting-started, 3 rust examples)
+
+**Files Modified**:
+- `examples/README.md` - Phase 13 update, rust examples 6→3, profile count 10→21
+- `examples/script-users/README.md` - Phase 13 update, profile count, file references
+
+**Completion Notes**:
+- Removed all "Phase 8" and "Phase 8.10.6" references
+- Fixed rust-developers example count: 6 → 3
+- Fixed profile count: 10 → 21
+- Updated 05-first-rag.lua → 05-memory-rag-advanced.lua
+- Updated "Phase 8 RAG Features" → "Phase 13 Memory & RAG Features"
+- rust-developers/README.md had no Phase 8 references (already clean)
 
 **Implementation Steps**:
 1. Update `examples/README.md`:
