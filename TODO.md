@@ -8330,11 +8330,11 @@ Most tests were already implemented in Tasks 13c.4.3-13c.4.7. This task added th
    ```
 
 **Definition of Done**:
-- [ ] quality-check.sh updated
-- [ ] Non-blocking behavior correct
-- [ ] getting-started failures block PR
-- [ ] API key skips allowed
-- [ ] Clear messaging
+- [x] quality-check.sh updated (Step 9 added)
+- [x] Non-blocking behavior correct (cookbook warns, doesn't fail)
+- [x] getting-started failures block PR (sets OVERALL_SUCCESS=1)
+- [x] API key skips allowed (rate limit detection)
+- [x] Clear messaging (✅/⚠️/❌ with print_status/warning helpers)
 
 **Files to Modify**:
 - `scripts/quality/quality-check.sh`
