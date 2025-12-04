@@ -2107,7 +2107,7 @@ presets/            (20 combinations: minimal, development, postgres-prod, etc.)
 
 ### **Phase 14: Web Interface (Weeks 55-58)**
 
-**Goal**: Create HTTP API and browser-based web interface for llmspell
+**Goal**: Create HTTP API and browser-based web interface as a single binary
 **Priority**: HIGH (User Experience & Accessibility)
 **Dependencies**: Phase 13c (Storage Consolidation) ✅, Phase 10 (Service Integration)
 
@@ -2118,9 +2118,40 @@ presets/            (20 combinations: minimal, development, postgres-prod, etc.)
 - Integration with web applications and services
 - Accessibility for non-CLI users
 
-**Components**:
+**Architecture Principles**:
+- **Single Binary Distribution**: Frontend assets embedded via `rust-embed`, no separate Node.js process required
+- **Leverage Daemon Infrastructure**: Reuse existing signal handling, PID management, graceful shutdown from `llmspell-kernel/src/daemon/`
+- **CLI-Managed Lifecycle**: Web server started/stopped via `llmspell web` subcommands
+- **Zero External Dependencies**: Self-contained binary with embedded static files
 
-**Backend (llmspell-web crate)**:
+---
+
+#### **Phase 14a: HTTP Backend (Weeks 55-56)**
+
+**Goal**: HTTP/WebSocket API server integrated with CLI
+
+**CLI Integration**:
+```bash
+# Start web server (foreground)
+llmspell web start --port 8080
+
+# Start as daemon (background)
+llmspell web start --port 8080 --daemon
+
+# Development mode (auto-reload, verbose logging)
+llmspell web start --port 8080 --dev
+
+# Stop daemon
+llmspell web stop
+
+# Check status
+llmspell web status
+
+# Open browser
+llmspell web open
+```
+
+**Components (llmspell-web crate)**:
 - HTTP server using axum (async, tower middleware ecosystem)
 - REST API endpoints:
   - `POST /api/scripts/execute` - Execute Lua/JS scripts
@@ -2129,15 +2160,60 @@ presets/            (20 combinations: minimal, development, postgres-prod, etc.)
   - `GET /api/sessions` - List sessions
   - `GET /api/memory/search` - Memory queries
   - `GET /api/templates` - List templates
+  - `GET /health` - Health check (leverages existing `to_http_status()`)
+  - `GET /metrics` - Prometheus-format metrics
 - WebSocket endpoint for streaming (`/ws/stream`)
 - Server-Sent Events fallback (`/api/sse/stream`)
 - Authentication middleware (API keys, JWT)
 - CORS configuration for browser access
-- Integration with existing kernel infrastructure
 
-**Frontend (web-ui)**:
-- React/Next.js single-page application
-- Monaco editor for script editing
+**Daemon Integration** (from `llmspell-kernel/src/daemon/`):
+- Signal handling: SIGTERM (graceful stop), SIGHUP (reload config), SIGUSR1/2 (debug)
+- PID file management for daemon mode
+- Multi-phase graceful shutdown (drain connections → complete requests → cleanup)
+- Health monitoring with `to_http_status()` for /health endpoint
+
+**Success Criteria (14a)**:
+- [ ] `llmspell web start` launches HTTP server
+- [ ] `llmspell web start --daemon` backgrounds correctly
+- [ ] `llmspell web stop` gracefully shuts down daemon
+- [ ] REST API endpoints functional for all operations
+- [ ] WebSocket streaming delivers real-time LLM output
+- [ ] Signal handling works (SIGTERM, SIGHUP)
+- [ ] PID file created/cleaned up properly
+- [ ] API-only mode works without frontend
+
+---
+
+#### **Phase 14b: Web Frontend (Weeks 57-58)**
+
+**Goal**: Browser UI embedded in single binary
+
+**Frontend Options** (POC both, choose based on results):
+
+**Option A: React + rust-embed**
+- Build React/Vite app at compile time
+- Embed static files via `rust-embed` crate
+- Serve from `GET /*` with SPA fallback
+- Pros: Rich ecosystem (Monaco, component libraries), familiar to web devs
+- Cons: Build-time Node.js dependency, larger binary (~10-20MB for assets)
+
+**Option B: Leptos (Pure Rust)**
+- Full-stack Rust with Leptos framework
+- WASM frontend compiled alongside backend
+- Truly single-language codebase
+- Pros: No Node.js anywhere, type-safe across stack, smaller WASM bundles
+- Cons: Smaller ecosystem, steeper learning curve, fewer UI components
+
+**POC Decision Criteria**:
+- Developer experience (hot reload, debugging)
+- Bundle size and load time
+- Component library availability (editor, charts, etc.)
+- Build complexity and CI/CD integration
+- Long-term maintainability
+
+**Frontend Features** (both options):
+- Monaco editor (or CodeMirror for Leptos) for script editing
 - Real-time output streaming display
 - Agent/Tool management dashboard
 - Session browser with replay capability
@@ -2145,20 +2221,35 @@ presets/            (20 combinations: minimal, development, postgres-prod, etc.)
 - Template gallery and executor
 - Responsive design for desktop/tablet
 
-**Infrastructure**:
-- Static file serving for frontend
-- Health check and metrics endpoints
-- Rate limiting and request validation
-- Graceful shutdown with in-flight request handling
+**Static File Serving**:
+```rust
+// rust-embed pattern
+#[derive(RustEmbed)]
+#[folder = "web-ui/dist"]
+struct Assets;
 
-**Success Criteria**:
-- [ ] HTTP server starts and accepts connections
-- [ ] REST API endpoints functional for all major operations
-- [ ] WebSocket streaming delivers real-time LLM output
-- [ ] Web UI loads and connects to backend
+// Serve embedded files
+async fn serve_static(path: Path<String>) -> impl IntoResponse {
+    Assets::get(&path).map(|f| ([(header::CONTENT_TYPE, f.mime)], f.data))
+}
+```
+
+**Success Criteria (14b)**:
+- [ ] Frontend assets embedded in binary
+- [ ] `llmspell web start` serves UI at root path
 - [ ] Script execution works end-to-end via browser
 - [ ] Agent invocation with streaming response works
 - [ ] Session management accessible via UI
+- [ ] Single binary works without external dependencies
+- [ ] `--dev` mode supports frontend hot reload
+
+---
+
+**Combined Success Criteria**:
+- [ ] Single binary distribution (~50MB max with embedded assets)
+- [ ] Zero runtime dependencies (no Node.js, no external servers)
+- [ ] CLI manages all lifecycle (`start`, `stop`, `status`)
+- [ ] Daemon mode with proper signal handling
 - [ ] Authentication prevents unauthorized access
 - [ ] Performance: <100ms API response time (non-LLM operations)
 - [ ] Zero regressions in CLI functionality
@@ -2166,18 +2257,21 @@ presets/            (20 combinations: minimal, development, postgres-prod, etc.)
 **Testing Requirements**:
 - HTTP endpoint integration tests
 - WebSocket streaming tests
-- Frontend component tests
+- CLI subcommand tests (`web start/stop/status`)
+- Daemon mode tests (backgrounding, PID, signals)
+- Frontend component tests (if React) or Rust tests (if Leptos)
 - End-to-end browser automation tests
 - Load testing for concurrent connections
 - Authentication/authorization tests
-- CORS policy validation
+- Embedded asset serving tests
 - Graceful shutdown tests
 
 **Performance Targets**:
+- Binary size: <50MB with embedded frontend
 - API response time: <100ms (excluding LLM inference)
 - WebSocket message latency: <50ms
 - Concurrent connections: 100+ simultaneous users
-- Frontend initial load: <3 seconds
+- Frontend initial load: <2 seconds (embedded, no network)
 - Memory overhead: <100MB for web server
 
 ---
