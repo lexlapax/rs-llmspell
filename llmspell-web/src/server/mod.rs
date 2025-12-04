@@ -19,6 +19,7 @@ impl WebServer {
         let app = Router::new()
             .route("/health", get(health_check))
             .route("/api/scripts/execute", post(handlers::scripts::execute_script))
+            .route("/ws/stream", get(handlers::ws::ws_handler))
             .with_state(state);
 
         let listener = tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await?;

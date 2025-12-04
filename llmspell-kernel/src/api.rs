@@ -569,6 +569,11 @@ impl KernelHandle {
     pub fn into_kernel(self) -> IntegratedKernel<JupyterProtocol> {
         self.kernel
     }
+
+    /// Get the session manager
+    pub fn session_manager(&self) -> &Arc<crate::sessions::SessionManager> {
+        self.kernel.get_session_manager()
+    }
 }
 
 /// Handle for a client connection to a kernel

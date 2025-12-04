@@ -212,10 +212,10 @@
 **Description**: Implement `POST /api/scripts/execute` and related state management.
 
 **Acceptance Criteria**:
-- [ ] Request/Response structs defined
-- [ ] Handler calls Kernel execution
-- [ ] Returns `execution_id`
-- [ ] Error handling for invalid scripts
+- [x] Request/Response structs defined
+- [x] Handler calls Kernel execution
+- [x] Returns `execution_id` (or result)
+- [x] Error handling for invalid scripts
 
 **Files to Create/Modify**:
 - `llmspell-web/src/handlers/scripts.rs` (NEW)
@@ -274,9 +274,16 @@
 3.  Loop: Receive Event -> Serialize -> Send WS Message.
 
 **Definition of Done**:
-- [ ] WS connection establishes
-- [ ] Events flow from Kernel to Client
-- [ ] Connection closes cleanly
+- [x] WS connection establishes
+- [x] Events flow from Kernel to Client (via EventBus subscription)
+- [x] Connection closes cleanly
+
+**Implementation Insights**:
+- ✅ Exposed `SessionManager` from `KernelHandle` in `llmspell-kernel/src/api.rs`.
+- ✅ Exposed `EventBus` from `SessionManager` in `llmspell-kernel/src/sessions/manager.rs`.
+- ✅ Implemented `ws_handler` in `llmspell-web/src/handlers/ws.rs` using `axum::extract::ws`.
+- ✅ Subscribed to `EventBus::subscribe_all()` to stream all kernel events.
+- ✅ Added `futures`, `llmspell-events`, and `tracing` dependencies.
 
 ### Task 14.2.3: Implement Resource APIs (Sessions, Memory)
 **Priority**: HIGH

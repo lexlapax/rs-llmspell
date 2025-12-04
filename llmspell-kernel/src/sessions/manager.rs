@@ -66,6 +66,10 @@ pub struct SessionManager {
 }
 
 impl SessionManager {
+    /// Get the event bus
+    pub fn event_bus(&self) -> &Arc<EventBus> {
+        &self.event_bus
+    }
     /// Create a new session manager with the given dependencies
     ///
     /// # Errors
