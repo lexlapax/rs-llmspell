@@ -1,0 +1,42 @@
+# CLI Base Layer
+# One-shot script execution for interactive command-line usage
+
+[profile]
+name = "CLI Base"
+description = "Interactive command-line execution with minimal overhead"
+
+# Minimal concurrency for single-user interaction
+[runtime]
+max_concurrent_scripts = 1
+script_timeout_seconds = 300  # 5 minutes
+enable_streaming = true
+
+# Security: Safe by default for interactive use
+[runtime.security]
+allow_file_access = false
+allow_network_access = false
+allow_process_spawn = false
+
+# State: In-memory only, no persistence needed for CLI
+[runtime.state_persistence]
+enabled = false
+
+# Sessions: Single session per CLI invocation
+[runtime.sessions]
+enabled = true
+max_sessions = 1
+session_timeout_seconds = 3600
+
+# Debug: Human-readable output to stdout
+[debug]
+enabled = true
+level = "info"
+
+[debug.output]
+stdout = true
+colored = true
+format = "text"
+
+# Events: Minimal event tracking for CLI
+[events]
+enabled = false

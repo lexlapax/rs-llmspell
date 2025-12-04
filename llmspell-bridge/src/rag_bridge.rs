@@ -1,6 +1,8 @@
 //! ABOUTME: Native Rust bridge for RAG functionality
 //! ABOUTME: Provides vector storage, retrieval, and multi-tenant RAG operations
 
+use llmspell_core::traits::storage::VectorStorage;
+use llmspell_core::types::storage::{VectorEntry, VectorResult};
 use llmspell_core::{execution_context::ExecutionContext, logging::warn, Result};
 use llmspell_kernel::sessions::{SessionId, SessionManager};
 use llmspell_kernel::state::{StateManager, StateScope};
@@ -9,7 +11,6 @@ use llmspell_rag::{
     multi_tenant_integration::MultiTenantRAG, session_integration::SessionAwareRAGPipeline,
     state_integration::StateAwareVectorStorage,
 };
-use llmspell_storage::{VectorEntry, VectorResult, VectorStorage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -127,7 +128,7 @@ impl RAGBridge {
     /// # Panics
     ///
     /// Panics if `vector_storage` is `None`. Vector storage is required for RAG operations
-    /// and must be provided. Use `HNSWVectorStorage` or another implementation of the
+    /// and must be provided. Use `SqliteVectorStorage` or another implementation of the
     /// `VectorStorage` trait.
     #[must_use]
     pub fn new(

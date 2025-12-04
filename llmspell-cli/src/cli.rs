@@ -108,30 +108,44 @@ pub struct Cli {
 
     /// Built-in configuration profile (GLOBAL)
     ///
-    /// Available profiles:
+    /// Supports three syntax forms:
+    ///   1. Single preset:      llmspell -p minimal
+    ///   2. Explicit preset:    llmspell -p presets/rag-dev
+    ///   3. Multi-layer:        llmspell -p bases/cli,features/rag,envs/dev
     ///
-    /// Core:
-    ///   minimal      - Tools only, no LLM providers
-    ///   development  - Dev settings with debug logging
+    /// Available presets (20 total):
     ///
-    /// Common Workflows:
-    ///   providers    - OpenAI + Anthropic setup
-    ///   state        - State persistence with memory backend
-    ///   sessions     - Sessions + state + hooks + events
+    /// Backward Compatible (12):
+    ///   minimal              - Tools only, no LLM features
+    ///   development          - Dev environment with cloud LLM providers
+    ///   providers            - All LLM providers (OpenAI, Anthropic, Gemini, Ollama, Candle)
+    ///   state                - State persistence + sessions
+    ///   sessions             - Session management with artifacts
+    ///   ollama               - Local Ollama models
+    ///   candle               - Local Candle ML models
+    ///   memory               - Adaptive memory system
+    ///   rag-dev              - RAG development with trace logging
+    ///   rag-prod             - RAG production with SQLite
+    ///   rag-perf             - RAG performance tuned
+    ///   default              - Minimal CLI setup
     ///
-    /// Local LLM:
-    ///   ollama       - Ollama backend configuration
-    ///   candle       - Candle embedded inference
+    /// New Combinations (8):
+    ///   postgres-prod        - Production PostgreSQL backend
+    ///   daemon-dev           - Daemon mode development
+    ///   daemon-prod          - Daemon mode production
+    ///   gemini-prod          - Full Phase 13 stack + Gemini
+    ///   openai-prod          - Full Phase 13 stack + OpenAI
+    ///   claude-prod          - Full Phase 13 stack + Claude/Anthropic
+    ///   full-local-ollama    - Complete local stack (Ollama + SQLite)
+    ///   research             - Full features + trace logging
     ///
-    /// RAG:
-    ///   rag-dev      - Development RAG (small dims, fast)
-    ///   rag-prod     - Production RAG (reliability, monitoring)
-    ///   rag-perf     - Performance RAG (high memory, cores)
+    /// Multi-layer composition uses 4 layer types:
+    ///   bases/*      - Deployment modes (cli, daemon, embedded, testing)
+    ///   features/*   - Capabilities (minimal, llm, rag, memory, full)
+    ///   envs/*       - Tuning (dev, staging, prod, perf)
+    ///   backends/*   - Storage (memory, sqlite, postgres)
     ///
     /// Use 'llmspell config list-profiles' for detailed information.
-    ///
-    /// Profiles are complete configurations loaded from built-in TOML files.
-    /// Use --profile to select a builtin, or -c for custom config files.
     ///
     /// Precedence: --profile > -c > discovery > default
     #[arg(short = 'p', long, global = true)]
@@ -563,10 +577,10 @@ EXAMPLES:
 
     /// Storage migration and management operations
     #[command(
-        long_about = "Manage storage migrations between backends (Sled, PostgreSQL).
+        long_about = "Manage storage migrations between backends (SQLite, PostgreSQL).
 
 Migration operations enable safe data migration with plan-based workflow, validation,
-and rollback capabilities. Phase 1 supports Sled→PostgreSQL for Agent State, Workflow
+and rollback capabilities. Phase 1 supports SQLite→PostgreSQL for Agent State, Workflow
 State, and Sessions.
 
 Workflow:
@@ -577,7 +591,7 @@ Workflow:
   5. Validate:      Verify data integrity post-migration
 
 EXAMPLES:
-    llmspell storage migrate plan --from sled --to postgres \\
+    llmspell storage migrate plan --from sqlite --to postgres \\
       --components agent_state,workflow_state,sessions \\
       --output migration-plan.toml
 
@@ -585,7 +599,7 @@ EXAMPLES:
 
     llmspell storage migrate execute --plan migration-plan.toml
 
-    llmspell storage info --backend sled
+    llmspell storage info --backend sqlite
 
     llmspell storage validate --backend postgres --components agent_state"
     )]
@@ -1569,7 +1583,7 @@ pub enum StorageCommands {
     #[command(
         long_about = "Migrate data between storage backends with plan-based workflow.
 
-Phase 1 supports Sled→PostgreSQL for Agent State, Workflow State, and Sessions.
+Phase 1 supports SQLite→PostgreSQL for Agent State, Workflow State, and Sessions.
 
 Workflow:
   1. Generate plan with estimated record counts
@@ -1579,7 +1593,7 @@ Workflow:
   5. Validate data integrity
 
 EXAMPLES:
-    llmspell storage migrate plan --from sled --to postgres \\
+    llmspell storage migrate plan --from sqlite --to postgres \\
       --components agent_state,workflow_state,sessions \\
       --output migration-plan.toml
 
@@ -1596,11 +1610,11 @@ EXAMPLES:
         long_about = "Display storage backend characteristics and configuration.
 
 EXAMPLES:
-    llmspell storage info --backend sled       # Show Sled backend info
+    llmspell storage info --backend sqlite     # Show SQLite backend info
     llmspell storage info --backend postgres   # Show PostgreSQL backend info"
     )]
     Info {
-        /// Backend to show info for (sled, postgres)
+        /// Backend to show info for (sqlite, postgres)
         #[arg(long)]
         backend: String,
     },
@@ -1609,16 +1623,58 @@ EXAMPLES:
     #[command(long_about = "Validate data integrity for storage components.
 
 EXAMPLES:
-    llmspell storage validate --backend sled --components agent_state
+    llmspell storage validate --backend sqlite --components agent_state
     llmspell storage validate --backend postgres --components agent_state,workflow_state")]
     Validate {
-        /// Backend to validate (sled, postgres)
+        /// Backend to validate (sqlite, postgres)
         #[arg(long)]
         backend: String,
 
         /// Components to validate (comma-separated)
         #[arg(long)]
         components: String,
+    },
+
+    /// Export storage data to JSON file
+    #[command(
+        long_about = "Export all storage data from PostgreSQL or SQLite to JSON format.
+
+Exports all 10 data types (vectors, graph, patterns, state, workflows, sessions, artifacts, events, hooks).
+The JSON export can be imported into any backend for migration or backup.
+
+EXAMPLES:
+    llmspell storage export --backend postgres --output backup.json
+    llmspell storage export --backend sqlite --output export.json"
+    )]
+    Export {
+        /// Backend to export from (sqlite, postgres)
+        #[arg(long)]
+        backend: String,
+
+        /// Output JSON file path
+        #[arg(long)]
+        output: std::path::PathBuf,
+    },
+
+    /// Import storage data from JSON file
+    #[command(
+        long_about = "Import storage data from JSON file into PostgreSQL or SQLite backend.
+
+Imports all data types using transaction safety (rollback on error).
+The target backend must have all required migrations applied.
+
+EXAMPLES:
+    llmspell storage import --backend sqlite --input backup.json
+    llmspell storage import --backend postgres --input export.json"
+    )]
+    Import {
+        /// Backend to import into (sqlite, postgres)
+        #[arg(long)]
+        backend: String,
+
+        /// Input JSON file path
+        #[arg(long)]
+        input: std::path::PathBuf,
     },
 }
 
@@ -1633,16 +1689,16 @@ The plan includes source/target configs, component list, batch sizes, validation
 rules, and rollback metadata. Review the plan before executing.
 
 EXAMPLES:
-    llmspell storage migrate plan --from sled --to postgres \\
+    llmspell storage migrate plan --from sqlite --to postgres \\
       --components agent_state,workflow_state,sessions \\
       --output migration-plan.toml"
     )]
     Plan {
-        /// Source backend (sled)
+        /// Source backend (sqlite, postgres)
         #[arg(long)]
         from: String,
 
-        /// Target backend (postgres)
+        /// Target backend (sqlite, postgres)
         #[arg(long)]
         to: String,
 

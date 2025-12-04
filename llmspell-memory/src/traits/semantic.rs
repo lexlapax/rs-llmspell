@@ -28,7 +28,7 @@ use chrono::{DateTime, Utc};
 use crate::error::Result;
 
 // Re-export graph types as canonical types for semantic memory
-pub use llmspell_graph::types::{Entity, Relationship};
+pub use llmspell_graph::{Entity, Relationship};
 
 /// Semantic memory stores bi-temporal knowledge graph
 ///
@@ -39,12 +39,15 @@ pub use llmspell_graph::types::{Entity, Relationship};
 /// ```rust,no_run
 /// use llmspell_memory::prelude::*;
 /// use llmspell_memory::semantic::GraphSemanticMemory;
+/// use llmspell_storage::backends::sqlite::SqliteBackend;
 /// use serde_json::json;
 /// use chrono::Utc;
+/// use std::sync::Arc;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
-///     let semantic = GraphSemanticMemory::new_temp().await?;
+///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.map_err(|e| llmspell_memory::MemoryError::Storage(e.to_string()))?);
+///     let semantic = GraphSemanticMemory::new_with_sqlite(sqlite_backend);
 ///
 ///     // Add an entity
 ///     semantic.upsert_entity(Entity::new(

@@ -50,7 +50,7 @@
 use crate::{providers::ProviderManager, registry::ComponentRegistry};
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
-use llmspell_storage::backends::vector::HNSWVectorStorage;
+use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -71,6 +71,9 @@ pub struct Infrastructure {
 
     /// RAG system (optional, created if config.rag.enabled)
     pub rag: Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>,
+
+    /// Vector storage for RAG (optional, created with rag)
+    pub vector_storage: Option<Arc<SqliteVectorStorage>>,
 
     /// Memory manager (optional, created if config.memory.enabled)
     pub memory_manager: Option<Arc<llmspell_memory::DefaultMemoryManager>>,
@@ -118,11 +121,12 @@ impl Infrastructure {
         let session_manager = create_session_manager(state_manager.clone(), config)?;
 
         // 4. Create RAG if enabled
-        let rag = if config.rag.enabled {
-            Some(create_rag(config))
+        let (rag, vector_storage) = if config.rag.enabled {
+            let (rag, vs) = create_rag(config).await?;
+            (Some(rag), Some(vs))
         } else {
             debug!("RAG disabled in config, skipping creation");
-            None
+            (None, None)
         };
 
         // 5. Create memory manager if enabled
@@ -153,6 +157,7 @@ impl Infrastructure {
             state_manager,
             session_manager,
             rag,
+            vector_storage,
             memory_manager,
             tool_registry,
             agent_registry,
@@ -200,26 +205,15 @@ async fn create_state_manager(
 /// Returns an error if session manager initialization fails
 fn create_session_manager(
     state_manager: Arc<llmspell_kernel::state::StateManager>,
-    config: &LLMSpellConfig,
+    _config: &LLMSpellConfig,
 ) -> Result<Arc<llmspell_kernel::sessions::SessionManager>, LLMSpellError> {
     debug!("Creating session manager");
 
-    // Create session storage backend based on config (Phase 13b.16.9 - Fix lock contention)
-    let session_storage_backend: Arc<dyn llmspell_storage::StorageBackend> =
-        if config.runtime.sessions.storage_backend.as_str() == "memory" {
-            debug!("Using memory backend for session storage");
-            Arc::new(llmspell_storage::MemoryBackend::new())
-        } else {
-            debug!("Using Sled backend for session storage at ./sessions");
-            Arc::new(
-                llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
-                    LLMSpellError::Component {
-                        message: format!("Failed to create session storage backend: {e}"),
-                        source: None,
-                    }
-                })?,
-            )
-        };
+    // Only memory backend supported via Lua bridge (production: use Rust API with SQLite/PostgreSQL)
+    let session_storage_backend: Arc<dyn llmspell_storage::StorageBackend> = {
+        debug!("Using memory backend for session storage");
+        Arc::new(llmspell_storage::MemoryBackend::new())
+    };
 
     // Create hook infrastructure
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
@@ -251,44 +245,86 @@ fn create_session_manager(
 /// Create RAG system from config
 ///
 /// Only called when `config.rag.enabled` is true.
-fn create_rag(
+///
+/// # Returns
+///
+/// Returns a tuple of (`MultiTenantRAG`, `SqliteVectorStorage`)
+///
+/// # Errors
+///
+/// Returns an error if `SQLite` backend or vector storage initialization fails
+async fn create_rag(
     config: &LLMSpellConfig,
-) -> Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG> {
+) -> Result<
+    (
+        Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>,
+        Arc<SqliteVectorStorage>,
+    ),
+    LLMSpellError,
+> {
     debug!("Creating RAG infrastructure (enabled via config)");
 
     // Read configuration from config.rag
     let dimensions = config.rag.vector_storage.dimensions;
 
-    // Convert llmspell_config::rag::HNSWConfig to llmspell_storage::HNSWConfig
-    let storage_hnsw_config = llmspell_storage::HNSWConfig {
-        m: config.rag.vector_storage.hnsw.m,
-        ef_construction: config.rag.vector_storage.hnsw.ef_construction,
-        ef_search: config.rag.vector_storage.hnsw.ef_search,
-        max_elements: config.rag.vector_storage.hnsw.max_elements,
-        seed: config.rag.vector_storage.hnsw.seed,
-        metric: convert_distance_metric(&config.rag.vector_storage.hnsw.metric),
-        allow_replace_deleted: config.rag.vector_storage.hnsw.allow_replace_deleted,
-        num_threads: config.rag.vector_storage.hnsw.num_threads,
-        nb_layers: config.rag.vector_storage.hnsw.nb_layers,
-        parallel_batch_size: config.rag.vector_storage.hnsw.parallel_batch_size,
-        enable_mmap: config.rag.vector_storage.hnsw.enable_mmap,
-        mmap_sync_interval: config.rag.vector_storage.hnsw.mmap_sync_interval,
+    // Create SQLite backend (in-memory if no persistence_path specified)
+    let sqlite_config = if let Some(path) = &config.rag.vector_storage.persistence_path {
+        // If path is a directory or doesn't have an extension, append default db filename
+        let db_path = if path.is_dir() || path.extension().is_none() {
+            // Create directory if it doesn't exist
+            if !path.exists() {
+                std::fs::create_dir_all(path).map_err(|e| LLMSpellError::Storage {
+                    message: format!("Failed to create persistence directory: {e}"),
+                    operation: Some("create_directory".to_string()),
+                    source: None,
+                })?;
+            }
+            path.join("vectors.db")
+        } else {
+            path.clone()
+        };
+        debug!("Creating SQLite vector storage at: {:?}", db_path);
+        SqliteConfig::new(db_path)
+    } else {
+        debug!("Creating in-memory SQLite vector storage (no persistence_path configured)");
+        SqliteConfig::in_memory()
     };
 
-    // Create vector storage
-    let mut vector_storage = HNSWVectorStorage::new(dimensions, storage_hnsw_config);
+    let backend =
+        Arc::new(
+            SqliteBackend::new(sqlite_config)
+                .await
+                .map_err(|e| LLMSpellError::Storage {
+                    message: format!("Failed to create SQLite backend for RAG: {e}"),
+                    operation: Some("create_backend".to_string()),
+                    source: None,
+                })?,
+        );
 
-    // Enable persistence if configured
-    if let Some(ref persistence_path) = config.rag.vector_storage.persistence_path {
-        debug!("Enabling RAG vector persistence at: {:?}", persistence_path);
-        vector_storage = vector_storage.with_persistence(persistence_path.clone());
-    }
+    // Run migrations to create required tables
+    backend
+        .run_migrations()
+        .await
+        .map_err(|e| LLMSpellError::Storage {
+            message: format!("Failed to run migrations for RAG storage: {e}"),
+            operation: Some("run_migrations".to_string()),
+            source: None,
+        })?;
+
+    // Create vector storage with SQLite backend
+    let vector_storage = SqliteVectorStorage::new(backend.clone(), dimensions)
+        .await
+        .map_err(|e| LLMSpellError::Storage {
+            message: format!("Failed to create SQLite vector storage for RAG: {e}"),
+            operation: Some("create_vector_storage".to_string()),
+            source: None,
+        })?;
 
     let vector_storage = Arc::new(vector_storage);
 
     // Create tenant manager
     let tenant_manager = Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(
-        vector_storage,
+        vector_storage.clone(),
     ));
 
     // Create multi-tenant RAG
@@ -298,7 +334,7 @@ fn create_rag(
 
     debug!("RAG infrastructure created (dimensions={})", dimensions);
 
-    rag
+    Ok((rag, vector_storage))
 }
 
 /// Create memory manager from config
@@ -366,19 +402,4 @@ fn create_component_registry(
     };
 
     Ok(Arc::new(registry))
-}
-
-/// Convert config `DistanceMetric` to storage `DistanceMetric`
-const fn convert_distance_metric(
-    metric: &llmspell_config::rag::DistanceMetric,
-) -> llmspell_storage::DistanceMetric {
-    match metric {
-        llmspell_config::rag::DistanceMetric::Cosine => llmspell_storage::DistanceMetric::Cosine,
-        llmspell_config::rag::DistanceMetric::Euclidean => {
-            llmspell_storage::DistanceMetric::Euclidean
-        }
-        llmspell_config::rag::DistanceMetric::InnerProduct => {
-            llmspell_storage::DistanceMetric::InnerProduct
-        }
-    }
 }

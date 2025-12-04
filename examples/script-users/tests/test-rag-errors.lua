@@ -1,3 +1,7 @@
+-- Recommended profile: rag-dev
+-- Run with: llmspell -p rag-dev run test-rag-errors.lua
+-- RAG testing with debug output
+
 -- Test: RAG Error Handling Validation Test
 -- Purpose: Tests error conditions, boundary cases, and recovery
 -- Prerequisites: OPENAI_API_KEY environment variable for embeddings

@@ -1,3 +1,7 @@
+-- Recommended profile: minimal
+-- Run with: llmspell -p minimal run code-input.lua
+-- Input file (no execution profile needed)
+
 -- Code Input for Code Review Assistant
 -- This file provides code samples to be reviewed
 -- Similar to how webapp-creator uses user-input-ecommerce.lua

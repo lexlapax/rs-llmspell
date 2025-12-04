@@ -3,6 +3,7 @@
 
 pub mod agent_io;
 mod media;
+pub mod storage;
 mod streaming;
 
 pub use agent_io::{

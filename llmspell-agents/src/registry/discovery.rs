@@ -59,19 +59,14 @@ pub enum SortField {
 }
 
 /// Sort order
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum SortOrder {
     /// Ascending order
+    #[default]
     Ascending,
 
     /// Descending order
     Descending,
-}
-
-impl Default for SortOrder {
-    fn default() -> Self {
-        Self::Ascending
-    }
 }
 
 /// Search result with relevance scoring

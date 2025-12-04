@@ -11,12 +11,12 @@ use super::performance::{
 use super::{StateError, StateResult, StateScope};
 use crate::state::agent_state::ToolUsageStats;
 use llmspell_core::state::{ArtifactCorrelationManager, ArtifactId, StateOperation};
+use llmspell_core::traits::storage::StorageBackend;
 use llmspell_core::types::ComponentId as CoreComponentId;
 use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{
     ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
 };
-use llmspell_storage::StorageBackend;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -267,7 +267,7 @@ impl StateManager {
     ///
     /// # Arguments
     ///
-    /// * `backend_type` - Storage backend type (Memory, Sled, `RocksDB`)
+    /// * `backend_type` - Storage backend type (Memory, Sqlite, Postgres)
     /// * `config` - Persistence configuration
     /// * `memory_manager` - Optional memory manager for state-memory synchronization (Phase 13.7.4)
     ///
@@ -295,6 +295,30 @@ impl StateManager {
         let event_bus = Arc::new(EventBus::new());
         let correlation_tracker = Arc::new(EventCorrelationTracker::default());
         let replay_manager = HookReplayManager::new(storage_adapter.clone());
+
+        // Run migrations before loading state (for persistent backends)
+        if config.enabled {
+            match &backend_type {
+                crate::state::config::StorageBackendType::Sqlite(_) => {
+                    storage_backend.run_migrations().await.map_err(|e| {
+                        StateError::storage(format!(
+                            "Failed to run migrations during initialization: {e}"
+                        ))
+                    })?;
+                }
+                #[cfg(feature = "postgres")]
+                crate::state::config::StorageBackendType::Postgres(_) => {
+                    storage_backend.run_migrations().await.map_err(|e| {
+                        StateError::storage(format!(
+                            "Failed to run migrations during initialization: {e}"
+                        ))
+                    })?;
+                }
+                crate::state::config::StorageBackendType::Memory => {
+                    // No migrations needed for in-memory backend
+                }
+            }
+        }
 
         // Load existing state from storage if persistent
         let in_memory = if config.enabled {
@@ -365,6 +389,57 @@ impl StateManager {
             artifact_correlation_manager: Arc::new(ArtifactCorrelationManager::new()),
             memory_manager,
         })
+    }
+
+    /// Run database migrations
+    ///
+    /// Applies all necessary schema migrations for the underlying storage backend.
+    /// This should be called explicitly after creating a `StateManager` with a persistent backend.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - The backend fails to apply migrations
+    /// - Unable to query migration version
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use llmspell_kernel::state::{StateManager, StorageBackendType, PersistenceConfig};
+    /// use llmspell_kernel::state::config::SqliteConfig;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let state_manager = StateManager::with_backend(
+    ///     StorageBackendType::Sqlite(SqliteConfig {
+    ///         path: "./test.db".into(),
+    ///     }),
+    ///     PersistenceConfig::default(),
+    ///     None,
+    /// ).await?;
+    ///
+    /// // Run migrations before using the state manager
+    /// state_manager.run_migrations().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn run_migrations(&self) -> StateResult<()> {
+        self.storage_backend
+            .run_migrations()
+            .await
+            .map_err(|e| StateError::storage(format!("Failed to run migrations: {e}")))
+    }
+
+    /// Get current migration version
+    ///
+    /// Returns the highest applied migration version from the underlying storage backend.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if unable to query migration version
+    pub async fn migration_version(&self) -> StateResult<usize> {
+        self.storage_backend
+            .migration_version()
+            .await
+            .map_err(|e| StateError::storage(format!("Failed to query migration version: {e}")))
     }
 
     /// Set state with hooks and persistence (uses async hooks if enabled)

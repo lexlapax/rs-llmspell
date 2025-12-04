@@ -1,0 +1,66 @@
+//! SQLite storage backend (Phase 13c.2)
+//!
+//! Unified local storage using libsql with encryption, connection pooling,
+//! and tenant context management for RLS-style isolation.
+//!
+//! # Features
+//!
+//! - **libsql**: SQLite fork with encryption at rest and replication
+//! - **WAL Mode**: Write-Ahead Logging for concurrent readers
+//! - **Connection Pooling**: Custom async pool with PRAGMA initialization  
+//! - **Tenant Isolation**: Application-level row filtering via DashMap
+//! - **Health Monitoring**: Connection tests and statistics
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig};
+//!
+//! # async fn example() -> anyhow::Result<()> {
+//! // Create backend
+//! let config = SqliteConfig::new("./llmspell.db")
+//!     .with_max_connections(20);
+//! let backend = SqliteBackend::new(config).await?;
+//!
+//! // Set tenant context
+//! backend.set_tenant_context("tenant-123").await?;
+//!
+//! // Get connection
+//! let conn = backend.get_connection().await?;
+//!
+//! // Health check
+//! assert!(backend.health_check().await?);
+//! # Ok(())
+//! # }
+//! ```
+
+mod agent_state;
+mod artifact;
+mod backend;
+mod config;
+mod error;
+mod event_log;
+mod graph;
+mod hook_history;
+mod kv_store;
+mod migrations;
+mod pool;
+mod procedural;
+mod session;
+mod vector;
+mod workflow_state;
+
+pub use agent_state::SqliteAgentStateStorage;
+pub use artifact::SqliteArtifactStorage;
+pub use backend::{HealthStatus, SqliteBackend, TenantContext};
+pub use config::SqliteConfig;
+pub use error::{Result, SqliteError};
+pub use event_log::{EventStorageStats, SqliteEventLogStorage};
+pub use graph::SqliteGraphStorage;
+pub use hook_history::{HookHistoryStats, SerializedHookExecution, SqliteHookHistoryStorage};
+pub use kv_store::SqliteKVStorage;
+pub use pool::{PoolStats, SqlitePool};
+pub use procedural::{SqliteProceduralStorage, StoredPattern};
+pub use session::SqliteSessionStorage;
+pub use vector::SqliteVectorStorage;
+pub use workflow_state::SqliteWorkflowStateStorage;

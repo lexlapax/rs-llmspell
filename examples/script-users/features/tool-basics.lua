@@ -1,8 +1,14 @@
+-- Profile: minimal (recommended)
+-- Run with: llmspell -p minimal run tool-basics.lua
+-- No LLM required
+
 -- ============================================================
 -- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 -- Feature ID: 02 - Tool Basics v0.7.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Automating file operations and data processing
 -- Feature Category: Tools
 --
@@ -166,13 +172,15 @@ end
 print("\n8. Error Handling")
 print("-" .. string.rep("-", 16))
 
--- Intentionally cause an error
-local error_result = use_tool("file-operations", {
-    operation = "read",
-    path = "/nonexistent/file.txt"
-})
+-- Intentionally cause an error - use pcall to catch thrown errors
+local ok, error_result = pcall(function()
+    return use_tool("file-operations", {
+        operation = "read",
+        path = "/nonexistent/file.txt"
+    })
+end)
 
-if error_result.success == false or error_result.error then
+if not ok or (error_result and (error_result.success == false or error_result.error)) then
     print("   Error handling: ✓ (caught expected error)")
 else
     print("   Error handling: ✗ (should have failed)")

@@ -1,15 +1,20 @@
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Example ID: 01 - First Tool v0.7.0
--- Complexity Level: BEGINNER
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: getting-started
+-- Profile: minimal (recommended)
+-- Example ID: 01 - First Tool v0.14.0
+-- Complexity: BEGINNER
 -- Real-World Use Case: File management and basic I/O operations
 --
 -- Purpose: Learn fundamental tool invocation patterns with file-operations tool.
 --          Demonstrates how to call tools, pass parameters, and handle results.
 --          This is the foundation for all tool-based automation in LLMSpell.
+--
 -- Architecture: Synchronous tool invocation via Tool.execute()
 -- Crates Showcased: llmspell-tools (file-operations), llmspell-bridge
+--
 -- Key Features:
 --   • Tool invocation syntax
 --   • Parameter passing patterns
@@ -22,7 +27,8 @@
 --   • No API keys required
 --
 -- HOW TO RUN:
--- ./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua
+-- ./target/debug/llmspell -p minimal \
+--   run examples/script-users/getting-started/01-first-tool.lua
 --
 -- EXPECTED OUTPUT:
 -- File created: /tmp/my_first_file.txt (50 bytes written)
@@ -30,7 +36,7 @@
 -- File exists: true
 -- All operations completed successfully
 --
--- Time to Complete: <5 seconds
+-- Runtime: ~5 seconds
 -- ============================================================
 
 print("=== LLMSpell: Your First Tool ===")

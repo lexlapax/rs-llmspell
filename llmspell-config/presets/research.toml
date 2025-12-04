@@ -1,0 +1,9 @@
+# Research Preset - Full features with detailed tracing
+[profile]
+name = "Research"
+description = "Full features with trace logging for research and debugging"
+extends = ["bases/cli", "features/full", "envs/dev", "backends/sqlite"]
+
+# Override for trace-level logging
+[debug]
+level = "trace"

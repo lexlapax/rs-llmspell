@@ -6,8 +6,8 @@ pub mod factory;
 pub mod types;
 
 pub use bridge::{
-    EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata, ScriptOutput,
-    ScriptStream, SecurityContext,
+    ApiDependencies, EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata,
+    ScriptOutput, ScriptStream, SecurityContext,
 };
 
 pub use factory::{

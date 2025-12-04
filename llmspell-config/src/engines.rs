@@ -17,32 +17,22 @@ pub struct EngineConfigs {
 }
 
 /// Security/access level for script execution
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub enum SecurityLevel {
+    #[default]
     Safe,
     Privileged,
     Unrestricted,
 }
 
-impl Default for SecurityLevel {
-    fn default() -> Self {
-        Self::Safe
-    }
-}
-
 /// Standard library access level
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 pub enum StdlibLevel {
     None,
     Basic,
+    #[default]
     Standard,
     All,
-}
-
-impl Default for StdlibLevel {
-    fn default() -> Self {
-        Self::Standard
-    }
 }
 
 /// Lua engine configuration

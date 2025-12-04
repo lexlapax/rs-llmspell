@@ -9,17 +9,16 @@
 //!
 //! ```text
 //! MemoryManager
-//! ├── EpisodicMemory (vector search via HNSW/ChromaDB/Qdrant)
-//! ├── SemanticMemory (knowledge graph via SurrealDB/Neo4j)
+//! ├── EpisodicMemory (vector search via SQLite/PostgreSQL)
+//! ├── SemanticMemory (knowledge graph via PostgreSQL)
 //! └── ProceduralMemory (pattern storage)
 //! ```
 //!
 //! ## Hot-Swappable Storage Backends
 //!
 //! All memory types support multiple storage backends through trait abstraction:
-//! - HNSW (default, from llmspell-kernel)
-//! - `ChromaDB` (external service)
-//! - Qdrant (external service)
+//! - `SQLite` with vectorlite HNSW (default, persistent local storage)
+//! - `PostgreSQL` with pgvector (production, multi-tenant RLS)
 //! - `InMemory` (testing/development)
 //!
 //! ## Usage
@@ -61,7 +60,7 @@ pub mod types;
 
 // Re-exports for convenience
 pub use config::{EpisodicBackendType, MemoryConfig};
-pub use episodic::{EpisodicBackend, HNSWEpisodicMemory, InMemoryEpisodicMemory};
+pub use episodic::{EpisodicBackend, InMemoryEpisodicMemory};
 pub use error::{MemoryError, Result};
 pub use manager::DefaultMemoryManager;
 pub use procedural::{InMemoryPatternTracker, NoopProceduralMemory};

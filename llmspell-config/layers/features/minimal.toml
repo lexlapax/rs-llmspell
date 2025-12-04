@@ -1,0 +1,18 @@
+# Minimal Feature Layer
+# Basic tools and agents only - no LLM providers, no persistence
+
+[profile]
+name = "Minimal Features"
+description = "Core tools and agents without external dependencies"
+
+# Tools: Enabled but with no external access
+[tools]
+enabled = true
+
+[tools.file_operations]
+# File operations disabled for security
+allowed_paths = []
+
+[tools.web_search]
+# Web search disabled
+max_results = 0

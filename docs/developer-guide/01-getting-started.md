@@ -293,7 +293,7 @@ async fn test_my_feature() {
 ```
 1. This guide (01-getting-started.md)
 2. [03-extending-components.md](03-extending-components.md) → Part 5 (RAG)
-3. examples/script-users/getting-started/05-first-rag.lua
+3. examples/script-users/getting-started/05-memory-rag-advanced.lua
 4. examples/script-users/cookbook/rag-multi-tenant.lua
 5. Build RAG features
 ```
@@ -376,7 +376,7 @@ cargo doc --workspace --all-features --no-deps --open
 **Key Phase 13 Additions**:
 - 21 crates (not 18) - added llmspell-memory, llmspell-graph, llmspell-context
 - 3-tier memory system (episodic, semantic, procedural)
-- Hot-swappable backends (InMemory, HNSW, SurrealDB)
+- Hot-swappable backends (InMemory, HNSW via vectorlite-rs, SQLite/PostgreSQL graph)
 - <2ms memory overhead (50x faster than target)
 - 149 tests passing, zero warnings
 

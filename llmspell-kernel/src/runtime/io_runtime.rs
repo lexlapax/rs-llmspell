@@ -14,19 +14,18 @@
 //! share the same persistent runtime context.
 
 use metrics::{counter, gauge, histogram};
-use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::runtime::{Builder, Runtime};
 use tracing::{debug, info, instrument, trace, warn};
 
 /// Global IO runtime instance - the foundation of kernel stability
-static GLOBAL_IO_RUNTIME: OnceCell<Arc<Runtime>> = OnceCell::new();
+static GLOBAL_IO_RUNTIME: OnceLock<Arc<Runtime>> = OnceLock::new();
 
 /// Runtime metrics tracking
-static RUNTIME_METRICS: OnceCell<Arc<RuntimeMetrics>> = OnceCell::new();
+static RUNTIME_METRICS: OnceLock<Arc<RuntimeMetrics>> = OnceLock::new();
 
 /// Get the global IO runtime instance
 ///

@@ -1,337 +1,257 @@
-//! ABOUTME: Storage migration CLI commands
-//! ABOUTME: Provides plan-based migration workflow for storage backends
+//! Storage migration CLI commands for PostgreSQL ↔ SQLite data migration
 
 use crate::cli::OutputFormat;
 use anyhow::{anyhow, Context, Result};
 use llmspell_config::LLMSpellConfig;
-use llmspell_storage::backends::SledBackend;
-use llmspell_storage::migration::{
-    MigrationEngine, MigrationPlan, MigrationSource, MigrationTarget,
-};
-use llmspell_storage::traits::StorageBackend;
 use std::path::PathBuf;
 use std::sync::Arc;
-
-#[cfg(feature = "postgres")]
-use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig};
 
 /// Storage subcommands (imported from cli.rs)
 pub use crate::cli::{MigrateAction, StorageCommands};
 
+#[cfg(feature = "postgres")]
+use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig};
+#[cfg(feature = "postgres")]
+use llmspell_storage::export_import::PostgresExporter;
+#[cfg(feature = "postgres")]
+use llmspell_storage::export_import::PostgresImporter;
+
+use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig};
+use llmspell_storage::export_import::SqliteExporter;
+use llmspell_storage::export_import::SqliteImporter;
+
 /// Execute storage command
 pub async fn handle_storage_command(
     command: StorageCommands,
-    _config: LLMSpellConfig,
-    output_format: OutputFormat,
+    config: LLMSpellConfig,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     match command {
-        StorageCommands::Migrate { action } => handle_migrate(action, output_format).await,
-        StorageCommands::Info { backend } => handle_info(backend, output_format).await,
-        StorageCommands::Validate {
-            backend,
-            components,
-        } => handle_validate(backend, components, output_format).await,
+        StorageCommands::Export { backend, output } => {
+            handle_export(&backend, output, &config).await
+        }
+        StorageCommands::Import { backend, input } => handle_import(&backend, input, &config).await,
+        StorageCommands::Migrate { .. }
+        | StorageCommands::Info { .. }
+        | StorageCommands::Validate { .. } => Err(anyhow!(
+            "This storage command is not yet implemented.\n\
+                 \n\
+                 Available commands:\n\
+                 - export: Export data to JSON file\n\
+                 - import: Import data from JSON file"
+        )),
     }
 }
 
-/// Handle migrate commands
-async fn handle_migrate(action: MigrateAction, output_format: OutputFormat) -> Result<()> {
-    match action {
-        MigrateAction::Plan {
-            from,
-            to,
-            components,
-            output,
-        } => generate_plan(&from, &to, &components, &output, output_format).await,
+/// Handle export command
+async fn handle_export(backend: &str, output: PathBuf, config: &LLMSpellConfig) -> Result<()> {
+    println!(
+        "Exporting data from {} backend to {}...",
+        backend,
+        output.display()
+    );
 
-        MigrateAction::Execute { plan, dry_run } => {
-            execute_migration(&plan, dry_run, output_format).await
-        }
-    }
-}
+    match backend.to_lowercase().as_str() {
+        "sqlite" => {
+            // Use persistence path from config or default
+            let db_path = config
+                .rag
+                .vector_storage
+                .persistence_path
+                .clone()
+                .unwrap_or_else(|| PathBuf::from("./storage/llmspell.db"));
 
-/// Generate migration plan
-async fn generate_plan(
-    from: &str,
-    to: &str,
-    components: &str,
-    output: &PathBuf,
-    output_format: OutputFormat,
-) -> Result<()> {
-    // Parse components
-    let component_list: Vec<String> = components
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .collect();
+            let sqlite_config = SqliteConfig::new(db_path);
+            let backend = Arc::new(SqliteBackend::new(sqlite_config).await?);
+            let exporter = SqliteExporter::new(backend);
 
-    // Validate backends
-    if from != "sled" {
-        return Err(anyhow!(
-            "Phase 1: Only 'sled' is supported as source backend"
-        ));
-    }
-    if to != "postgres" {
-        return Err(anyhow!(
-            "Phase 1: Only 'postgres' is supported as target backend"
-        ));
-    }
+            println!("Starting export...");
+            let export_data = exporter.export_all().await?;
 
-    // Validate components (Phase 1)
-    for component in &component_list {
-        match component.as_str() {
-            "agent_state" | "workflow_state" | "sessions" => {}
-            _ => {
-                return Err(anyhow!(
-                    "Phase 1: Only agent_state, workflow_state, sessions are supported. Got: {}",
-                    component
-                ));
-            }
-        }
-    }
+            println!("Writing to file...");
+            let json = serde_json::to_string_pretty(&export_data)
+                .context("Failed to serialize export data")?;
+            std::fs::write(&output, json)
+                .with_context(|| format!("Failed to write to {}", output.display()))?;
 
-    // Create plan
-    let mut plan = MigrationPlan::new(from, to, component_list);
-
-    // Populate estimated counts from source
-    let source = create_source_backend(from)?;
-    for component in &mut plan.components {
-        let count = count_records(&*source, &component.name).await?;
-        component.estimated_count = count;
-    }
-
-    // Save plan
-    plan.save(output)
-        .with_context(|| format!("Failed to save migration plan to {:?}", output))?;
-
-    // Output result
-    match output_format {
-        OutputFormat::Json => {
-            let json = serde_json::json!({
-                "success": true,
-                "plan_file": output,
-                "components": plan.components.len(),
-                "estimated_records": plan.components.iter().map(|c| c.estimated_count).sum::<usize>(),
-            });
-            println!("{}", serde_json::to_string_pretty(&json)?);
-        }
-        OutputFormat::Text | OutputFormat::Pretty => {
-            println!("Migration plan generated: {:?}", output);
-            println!("\nPlan summary:");
             println!(
-                "  Source: {} → Target: {}",
-                plan.source.backend, plan.target.backend
+                "✅ Exported {} records to {}",
+                count_records(&export_data),
+                output.display()
             );
-            println!("  Components: {}", plan.components.len());
-            for component in &plan.components {
-                println!(
-                    "    - {}: {} records (batch size: {})",
-                    component.name, component.estimated_count, component.batch_size
-                );
-            }
-            println!("\nNext steps:");
-            println!("  1. Review plan: cat {:?}", output);
+            Ok(())
+        }
+        #[cfg(feature = "postgres")]
+        "postgres" | "postgresql" => {
+            // Get connection string from environment variable
+            let connection_string = std::env::var("DATABASE_URL")
+                .context("DATABASE_URL environment variable not set for PostgreSQL export")?;
+
+            let postgres_config = PostgresConfig::new(connection_string);
+            let backend = Arc::new(PostgresBackend::new(postgres_config).await?);
+            let exporter = PostgresExporter::new(backend);
+
+            println!("Starting export...");
+            let export_data = exporter.export_all().await?;
+
+            println!("Writing to file...");
+            let json = serde_json::to_string_pretty(&export_data)
+                .context("Failed to serialize export data")?;
+            std::fs::write(&output, json)
+                .with_context(|| format!("Failed to write to {}", output.display()))?;
+
             println!(
-                "  2. Dry-run: llmspell storage migrate execute --plan {:?} --dry-run",
-                output
+                "✅ Exported {} records to {}",
+                count_records(&export_data),
+                output.display()
             );
-            println!(
-                "  3. Execute: llmspell storage migrate execute --plan {:?}",
-                output
-            );
+            Ok(())
         }
-    }
-
-    Ok(())
-}
-
-/// Execute migration
-async fn execute_migration(
-    plan_path: &PathBuf,
-    dry_run: bool,
-    output_format: OutputFormat,
-) -> Result<()> {
-    // Load plan
-    let plan = MigrationPlan::from_file(plan_path)
-        .with_context(|| format!("Failed to load migration plan from {:?}", plan_path))?;
-
-    // Create source and target backends
-    let source = create_source_backend(&plan.source.backend)?;
-    let target = create_target_backend(&plan.target.backend).await?;
-
-    // Create migration engine
-    let engine = MigrationEngine::new(source, target, plan.clone());
-
-    // Execute migration
-    match output_format {
-        OutputFormat::Text | OutputFormat::Pretty => {
-            if dry_run {
-                println!("[DRY-RUN] Migration validation starting...");
-            } else {
-                println!("Migration starting...");
-            }
-        }
-        _ => {}
-    }
-
-    let report = engine
-        .execute(dry_run)
-        .await
-        .context("Migration execution failed")?;
-
-    // Output result
-    match output_format {
-        OutputFormat::Json => {
-            let json = serde_json::json!({
-                "success": report.success,
-                "dry_run": dry_run,
-                "components": report.components,
-                "source_count": report.source_count,
-                "target_count": report.target_count,
-                "duration_seconds": report.duration.num_seconds(),
-                "records_per_second": report.records_per_second,
-                "validation_results": report.validation_results,
-                "errors": report.errors,
-            });
-            println!("{}", serde_json::to_string_pretty(&json)?);
-        }
-        OutputFormat::Text | OutputFormat::Pretty => {
-            println!("\n{}", report.format());
-        }
-    }
-
-    if !report.success {
-        return Err(anyhow!("Migration failed"));
-    }
-
-    Ok(())
-}
-
-/// Handle info command
-async fn handle_info(backend: String, output_format: OutputFormat) -> Result<()> {
-    match backend.as_str() {
-        "sled" => {
-            let sled = SledBackend::new()?;
-            let chars = sled.characteristics();
-
-            match output_format {
-                OutputFormat::Json => {
-                    let json = serde_json::json!({
-                        "backend": "sled",
-                        "persistent": chars.persistent,
-                        "transactional": chars.transactional,
-                        "supports_prefix_scan": chars.supports_prefix_scan,
-                        "supports_atomic_ops": chars.supports_atomic_ops,
-                        "avg_read_latency_us": chars.avg_read_latency_us,
-                        "avg_write_latency_us": chars.avg_write_latency_us,
-                    });
-                    println!("{}", serde_json::to_string_pretty(&json)?);
-                }
-                OutputFormat::Text | OutputFormat::Pretty => {
-                    println!("Backend: Sled");
-                    println!("Persistent: {}", chars.persistent);
-                    println!("Transactional: {}", chars.transactional);
-                    println!("Prefix Scan: {}", chars.supports_prefix_scan);
-                    println!("Atomic Ops: {}", chars.supports_atomic_ops);
-                    println!("Read Latency: {}μs", chars.avg_read_latency_us);
-                    println!("Write Latency: {}μs", chars.avg_write_latency_us);
-                }
-            }
-        }
-        "postgres" => {
-            // TODO: Get connection string from config
-            return Err(anyhow!("PostgreSQL info requires configuration"));
-        }
-        _ => {
-            return Err(anyhow!("Unknown backend: {}", backend));
-        }
-    }
-
-    Ok(())
-}
-
-/// Handle validate command
-async fn handle_validate(
-    backend: String,
-    components: String,
-    output_format: OutputFormat,
-) -> Result<()> {
-    let component_list: Vec<String> = components
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .collect();
-
-    match backend.as_str() {
-        "sled" => {
-            let sled = SledBackend::new()?;
-            for component in component_list {
-                let count = count_records(&sled, &component).await?;
-                match output_format {
-                    OutputFormat::Json => {
-                        let json = serde_json::json!({
-                            "component": component,
-                            "count": count,
-                        });
-                        println!("{}", serde_json::to_string_pretty(&json)?);
-                    }
-                    OutputFormat::Text | OutputFormat::Pretty => {
-                        println!("{}: {} records", component, count);
-                    }
-                }
-            }
-        }
-        "postgres" => {
-            // TODO: PostgreSQL validation requires connection
-            return Err(anyhow!("PostgreSQL validation requires configuration"));
-        }
-        _ => {
-            return Err(anyhow!("Unknown backend: {}", backend));
-        }
-    }
-
-    Ok(())
-}
-
-/// Create source backend
-fn create_source_backend(backend: &str) -> Result<Arc<dyn MigrationSource>> {
-    match backend {
-        "sled" => {
-            let sled = SledBackend::new()?;
-            Ok(Arc::new(sled))
-        }
-        _ => Err(anyhow!("Unsupported source backend: {}", backend)),
+        #[cfg(not(feature = "postgres"))]
+        "postgres" | "postgresql" => Err(anyhow!(
+            "PostgreSQL support not enabled. Rebuild with --features postgres"
+        )),
+        _ => Err(anyhow!(
+            "Unknown backend: {}. Supported backends: sqlite, postgres",
+            backend
+        )),
     }
 }
 
-/// Create target backend
-#[cfg(feature = "postgres")]
-async fn create_target_backend(backend: &str) -> Result<Arc<dyn MigrationTarget>> {
-    match backend {
-        "postgres" => {
-            // Use default connection string for now
-            // TODO: Get from config
-            let connection_string =
-                "postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev";
-            let config = PostgresConfig::new(connection_string);
-            let postgres = PostgresBackend::new(config)
-                .await
-                .context("Failed to connect to PostgreSQL")?;
-            Ok(Arc::new(postgres))
+/// Handle import command
+async fn handle_import(backend: &str, input: PathBuf, config: &LLMSpellConfig) -> Result<()> {
+    println!(
+        "Importing data into {} backend from {}...",
+        backend,
+        input.display()
+    );
+
+    if !input.exists() {
+        return Err(anyhow!("Input file does not exist: {}", input.display()));
+    }
+
+    match backend.to_lowercase().as_str() {
+        "sqlite" => {
+            // Use persistence path from config or default
+            let db_path = config
+                .rag
+                .vector_storage
+                .persistence_path
+                .clone()
+                .unwrap_or_else(|| PathBuf::from("./storage/llmspell.db"));
+
+            let sqlite_config = SqliteConfig::new(db_path);
+            let backend = Arc::new(SqliteBackend::new(sqlite_config).await?);
+            let importer = SqliteImporter::new(backend);
+
+            println!("Reading JSON file...");
+            let stats = importer
+                .import_from_file(input.to_str().ok_or_else(|| anyhow!("Invalid file path"))?)
+                .await?;
+
+            println!("✅ Imported {} total records:", stats.total());
+            print_import_stats(&stats);
+            Ok(())
         }
-        _ => Err(anyhow!("Unsupported target backend: {}", backend)),
+        #[cfg(feature = "postgres")]
+        "postgres" | "postgresql" => {
+            // Get connection string from environment variable
+            let connection_string = std::env::var("DATABASE_URL")
+                .context("DATABASE_URL environment variable not set for PostgreSQL import")?;
+
+            let postgres_config = PostgresConfig::new(connection_string);
+            let backend = Arc::new(PostgresBackend::new(postgres_config).await?);
+            let importer = PostgresImporter::new(backend);
+
+            println!("Reading JSON file...");
+            let stats = importer
+                .import_from_file(input.to_str().ok_or_else(|| anyhow!("Invalid file path"))?)
+                .await?;
+
+            println!("✅ Imported {} total records:", stats.total());
+            print_import_stats(&stats);
+            Ok(())
+        }
+        #[cfg(not(feature = "postgres"))]
+        "postgres" | "postgresql" => Err(anyhow!(
+            "PostgreSQL support not enabled. Rebuild with --features postgres"
+        )),
+        _ => Err(anyhow!(
+            "Unknown backend: {}. Supported backends: sqlite, postgres",
+            backend
+        )),
     }
 }
 
-/// Create target backend (fallback when postgres feature not enabled)
-#[cfg(not(feature = "postgres"))]
-async fn create_target_backend(backend: &str) -> Result<Arc<dyn MigrationTarget>> {
-    Err(anyhow!(
-        "Target backend '{}' requires 'postgres' feature to be enabled. \
-         Please rebuild with --features postgres",
-        backend
-    ))
+/// Count total records in export data
+fn count_records(export: &llmspell_storage::export_import::ExportFormat) -> usize {
+    let mut total = 0;
+
+    // Count vector embeddings
+    for vectors in export.data.vector_embeddings.values() {
+        total += vectors.len();
+    }
+
+    // Count knowledge graph
+    if let Some(kg) = &export.data.knowledge_graph {
+        total += kg.entities.len();
+        total += kg.relationships.len();
+    }
+
+    // Count other components
+    total += export.data.procedural_memory.len();
+    total += export.data.agent_state.len();
+    total += export.data.kv_store.len();
+    total += export.data.workflow_states.len();
+    total += export.data.sessions.len();
+
+    if let Some(artifacts) = &export.data.artifacts {
+        total += artifacts.content.len();
+        total += artifacts.artifacts.len();
+    }
+
+    total += export.data.event_log.len();
+    total += export.data.hook_history.len();
+
+    total
 }
 
-/// Count records for a component
-async fn count_records(backend: &dyn MigrationSource, component: &str) -> Result<usize> {
-    backend.count(component).await
+/// Print import statistics
+fn print_import_stats(stats: &llmspell_storage::export_import::ImportStats) {
+    if stats.vectors > 0 {
+        println!("  - Vectors: {}", stats.vectors);
+    }
+    if stats.entities > 0 {
+        println!("  - Entities: {}", stats.entities);
+    }
+    if stats.relationships > 0 {
+        println!("  - Relationships: {}", stats.relationships);
+    }
+    if stats.patterns > 0 {
+        println!("  - Patterns: {}", stats.patterns);
+    }
+    if stats.agent_states > 0 {
+        println!("  - Agent States: {}", stats.agent_states);
+    }
+    if stats.kv_entries > 0 {
+        println!("  - KV Entries: {}", stats.kv_entries);
+    }
+    if stats.workflow_states > 0 {
+        println!("  - Workflow States: {}", stats.workflow_states);
+    }
+    if stats.sessions > 0 {
+        println!("  - Sessions: {}", stats.sessions);
+    }
+    if stats.artifact_content > 0 {
+        println!("  - Artifact Content: {}", stats.artifact_content);
+    }
+    if stats.artifacts > 0 {
+        println!("  - Artifacts: {}", stats.artifacts);
+    }
+    if stats.events > 0 {
+        println!("  - Events: {}", stats.events);
+    }
+    if stats.hooks > 0 {
+        println!("  - Hooks: {}", stats.hooks);
+    }
 }

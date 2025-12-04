@@ -1,11 +1,11 @@
 # Getting Started
 
-**Version**: 0.13.0
-**Time Required**: 10 minutes (or <5 minutes with AI Agent Templates!)
+**Version**: 0.13.x (Phase 13)
+**Time Required**: 15-30 minutes for complete 6-example path
 
-> **🚀 Quick Start**: Get LLMSpell kernel running in under 5 minutes with this focused guide. **NEW in Phase 12**: Use experimental workflows for rapid exploration AI workflow templates for instant productivity!
+> **🚀 Quick Start**: Get LLMSpell running with builtin profiles - no configuration files needed! Phase 13 features: adaptive memory, context engineering, 21 preset profiles, and comprehensive example validation.
 
-**🔗 Navigation**: [← User Guide](README.md) | [Core Concepts →](concepts.md) | [Service Deployment →](service-deployment.md)
+**🔗 Navigation**: [← User Guide](README.md) | [Core Concepts →](02-core-concepts.md) | [Profile Guide →](profile-layers-guide.md)
 
 ---
 
@@ -34,14 +34,14 @@ export LLMSPELL_TOOLS_ALLOWED_PATHS="/tmp,/workspace"
 # See docs/user-guide/security-and-permissions.md for production security
 
 # Verify installation
-./target/release/llmspell exec 'print("LLMSpell " .. tostring(_G._VERSION or "0.8.10") .. " ready!")'
+./target/release/llmspell exec 'print("LLMSpell ready!")'
 ```
 
 ## First Script
 
 ### Option 1: One-liner (Basic)
 ```bash
-./target/release/llmspell exec 'print("Hello from LLMSpell Phase 8.10.6!")'
+./target/release/llmspell exec 'print("Hello from LLMSpell!")'
 ```
 
 ### Option 2: Agent One-liner (Requires API key)
@@ -107,7 +107,7 @@ Run it:
 
 ## Core Patterns
 
-### 1. Creating Agents (Phase 8.10.6)
+### 1. Creating Agents
 ```lua
 -- New pattern with explicit error handling
 local agent_result = Agent.builder()
@@ -137,7 +137,7 @@ local result = Tool.execute("file-operations", {
 
 -- Web search
 local search = Tool.execute("web-search", {
-    query = "LLMSpell Phase 8",
+    query = "LLMSpell",
     provider = "duckduckgo"
 })
 ```
@@ -189,7 +189,7 @@ local result = workflow:execute({})
 
 ### 5. Managing State (Scoped)
 ```lua
--- State requires scope parameter in Phase 8.10.6
+-- State requires scope parameter
 State.save("global", "counter", 0)
 State.save("user", "preferences", {theme = "dark"})
 
@@ -334,38 +334,37 @@ launchctl start com.llmspell.kernel     # macOS
 ./target/release/llmspell template search "research"
 ```
 
-## Progressive Learning Path
+## Progressive Learning Path (6 Examples)
 
-Follow the getting-started examples in order for best results:
+Follow the getting-started examples in order. Use **builtin profiles** - no config files needed:
 
 ```bash
-# 1. Hello World (2 seconds)
-./target/release/llmspell run examples/script-users/getting-started/00-hello-world.lua
+# 1. Hello World (2 min) - Profile: minimal (no LLM needed)
+./target/release/llmspell -p minimal run examples/script-users/getting-started/00-hello-world.lua
 
-# 2. First Tool (5 seconds) 
-./target/release/llmspell run examples/script-users/getting-started/01-first-tool.lua
+# 2. First Tool (3 min) - Profile: minimal
+./target/release/llmspell -p minimal run examples/script-users/getting-started/01-first-tool.lua
 
-# 3. First Agent (10 seconds, needs config)
-./target/release/llmspell -c examples/script-users/configs/example-providers.toml \
-  run examples/script-users/getting-started/02-first-agent.lua
+# 3. First Agent (5 min) - Profile: providers (requires API key)
+export OPENAI_API_KEY="sk-..."  # or ANTHROPIC_API_KEY
+./target/release/llmspell -p providers run examples/script-users/getting-started/02-first-agent.lua
 
-# 4. First Workflow (20 seconds)
-./target/release/llmspell run examples/script-users/getting-started/03-first-workflow.lua
+# 4. First Workflow (5 min) - Profile: providers
+./target/release/llmspell -p providers run examples/script-users/getting-started/03-first-workflow.lua
 
-# 5. Error Handling (5 seconds)
-./target/release/llmspell run examples/script-users/getting-started/04-handle-errors.lua
+# 5. Error Handling (5 min) - Profile: state
+./target/release/llmspell -p state run examples/script-users/getting-started/04-handle-errors.lua
 
-# 6. First RAG System (15 seconds, needs RAG config)
-./target/release/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/getting-started/05-first-rag.lua
-
-# 7. First Template ⭐ **Phase 12** (5 seconds)
-./target/release/llmspell template exec code-generator \
-    --param description="A function to reverse a string" \
-    --param language="lua" \
-    --param model="openai/gpt-4o-mini" \
-    --output text
+# 6. Memory & RAG (10 min) - Profile: memory (Phase 13 features)
+./target/release/llmspell -p memory run examples/script-users/getting-started/05-memory-rag-advanced.lua
 ```
+
+**Profile Quick Reference**:
+- `minimal` - Tools only, no LLM providers (fastest startup)
+- `providers` - OpenAI/Anthropic providers (requires API keys)
+- `state` - State persistence enabled
+- `memory` - Phase 13 memory system + RAG
+- See all 21 profiles: [Profile Guide](profile-layers-guide.md)
 
 ## Quick Examples
 
@@ -484,16 +483,16 @@ end
 ## What's Next?
 
 ### Immediate Next Steps
-1. **Try the 7 progressive examples** → `examples/script-users/getting-started/` (including templates!)
-2. **Explore templates** → Run `./target/release/llmspell template list` to see 10 built-in workflows
-3. **Configure your providers** → [Configuration Guide](configuration.md)
-4. **Set up RAG (Phase 8.10.6)** → Use `configs/rag-basic.toml`
+1. **Complete the 6 progressive examples** → `examples/script-users/getting-started/`
+2. **Explore profiles** → See [Profile Guide](profile-layers-guide.md) for all 21 presets
+3. **Try templates** → Run `./target/release/llmspell template list` to see 10 built-in workflows
+4. **Configure providers** → [Configuration Guide](03-configuration.md)
 
 ### Deeper Learning
-5. **Understand the architecture** → [Core Concepts](concepts.md) (RAG, HNSW, Multi-tenancy, Templates)
-6. **Template documentation** → [Template User Guide](templates/) (10 experimental workflows for rapid exploration workflows)
-7. **Production patterns** → [Cookbook](../../examples/script-users/cookbook/) (11 examples)
-8. **Real applications** → [Applications](../../examples/script-users/applications/) (9 complete apps)
+5. **Understand the architecture** → [Core Concepts](02-core-concepts.md) (Memory, RAG, Context, Templates)
+6. **Template documentation** → [Template User Guide](templates/) (10 experimental workflows)
+7. **Production patterns** → [Cookbook](../../examples/script-users/cookbook/) (16 examples)
+8. **Real applications** → [Applications](../../examples/script-users/applications/) (11 complete apps)
 9. **Complete API reference** → [Lua API](appendix/lua-api-reference.md) (18 globals including Template)
 
 ### Advanced Topics
@@ -588,11 +587,11 @@ let runtime = ScriptRuntime::new(config)
 - **Global IO runtime**: Fixes "dispatch task is gone" errors automatically
 - **Signal handling**: SIGTERM (shutdown), SIGHUP (reload), SIGUSR1 (stats)
 
-### Phase 8 RAG Features
-- **RAG requires OpenAI**: Set up OpenAI provider for embedding generation
-- **Vector dimensions**: Default 384, supports 768, 1536, 3072
-- **HNSW performance**: <10ms search for 1M vectors with proper configuration
-- **Multi-tenancy**: Use `multi_tenant = true` in config for isolation
+### Phase 13 Memory & RAG Features
+- **Adaptive Memory**: 3-tier memory system (episodic, semantic, procedural)
+- **Context Engineering**: Strategy-based context assembly
+- **RAG Integration**: HNSW vector search with <10ms for 1M vectors
+- **21 Preset Profiles**: Use `-p memory` or `-p rag-dev` for quick setup
 
 ### Phase 12 Template Features
 - **10 built-in templates**: Instant productivity from day 0 with experimental workflows for rapid exploration workflows
@@ -611,17 +610,17 @@ let runtime = ScriptRuntime::new(config)
 ## Quick Start Checklist
 
 - [ ] ✅ Install Rust and build LLMSpell (`cargo build --release`)
-- [ ] 🔑 Set up OpenAI API key (`export OPENAI_API_KEY="sk-..."`)
-- [ ] 📂 Try hello world (`./target/release/llmspell exec 'print("Hello!")'`)
-- [ ] 🤖 Create first agent with config file
-- [ ] 📋 Try first template (`./target/release/llmspell template exec code-generator --param...`)
-- [ ] 📚 Try RAG example with `rag-basic.toml`
+- [ ] 🔑 Set up API key (`export OPENAI_API_KEY="sk-..."` or `ANTHROPIC_API_KEY`)
+- [ ] 📂 Try hello world (`./target/release/llmspell -p minimal run examples/script-users/getting-started/00-hello-world.lua`)
+- [ ] 🤖 Create first agent (`-p providers` profile)
+- [ ] 🧠 Try memory & RAG (`-p memory` profile)
 - [ ] 🛠️ Explore 40+ tools with `Tool.list()`
 - [ ] 📝 Explore 10 templates with `Template.list()`
 - [ ] 🔄 Build your first workflow
-- [ ] 📖 Read [Core Concepts](concepts.md) to understand RAG, HNSW, and Templates
+- [ ] 📖 Read [Core Concepts](02-core-concepts.md) to understand Memory, RAG, and Templates
+- [ ] 📚 See [Profile Guide](profile-layers-guide.md) for all 21 preset profiles
 
-**Phase 12 Ready!** Production-ready AI workflow templates for instant productivity from day 0.
+**Phase 13 Ready!** Adaptive memory, context engineering, and 21 preset profiles for rapid AI experimentation.
 
 ---
 

@@ -1,0 +1,5 @@
+# Ollama Preset - Local models via Ollama
+[profile]
+name = "Ollama"
+description = "Local LLM serving with Ollama"
+extends = ["bases/cli", "features/llm-local", "envs/dev", "backends/memory"]

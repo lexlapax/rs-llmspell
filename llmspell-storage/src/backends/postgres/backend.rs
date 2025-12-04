@@ -233,7 +233,7 @@ impl TenantScoped for PostgresBackend {
     ///
     /// # Implementation Notes
     /// - Calls internal `set_tenant_context()` which updates both:
-    ///   1. Internal Rust state (Arc<RwLock<Option<String>>>)
+    ///   1. Internal Rust state (`Arc<RwLock<Option<String>>>`)
     ///   2. PostgreSQL session variable (`app.current_tenant_id`)
     /// - The scope parameter is ignored because PostgreSQL RLS operates at session scope
     /// - All subsequent `get_client()` calls will apply this tenant context
@@ -254,7 +254,7 @@ impl TenantScoped for PostgresBackend {
 // =============================================================================
 
 #[async_trait::async_trait]
-impl crate::traits::StorageBackend for PostgresBackend {
+impl crate::StorageBackend for PostgresBackend {
     async fn get(&self, key: &str) -> anyhow::Result<Option<Vec<u8>>> {
         // Route based on key pattern (4-way routing)
         if key.starts_with("agent:") {
@@ -455,12 +455,12 @@ impl crate::traits::StorageBackend for PostgresBackend {
         Ok(())
     }
 
-    fn backend_type(&self) -> crate::traits::StorageBackendType {
-        crate::traits::StorageBackendType::Postgres
+    fn backend_type(&self) -> crate::StorageBackendType {
+        crate::StorageBackendType::Postgres
     }
 
-    fn characteristics(&self) -> crate::traits::StorageCharacteristics {
-        crate::traits::StorageCharacteristics {
+    fn characteristics(&self) -> crate::StorageCharacteristics {
+        crate::StorageCharacteristics {
             persistent: true,
             transactional: true,
             supports_prefix_scan: true,
@@ -468,6 +468,16 @@ impl crate::traits::StorageBackend for PostgresBackend {
             avg_read_latency_us: 2000,  // ~2ms for network + query
             avg_write_latency_us: 3000, // ~3ms for network + query + fsync
         }
+    }
+
+    async fn run_migrations(&self) -> anyhow::Result<()> {
+        // Delegate to existing run_migrations method in migrations.rs
+        PostgresBackend::run_migrations(self).await
+    }
+
+    async fn migration_version(&self) -> anyhow::Result<usize> {
+        // Delegate to existing migration_version method in migrations.rs
+        PostgresBackend::migration_version(self).await
     }
 }
 

@@ -1,8 +1,14 @@
+-- Profile: minimal
+-- Run with: llmspell -p development run error-handling.lua
+-- Development environment with debug logging
+
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 01 - Error Handling Patterns v0.7.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: Enterprise-grade error handling for resilient automation
 -- Pattern Category: Error Handling & Recovery
 --

@@ -1,3 +1,7 @@
+-- Recommended profile: minimal
+-- Run with: llmspell -p minimal run minimal-input.lua
+-- Input file (no execution profile needed)
+
 -- WebApp Creator Minimal Input Example
 -- This demonstrates the minimum required configuration for WebApp Creator
 -- Use this as a starting template for simple applications

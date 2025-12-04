@@ -1,0 +1,44 @@
+# Embedded Base Layer
+# Library/programmatic integration for embedding in applications
+
+[profile]
+name = "Embedded Base"
+description = "Embedded library usage with minimal footprint"
+
+# Moderate concurrency for library usage
+[runtime]
+max_concurrent_scripts = 10
+script_timeout_seconds = 120  # 2 minutes
+enable_streaming = false
+
+# Security: Restricted, delegate to host application
+[runtime.security]
+allow_file_access = false
+allow_network_access = false
+allow_process_spawn = false
+
+# State: Delegate to host application
+[runtime.state_persistence]
+enabled = false
+
+# Sessions: Disabled, host manages state
+[runtime.sessions]
+enabled = false
+
+# Memory: Disabled in embedded mode
+[runtime.memory]
+enabled = false
+
+# Debug: Minimal logging, warn level only
+[debug]
+enabled = true
+level = "warn"
+
+[debug.output]
+stdout = true
+colored = false
+format = "text"
+
+# Events: Disabled, host can subscribe via callbacks
+[events]
+enabled = false

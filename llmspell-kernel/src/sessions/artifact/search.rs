@@ -9,9 +9,10 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
 /// Sort order for search results
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SortOrder {
     /// Sort by creation date (newest first)
+    #[default]
     DateDesc,
     /// Sort by creation date (oldest first)
     DateAsc,
@@ -25,12 +26,6 @@ pub enum SortOrder {
     SizeAsc,
     /// Sort by type then name
     TypeThenName,
-}
-
-impl Default for SortOrder {
-    fn default() -> Self {
-        Self::DateDesc
-    }
 }
 
 /// Extended artifact query with sorting and pagination

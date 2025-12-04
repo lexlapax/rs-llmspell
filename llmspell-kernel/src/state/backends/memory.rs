@@ -3,7 +3,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use llmspell_storage::{StorageBackend, StorageBackendType, StorageCharacteristics};
+use llmspell_core::traits::storage::StorageBackend;
+use llmspell_core::types::storage::{StorageBackendType, StorageCharacteristics};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -111,6 +112,16 @@ impl StorageBackend for MemoryBackend {
             avg_read_latency_us: 1,
             avg_write_latency_us: 1,
         }
+    }
+
+    async fn run_migrations(&self) -> Result<()> {
+        // No migrations needed for in-memory backend
+        Ok(())
+    }
+
+    async fn migration_version(&self) -> Result<usize> {
+        // No migrations for in-memory backend
+        Ok(0)
     }
 }
 

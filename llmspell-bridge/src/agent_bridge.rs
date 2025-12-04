@@ -28,10 +28,11 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
 /// Routing strategy for composite agents
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum RoutingStrategy {
     /// Execute delegate agents sequentially
+    #[default]
     Sequential,
     /// Execute delegate agents in parallel
     Parallel,
@@ -46,12 +47,6 @@ pub enum RoutingStrategy {
         /// Name of the custom strategy
         name: String,
     },
-}
-
-impl Default for RoutingStrategy {
-    fn default() -> Self {
-        Self::Sequential
-    }
 }
 
 /// Configuration for composite agent routing
@@ -342,11 +337,11 @@ impl AgentBridge {
         // Register in active agents, state machines, and component registry
         {
             let mut agents = self.active_agents.write().await;
-            agents.insert(instance_name.to_string(), agent.clone());
+            agents.insert(instance_name.clone(), agent.clone());
         }
         {
             let mut machines = self.state_machines.write().await;
-            machines.insert(instance_name.to_string(), state_machine);
+            machines.insert(instance_name.clone(), state_machine);
         }
 
         // Also register in component registry for script access
@@ -354,8 +349,7 @@ impl AgentBridge {
             "DEBUG: Registering agent '{}' in ComponentRegistry",
             instance_name
         );
-        self.registry
-            .register_agent(instance_name.to_string(), agent)?;
+        self.registry.register_agent(instance_name.clone(), agent)?;
         info!(
             "DEBUG: Successfully registered agent '{}' in ComponentRegistry",
             instance_name

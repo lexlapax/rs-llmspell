@@ -13,7 +13,6 @@ rate-limiting-http = ["reqwest"]
 [dependencies]
 # Async runtime
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }
 
@@ -39,7 +38,6 @@ path-clean = { workspace = true }
 walkdir = { workspace = true }
 
 # Concurrency primitives
-crossbeam = { workspace = true }
 parking_lot = { workspace = true }
 dashmap = { workspace = true }
 
@@ -62,7 +60,6 @@ regex = "1.10"
 
 # HTML escaping
 html-escape = "0.2"
-lazy_static = "1.5"
 
 # JSON schema validation
 jsonschema = { workspace = true }
@@ -77,17 +74,11 @@ tempfile = "3.13"
 # URL parsing
 url = "2.5"
 
-# Once cell for lazy statics
-once_cell = "1.20"
-
 # Security - memory scrubbing
 zeroize = { version = "1.8", features = ["derive"] }
 
 # Core types
 llmspell-core = { path = "../llmspell-core" }
-
-# Database for persistent storage
-sled = { workspace = true }
 
 # HTTP client for rate limiting headers (optional)
 reqwest = { workspace = true, optional = true }

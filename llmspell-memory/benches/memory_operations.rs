@@ -162,13 +162,11 @@ fn semantic_query_benchmark(c: &mut Criterion) {
 
     let rt = Runtime::new().unwrap();
     let memory_manager = rt.block_on(async {
-        let mm = DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager");
-
         // Preload semantic entities (simulated)
         // Note: Requires SemanticMemory.add() method
-        mm
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
     });
     let memory_manager = Arc::new(memory_manager);
 
@@ -296,7 +294,7 @@ fn backend_comparison_search_benchmark(c: &mut Criterion) {
         group.bench_function("InMemory", |b| {
             let mm = rt.block_on(async {
                 let config = MemoryConfig::for_testing();
-                let mm = DefaultMemoryManager::with_config(config).await.unwrap();
+                let mm = DefaultMemoryManager::with_config(&config).await.unwrap();
 
                 // Preload entries
                 for i in 0..dataset_size {
@@ -326,7 +324,7 @@ fn backend_comparison_search_benchmark(c: &mut Criterion) {
         group.bench_function("HNSW", |b| {
             let mm = rt.block_on(async {
                 let config = MemoryConfig::for_production(Arc::clone(&embedding_service));
-                let mm = DefaultMemoryManager::with_config(config).await.unwrap();
+                let mm = DefaultMemoryManager::with_config(&config).await.unwrap();
 
                 // Preload entries
                 for i in 0..dataset_size {

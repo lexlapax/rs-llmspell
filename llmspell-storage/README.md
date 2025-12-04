@@ -6,7 +6,6 @@ Storage backends and persistence for rs-llmspell, including vector storage for R
 
 ### Key-Value Storage
 - **MemoryBackend**: In-memory storage for testing and temporary data
-- **SledBackend**: Embedded database for persistent local storage
 - Trait-based storage abstraction for easy backend switching
 
 ### Vector Storage (Phase 8 - Production RAG)
@@ -24,7 +23,8 @@ Storage backends and persistence for rs-llmspell, including vector storage for R
 
 ### Key-Value Storage
 ```rust
-use llmspell_storage::{MemoryBackend, StorageBackend};
+use llmspell_storage::MemoryBackend;
+use llmspell_core::traits::storage::StorageBackend;
 use serde_json::json;
 
 let backend = MemoryBackend::new();
@@ -34,19 +34,15 @@ backend.set("user:123", serde_json::to_vec(&value)?).await?;
 
 ### Vector Storage (Production RAG)
 ```rust
-use llmspell_storage::{
-    VectorEntry, VectorQuery, HNSWVectorStorage, HNSWConfig, DistanceMetric
-};
-use llmspell_state_traits::StateScope;
-use std::collections::HashMap;
+use llmspell_storage::backends::sqlite::{SqliteVectorStorage, SqliteConfig};
+use std::sync::Arc;
 
-// Create production-optimized HNSW storage
-let config = HNSWConfig::production()  // Preset for production workloads
-    .with_distance_metric(DistanceMetric::Cosine)
-    .with_max_connections(16)
-    .with_ef_construction(200);
+// Create SQLite vector storage with vectorlite-rs pure Rust HNSW extension
+let config = SqliteConfig::new("./data/vectors.db")
+    .with_max_connections(20);
 
-let storage = HNSWVectorStorage::new(1536, config);  // OpenAI ada-002 dimensions
+let backend = Arc::new(SqliteBackend::new(config).await?);
+let storage = SqliteVectorStorage::new(backend, "main".to_string())?;  // tenant_id "main"
 
 // Multi-tenant document ingestion
 let mut metadata = HashMap::new();
@@ -174,11 +170,6 @@ This temporal model is essential for Phase 9's Adaptive Memory System, enabling:
 - Memory: All data in RAM
 - Persistence: None
 
-### SledBackend  
-- Read/Write: O(log n), <100μs/1ms
-- Memory: Configurable cache
-- Persistence: ACID compliant
-
 ### HNSW Vector Storage (Phase 8)
 - **Insert**: O(log n), <10ms for 1M vectors, 2-5ms typical for 100K vectors
 - **Search**: O(log n), <10ms for 1M vectors, 1-3ms typical for 100K vectors
@@ -192,7 +183,6 @@ This temporal model is essential for Phase 9's Adaptive Memory System, enabling:
 ## Dependencies
 - `llmspell-core` - Core traits and types
 - `llmspell-state-traits` - State scope definitions and multi-tenant isolation
-- `sled` - Embedded key-value database for persistence
 - `dashmap` - Lock-free concurrent hashmaps for high-performance operations
 - `parking_lot` - Low-overhead synchronization primitives
 - `uuid` - Unique identifiers for vectors and tenants
@@ -205,11 +195,8 @@ This temporal model is essential for Phase 9's Adaptive Memory System, enabling:
 llmspell-storage
 ├── backends/
 │   ├── memory.rs           # In-memory key-value storage
-│   ├── sled_backend.rs     # Persistent key-value storage
-│   └── vector/
-│       ├── hnsw.rs         # HNSW implementation with multi-tenant support
-│       ├── dimension_router.rs # Multi-dimensional embedding routing
-│       └── metadata_index.rs   # Inverted index for metadata filtering
+│   └── sqlite/
+│       └── vector.rs       # SQLite + vectorlite-rs HNSW implementation
 ├── vector_storage.rs       # VectorStorage trait with async operations
 └── traits.rs              # Storage backend abstractions
 ```

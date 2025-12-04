@@ -17,6 +17,7 @@ serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 rig-core.workspace = true
+reqwest = { version = "0.12", default-features = false }  # For rig-core 0.23 Ollama type parameter
 ollama-rs = "0.3.2"
 url = "2"
 chrono.workspace = true
@@ -27,6 +28,8 @@ tokenizers.workspace = true
 parking_lot.workspace = true
 rand.workspace = true
 dirs = "5.0"
+# Phase 13c.1.7: ureq kept (used in hf_downloader.rs for synchronous HuggingFace model downloads)
+# Reason: Candle model loading is sync, reqwest is async - using ureq avoids blocking executor
 ureq = "2.12"
 
 # Platform-specific dependencies for GPU support

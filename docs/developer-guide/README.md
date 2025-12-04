@@ -130,7 +130,7 @@
 Consolidated guides covering multiple crates by topic:
 
 1. **[Core Traits & Foundation](reference/core-traits.md)** - BaseAgent, ExecutionContext, testing framework
-2. **[Storage Backends](reference/storage-backends.md)** - Vector storage, HNSW, backends
+2. **[Storage Backends](reference/storage-backends.md)** - Vector storage, HNSW, backends, **export/import API (Phase 13c.3.2)**
 3. **[RAG Pipeline & Context Engineering](reference/rag-pipeline.md)** - Document ingestion, retrieval, knowledge graph
 4. **[Memory Backends](reference/memory-backends.md)** - Episodic, semantic, procedural memory systems
 5. **[Security & Multi-Tenancy](reference/security-integration.md)** - Access control, sandboxing, tenant isolation
@@ -151,8 +151,8 @@ cargo doc --package llmspell-core --all-features --open
 ## 🆕 What's New in Phase 13
 
 ### Experimental Memory & Context Engineering (Complete) ⭐
-- **3-Tier Memory System**: Episodic (HNSW), Semantic (SurrealDB), Procedural (patterns)
-- **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SurrealDB (bi-temporal graph)
+- **3-Tier Memory System**: Episodic (HNSW), Semantic (SQLite/PostgreSQL graph), Procedural (patterns)
+- **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SQLite/PostgreSQL (bi-temporal graph)
 - **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
 - **<2ms Memory Overhead**: 50x faster than target, production-quality validation at scale
 - **149 Tests**: 100% pass rate, zero warnings, comprehensive validation
@@ -238,7 +238,7 @@ cargo build --release                       # Minimal (19MB, core only)
 ```
 1. 01-getting-started.md → Architecture
 2. 03-extending-components.md → Part 5 (RAG)
-3. examples/script-users/getting-started/05-first-rag.lua
+3. examples/script-users/getting-started/05-memory-rag-advanced.lua
 4. examples/script-users/cookbook/rag-multi-tenant.lua
 5. Build RAG features
 ```
@@ -353,7 +353,7 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 
 ### Phase 13 (✅ Complete)
 - 3-Tier Memory System (Episodic, Semantic, Procedural)
-- Hot-Swappable Backends (InMemory, HNSW, SurrealDB)
+- Hot-Swappable Backends (InMemory, HNSW via vectorlite-rs, SQLite/PostgreSQL graph)
 - Context Engineering (4 strategies with parallel retrieval)
 - <2ms Memory Overhead (50x faster than target)
 

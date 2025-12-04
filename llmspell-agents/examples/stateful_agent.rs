@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
     // Create state manager with persistent storage
     let state_manager = Arc::new(
         StateManager::with_backend(
-            StorageBackendType::Memory, // Use Memory for example, could be Sled or RocksDB
+            StorageBackendType::Memory, // Use Memory for example, could be SQLite or Postgres
             PersistenceConfig {
                 enabled: true,
                 backend_type: StorageBackendType::Memory,

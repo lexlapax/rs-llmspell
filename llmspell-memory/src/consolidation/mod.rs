@@ -17,14 +17,13 @@
 //! use llmspell_memory::consolidation::{ManualConsolidationEngine, ConsolidationEngine};
 //! use llmspell_memory::types::EpisodicEntry;
 //! use llmspell_graph::extraction::RegexExtractor;
-//! use llmspell_graph::storage::surrealdb::SurrealDBBackend;
-//! use tempfile::TempDir;
+//! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 //!
 //! #[tokio::main]
 //! async fn main() -> llmspell_memory::Result<()> {
-//!     let temp = TempDir::new().unwrap();
+//!     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.unwrap());
 //!     let extractor = Arc::new(RegexExtractor::new());
-//!     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+//!     let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
 //!     let engine = ManualConsolidationEngine::new(extractor, graph);
 //!
 //!     let mut entries = vec![EpisodicEntry::new("session-123".into(), "user".into(), "test".into())];
@@ -93,14 +92,13 @@ pub trait ConsolidationEngine: Send + Sync {
     /// use llmspell_memory::consolidation::{ConsolidationEngine, ManualConsolidationEngine};
     /// use llmspell_memory::types::EpisodicEntry;
     /// use llmspell_graph::extraction::RegexExtractor;
-    /// use llmspell_graph::storage::surrealdb::SurrealDBBackend;
-    /// use tempfile::TempDir;
+    /// use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
     ///
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
-    ///     let temp = TempDir::new().unwrap();
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.unwrap());
     ///     let extractor = Arc::new(RegexExtractor::new());
-    ///     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+    ///     let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
     ///     let engine = ManualConsolidationEngine::new(extractor, graph);
     ///
     ///     let mut entries = vec![EpisodicEntry::new("session-123".into(), "user".into(), "test".into())];

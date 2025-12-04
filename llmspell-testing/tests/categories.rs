@@ -6,9 +6,9 @@
 //! This module provides predefined test categories that can be used
 //! across the test suite for consistent categorization.
 
-use lazy_static::lazy_static;
 use llmspell_testing::attributes::*;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 /// Predefined category for basic unit tests
 pub fn unit_test_category() -> TestCategory {
@@ -96,31 +96,29 @@ pub fn llm_test_category(provider: &str) -> TestCategory {
         .with_stability(Stability::Flaky)
 }
 
-lazy_static! {
-    /// Registry of all test categories
-    pub static ref CATEGORY_REGISTRY: HashMap<&'static str, TestCategory> = {
-        let mut registry = HashMap::new();
+/// Registry of all test categories
+static CATEGORY_REGISTRY: LazyLock<HashMap<&'static str, TestCategory>> = LazyLock::new(|| {
+    let mut registry = HashMap::new();
 
-        // Basic categories
-        registry.insert("unit", unit_test_category());
-        registry.insert("integration", integration_test_category());
-        registry.insert("e2e", e2e_test_category());
+    // Basic categories
+    registry.insert("unit", unit_test_category());
+    registry.insert("integration", integration_test_category());
+    registry.insert("e2e", e2e_test_category());
 
-        // Component categories
-        registry.insert("agent", agent_test_category());
-        registry.insert("tool", tool_test_category());
-        registry.insert("workflow", workflow_test_category());
-        registry.insert("lua", lua_test_category());
-        registry.insert("state", state_test_category());
-        registry.insert("security", security_test_category());
+    // Component categories
+    registry.insert("agent", agent_test_category());
+    registry.insert("tool", tool_test_category());
+    registry.insert("workflow", workflow_test_category());
+    registry.insert("lua", lua_test_category());
+    registry.insert("state", state_test_category());
+    registry.insert("security", security_test_category());
 
-        // Special categories
-        registry.insert("performance", performance_test_category());
-        registry.insert("network", network_test_category());
+    // Special categories
+    registry.insert("performance", performance_test_category());
+    registry.insert("network", network_test_category());
 
-        registry
-    };
-}
+    registry
+});
 
 /// Get a category by name
 pub fn get_category(name: &str) -> Option<&TestCategory> {

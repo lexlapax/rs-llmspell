@@ -12,8 +12,9 @@
 //! # Available Backends
 //!
 //! - **MemoryBackend**: In-memory storage for testing and temporary data
-//! - **SledBackend**: Embedded database for persistent local storage
-//! - **Vector Storage**: HNSW-based vector storage with dimension routing and metadata filtering
+//! - **PostgresBackend**: PostgreSQL for production multi-tenancy (Phase 13b.2)
+//! - **SqliteBackend**: SQLite/libsql for embedded production storage (Phase 13c.2)
+//! - **Vector Storage**: vectorlite-rs HNSW via SQLite extension (Phase 13c.2.2a)
 //! - Custom backends can be implemented via the `StorageBackend` trait
 //!
 //! # Examples
@@ -21,7 +22,8 @@
 //! ## Using Memory Backend
 //!
 //! ```
-//! use llmspell_storage::{MemoryBackend, StorageBackend};
+//! use llmspell_storage::MemoryBackend;
+//! use llmspell_core::traits::storage::StorageBackend;
 //! use serde_json::json;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -41,18 +43,21 @@
 //! # }
 //! ```
 //!
-//! ## Using Sled Backend
+//! ## Using SQLite Backend
 //!
-//! ```no_run
-//! use llmspell_storage::{SledBackend, StorageBackend};
+//! ```ignore
+//! # // Note: SqliteBackend does not implement StorageBackend directly
+//! # // Use domain-specific storage types (SqliteVectorStorage, SqliteGraphStorage, etc.)
+//! # #[cfg(feature = "sqlite")]
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig};
 //! use serde_json::json;
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let backend = SledBackend::new_with_path("./data/storage")?;
+//! let config = SqliteConfig::new("./data/storage.db");
+//! let backend = SqliteBackend::new(config).await?;
 //!
-//! // Data persists across restarts
-//! let value = json!({"version": "1.0"});
-//! backend.set("config:app", serde_json::to_vec(&value)?).await?;
+//! // Use domain-specific storage types built on top of SqliteBackend
+//! // See SqliteVectorStorage, SqliteGraphStorage, SqliteArtifactStorage examples
 //! # Ok(())
 //! # }
 //! ```
@@ -66,45 +71,59 @@
 //! - **Persistence**: None (data lost on restart)
 //! - **Use Case**: Testing, caching, temporary data
 //!
-//! ## SledBackend
-//! - **Read**: O(log n), <100μs for most operations
-//! - **Write**: O(log n), <1ms with fsync
-//! - **Memory**: Configurable cache, defaults to 1GB
-//! - **Persistence**: ACID compliant, crash-safe
-//! - **Use Case**: Production embedded database
+//! ## SqliteBackend
+//! - **Read**: O(log n), <50μs for indexed operations
+//! - **Write**: O(log n), <500μs with WAL mode
+//! - **Memory**: Configurable cache, defaults to OS page cache
+//! - **Persistence**: ACID compliant, crash-safe with WAL
+//! - **Use Case**: Production embedded database, multi-tenancy support
 //!
 //! # Integration Example
 //!
-//! ```no_run
-//! use llmspell_storage::{StorageBackend, StorageBackendType, MemoryBackend, SledBackend};
+//! ```
+//! use llmspell_storage::{StorageBackendType, MemoryBackend};
+//! use llmspell_core::traits::storage::StorageBackend;
 //! use std::sync::Arc;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Factory pattern for backend selection
-//! fn create_backend(backend_type: StorageBackendType) -> Result<Arc<dyn StorageBackend>, Box<dyn std::error::Error>> {
+//! async fn create_backend(backend_type: StorageBackendType) -> Result<Arc<dyn StorageBackend>, Box<dyn std::error::Error>> {
 //!     match backend_type {
 //!         StorageBackendType::Memory => Ok(Arc::new(MemoryBackend::new())),
-//!         StorageBackendType::Sled => Ok(Arc::new(SledBackend::new_with_path("./data")?)),
+//!         // Note: SQLite storage uses domain-specific types (SqliteVectorStorage, etc.)
+//!         // not a general StorageBackend implementation
 //!         _ => Err("Unsupported backend".into()),
 //!     }
 //! }
 //!
 //! // Use backend agnostically
-//! let backend = create_backend(StorageBackendType::Memory)?;
+//! let backend = create_backend(StorageBackendType::Memory).await?;
 //! let value = serde_json::json!({"value": 42});
 //! backend.set("key", serde_json::to_vec(&value)?).await?;
 //! # Ok(())
 //! # }
 //! ```
 
-pub mod backends;
-pub mod migration;
-pub mod traits;
-pub mod vector_storage;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
-// Re-export commonly used types
-pub use backends::{MemoryBackend, SledBackend};
-pub use traits::{StorageBackend, StorageBackendType, StorageCharacteristics, StorageSerialize};
+pub mod backends;
+pub mod export_import;
+pub mod migration;
+
+// Re-export core traits
+pub use llmspell_core::traits::storage::{
+    HNSWStorage, KnowledgeGraph, ProceduralMemory, StorageBackend, VectorStorage,
+};
+
+// Re-export core types
+pub use llmspell_core::types::storage::{
+    DistanceMetric, HNSWConfig, NamespaceStats, ScopedStats, StorageBackendType,
+    StorageCharacteristics, StorageStats, VectorEntry, VectorQuery, VectorResult,
+};
+
+// Re-export backend implementations
+pub use backends::MemoryBackend;
 
 // Re-export PostgreSQL types (Phase 13b.2+)
 #[cfg(feature = "postgres")]
@@ -113,8 +132,22 @@ pub use backends::postgres::{
     PostgresPool,
 };
 
-// Re-export vector storage types
-pub use vector_storage::{
-    DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
-    VectorEntry, VectorQuery, VectorResult, VectorStorage,
-};
+// Helper trait for serialization/deserialization
+pub trait StorageSerialize: Sized {
+    fn to_storage_bytes(&self) -> Result<Vec<u8>>;
+    fn from_storage_bytes(bytes: &[u8]) -> Result<Self>;
+}
+
+// Default implementation for serde types
+impl<T> StorageSerialize for T
+where
+    T: Serialize + for<'de> Deserialize<'de>,
+{
+    fn to_storage_bytes(&self) -> Result<Vec<u8>> {
+        Ok(serde_json::to_vec(self)?)
+    }
+
+    fn from_storage_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}

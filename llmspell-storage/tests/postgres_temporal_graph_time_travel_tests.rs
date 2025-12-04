@@ -10,7 +10,7 @@
 #![cfg(feature = "postgres")]
 
 use chrono::{DateTime, Duration, Utc};
-use llmspell_graph::types::TemporalQuery;
+use llmspell_graph::TemporalQuery;
 use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig, PostgresGraphStorage};
 use serde_json::json;
 use std::sync::Arc;

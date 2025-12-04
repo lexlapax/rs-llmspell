@@ -1,5 +1,5 @@
 //! ABOUTME: Storage backend discovery for state persistence
-//! ABOUTME: Provides discovery of available storage backends (`Memory`, `Sled`, `RocksDB`)
+//! ABOUTME: Provides discovery of available storage backends (`Memory`, `Postgres`)
 
 use crate::discovery::BridgeDiscovery;
 use serde::{Deserialize, Serialize};
@@ -74,53 +74,30 @@ impl StorageDiscovery {
             },
         );
 
-        // Sled backend
+        // Postgres backend
         backends.insert(
-            "sled".to_string(),
+            "postgres".to_string(),
             StorageInfo {
-                name: "sled".to_string(),
-                description: "Embedded database with crash-resistant storage".to_string(),
-                backend_type: "Sled".to_string(),
-                persistent: true,
-                supports_compression: true,
-                supports_encryption: true,
-                performance: StoragePerformance {
-                    read_latency: "medium".to_string(),
-                    write_latency: "medium".to_string(),
-                    throughput: "medium".to_string(),
-                    large_dataset_suitable: true,
-                },
-                required_params: vec!["path".to_string()],
-                optional_params: vec![
-                    "cache_capacity".to_string(),
-                    "use_compression".to_string(),
-                    "mode".to_string(),
-                ],
-            },
-        );
-
-        // RocksDB backend
-        backends.insert(
-            "rocksdb".to_string(),
-            StorageInfo {
-                name: "rocksdb".to_string(),
-                description: "High-performance embedded database for large datasets".to_string(),
-                backend_type: "RocksDB".to_string(),
+                name: "postgres".to_string(),
+                description:
+                    "High-performance production database for multi-tenant and large datasets"
+                        .to_string(),
+                backend_type: "Postgres".to_string(),
                 persistent: true,
                 supports_compression: true,
                 supports_encryption: true,
                 performance: StoragePerformance {
                     read_latency: "low".to_string(),
-                    write_latency: "medium".to_string(),
+                    write_latency: "low".to_string(),
                     throughput: "high".to_string(),
                     large_dataset_suitable: true,
                 },
-                required_params: vec!["path".to_string()],
+                required_params: vec!["connection_string".to_string()],
                 optional_params: vec![
-                    "create_if_missing".to_string(),
-                    "optimize_for_point_lookup".to_string(),
-                    "block_cache_size".to_string(),
-                    "write_buffer_size".to_string(),
+                    "pool_size".to_string(),
+                    "timeout_ms".to_string(),
+                    "max_connections".to_string(),
+                    "idle_timeout".to_string(),
                 ],
             },
         );
@@ -241,7 +218,7 @@ impl BridgeDiscovery<StorageInfo> for StorageDiscovery {
 /// Configuration for storage backend selection and setup
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageConfig {
-    /// Selected backend name (memory, sled, rocksdb)
+    /// Selected backend name (memory, postgres)
     pub backend: String,
     /// Backend-specific configuration parameters
     pub parameters: HashMap<String, serde_json::Value>,
@@ -335,23 +312,14 @@ impl StorageConfigBuilder {
         self
     }
 
-    /// Convenience method to configure for sled backend
+    /// Convenience method to configure for postgres backend
     #[must_use]
-    pub fn sled_backend(mut self, path: impl Into<String>) -> Self {
-        self.config.backend = "sled".to_string();
-        self.config
-            .parameters
-            .insert("path".to_string(), serde_json::Value::String(path.into()));
-        self
-    }
-
-    /// Convenience method to configure for rocksdb backend
-    #[must_use]
-    pub fn rocksdb_backend(mut self, path: impl Into<String>) -> Self {
-        self.config.backend = "rocksdb".to_string();
-        self.config
-            .parameters
-            .insert("path".to_string(), serde_json::Value::String(path.into()));
+    pub fn postgres_backend(mut self, connection_string: impl Into<String>) -> Self {
+        self.config.backend = "postgres".to_string();
+        self.config.parameters.insert(
+            "connection_string".to_string(),
+            serde_json::Value::String(connection_string.into()),
+        );
         self
     }
 
@@ -372,10 +340,9 @@ mod tests {
 
         // Test listing backends
         let backends = discovery.list_backend_names();
-        assert_eq!(backends.len(), 3);
+        assert_eq!(backends.len(), 2);
         assert!(backends.contains(&"memory".to_string()));
-        assert!(backends.contains(&"sled".to_string()));
-        assert!(backends.contains(&"rocksdb".to_string()));
+        assert!(backends.contains(&"postgres".to_string()));
 
         // Test getting backend info
         let memory_info = discovery.get_backend_info("memory").unwrap();
@@ -385,23 +352,23 @@ mod tests {
 
         // Test persistent backends
         let persistent = discovery.get_persistent_backends();
-        assert_eq!(persistent.len(), 2);
+        assert_eq!(persistent.len(), 1);
 
         // Test large dataset backends
         let large_dataset = discovery.get_large_dataset_backends();
-        assert_eq!(large_dataset.len(), 2);
+        assert_eq!(large_dataset.len(), 1);
 
         // Test compression-enabled backends
         let compression_backends = discovery.get_compression_enabled_backends();
-        assert_eq!(compression_backends.len(), 3); // All backends support compression
+        assert_eq!(compression_backends.len(), 2); // All backends support compression
 
         // Test encryption-enabled backends
         let encryption_backends = discovery.get_encryption_enabled_backends();
-        assert_eq!(encryption_backends.len(), 3); // All backends support encryption
+        assert_eq!(encryption_backends.len(), 2); // All backends support encryption
 
         // Test performance-based filtering
         let high_perf = discovery.get_backends_by_performance("low", "high");
-        assert_eq!(high_perf.len(), 2); // memory and rocksdb
+        assert_eq!(high_perf.len(), 2); // memory and postgres
     }
 
     #[tokio::test]
@@ -410,23 +377,23 @@ mod tests {
 
         // Test discover_types
         let types = discovery.discover_types().await;
-        assert_eq!(types.len(), 3);
+        assert_eq!(types.len(), 2);
 
         // Test get_type_info
-        let sled_info = discovery.get_type_info("sled").await.unwrap();
-        assert_eq!(sled_info.backend_type, "Sled");
-        assert!(sled_info.persistent);
+        let postgres_info = discovery.get_type_info("postgres").await.unwrap();
+        assert_eq!(postgres_info.backend_type, "Postgres");
+        assert!(postgres_info.persistent);
 
         // Test has_type
         assert!(discovery.has_type("memory").await);
-        assert!(discovery.has_type("sled").await);
+        assert!(discovery.has_type("postgres").await);
         assert!(!discovery.has_type("redis").await);
 
         // Test filter_types
         let high_perf = discovery
             .filter_types(|_, info| info.performance.throughput == "high")
             .await;
-        assert_eq!(high_perf.len(), 2); // memory and rocksdb
+        assert_eq!(high_perf.len(), 2); // memory and postgres
     }
 
     #[test]
@@ -439,40 +406,44 @@ mod tests {
 
         // Test builder pattern
         let config = StorageConfig::builder()
-            .sled_backend("/tmp/test.sled")
+            .postgres_backend("postgresql://user:pass@localhost/test")
             .enable_compression(true)
             .enable_encryption(true)
             .performance_preset("fast")
             .parameter(
-                "cache_capacity",
-                serde_json::Value::Number(serde_json::Number::from(1000)),
+                "pool_size",
+                serde_json::Value::Number(serde_json::Number::from(20)),
             )
             .build();
 
-        assert_eq!(config.backend, "sled");
+        assert_eq!(config.backend, "postgres");
         assert!(config.enable_compression);
         assert!(config.enable_encryption);
         assert_eq!(config.performance_preset, "fast");
         assert_eq!(
-            config.parameters.get("path"),
-            Some(&serde_json::Value::String("/tmp/test.sled".to_string()))
+            config.parameters.get("connection_string"),
+            Some(&serde_json::Value::String(
+                "postgresql://user:pass@localhost/test".to_string()
+            ))
         );
         assert_eq!(
-            config.parameters.get("cache_capacity"),
-            Some(&serde_json::Value::Number(serde_json::Number::from(1000)))
+            config.parameters.get("pool_size"),
+            Some(&serde_json::Value::Number(serde_json::Number::from(20)))
         );
 
         // Test convenience methods
         let memory_config = StorageConfig::builder().memory_backend().build();
         assert_eq!(memory_config.backend, "memory");
 
-        let rocksdb_config = StorageConfig::builder()
-            .rocksdb_backend("/tmp/rocks")
+        let postgres_config = StorageConfig::builder()
+            .postgres_backend("postgresql://localhost/db")
             .build();
-        assert_eq!(rocksdb_config.backend, "rocksdb");
+        assert_eq!(postgres_config.backend, "postgres");
         assert_eq!(
-            rocksdb_config.parameters.get("path"),
-            Some(&serde_json::Value::String("/tmp/rocks".to_string()))
+            postgres_config.parameters.get("connection_string"),
+            Some(&serde_json::Value::String(
+                "postgresql://localhost/db".to_string()
+            ))
         );
     }
 }

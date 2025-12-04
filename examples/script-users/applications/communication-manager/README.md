@@ -219,6 +219,11 @@ Typical execution times:
 
 ## Related Examples
 
+### Cookbook Patterns
+For focused communication patterns and building blocks:
+- **[webhook-integration.lua](../../cookbook/webhook-integration.lua)** - Webhook calling patterns for notifications
+- **[workflow-patterns.lua](../../cookbook/)** - Conditional workflow building blocks
+
+### Other Applications
 - **Content Generation Platform**: Similar conditional routing patterns
 - **Data Pipeline**: Parallel processing techniques
-- **Workflow Examples**: Basic patterns in `examples/lua/workflows/`

@@ -11,8 +11,9 @@ use crate::consolidation::{ConsolidationEngine, NoopConsolidationEngine};
 use crate::error::Result;
 use crate::procedural::InMemoryPatternTracker;
 use crate::semantic::GraphSemanticMemory;
-use crate::traits::{EpisodicMemory, MemoryManager, ProceduralMemory, SemanticMemory};
+use crate::traits::{EpisodicMemory, MemoryManager, SemanticMemory};
 use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
+use llmspell_core::traits::storage::ProceduralMemory;
 
 #[cfg(test)]
 use crate::episodic::InMemoryEpisodicMemory;
@@ -25,8 +26,8 @@ use crate::episodic::InMemoryEpisodicMemory;
 ///
 /// ```text
 /// DefaultMemoryManager
-/// ├── Episodic: InMemoryEpisodicMemory (HNSW vector search)
-/// ├── Semantic: GraphSemanticMemory (wraps SurrealDB)
+/// ├── Episodic: InMemoryEpisodicMemory (or SqliteEpisodicMemory with vectorlite-rs)
+/// ├── Semantic: GraphSemanticMemory (wraps SqliteGraphStorage or PostgresGraphStorage)
 /// ├── Procedural: NoopProceduralMemory (placeholder)
 /// └── Consolidation: ConsolidationEngine (NoopConsolidationEngine by default)
 /// ```
@@ -77,11 +78,13 @@ impl DefaultMemoryManager {
     /// use llmspell_memory::{DefaultMemoryManager, InMemoryEpisodicMemory};
     /// use llmspell_memory::semantic::GraphSemanticMemory;
     /// use llmspell_memory::procedural::NoopProceduralMemory;
+    /// use llmspell_storage::backends::sqlite::SqliteBackend;
     ///
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
     ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    ///     let semantic = Arc::new(GraphSemanticMemory::new_temp().await?);
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.map_err(|e| llmspell_memory::MemoryError::Storage(e.to_string()))?);
+    ///     let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(sqlite_backend));
     ///     let procedural = Arc::new(NoopProceduralMemory);
     ///
     ///     let manager = DefaultMemoryManager::new(episodic, semantic, procedural);
@@ -121,18 +124,17 @@ impl DefaultMemoryManager {
     /// use llmspell_memory::procedural::NoopProceduralMemory;
     /// use llmspell_memory::consolidation::ManualConsolidationEngine;
     /// use llmspell_graph::extraction::RegexExtractor;
-    /// use llmspell_graph::storage::surrealdb::SurrealDBBackend;
-    /// use tempfile::TempDir;
+    /// use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
     ///
     /// #[tokio::main]
     /// async fn main() -> llmspell_memory::Result<()> {
-    ///     let temp = TempDir::new().unwrap();
     ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    ///     let semantic = Arc::new(GraphSemanticMemory::new_temp().await?);
+    ///     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.map_err(|e| llmspell_memory::MemoryError::Storage(e.to_string()))?);
+    ///     let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(Arc::clone(&sqlite_backend)));
     ///     let procedural = Arc::new(NoopProceduralMemory);
     ///
     ///     let extractor = Arc::new(RegexExtractor::new());
-    ///     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+    ///     let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
     ///     let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
     ///     let manager = DefaultMemoryManager::with_consolidation(
     ///         episodic, semantic, procedural, engine
@@ -183,7 +185,7 @@ impl DefaultMemoryManager {
     /// # async fn example() -> llmspell_memory::Result<()> {
     /// // Testing configuration (InMemory backend, no embeddings)
     /// let test_config = MemoryConfig::for_testing();
-    /// let test_manager = DefaultMemoryManager::with_config(test_config).await?;
+    /// let test_manager = DefaultMemoryManager::with_config(&test_config).await?;
     ///
     /// // Production configuration (HNSW backend with embeddings)
     /// # use llmspell_memory::embeddings::EmbeddingService;
@@ -201,11 +203,11 @@ impl DefaultMemoryManager {
     /// # let provider: Arc<dyn EmbeddingProvider> = Arc::new(MockProvider);
     /// let service = Arc::new(EmbeddingService::new(provider));
     /// let prod_config = MemoryConfig::for_production(service);
-    /// let prod_manager = DefaultMemoryManager::with_config(prod_config).await?;
+    /// let prod_manager = DefaultMemoryManager::with_config(&prod_config).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn with_config(config: crate::config::MemoryConfig) -> Result<Self> {
+    pub async fn with_config(config: &crate::config::MemoryConfig) -> Result<Self> {
         use crate::episodic::EpisodicBackend;
 
         info!(
@@ -214,11 +216,11 @@ impl DefaultMemoryManager {
         );
 
         // Create episodic backend from configuration
-        let episodic = EpisodicBackend::from_config(&config)?;
+        let episodic = EpisodicBackend::from_config(config)?;
         info!("Episodic backend created: {}", episodic.backend_name());
 
         // Create other subsystems
-        let semantic = Self::create_semantic_memory(&config).await?;
+        let semantic = Self::create_semantic_memory(config).await?;
         let procedural = Self::create_procedural_memory();
 
         info!("DefaultMemoryManager initialized successfully with config");
@@ -232,12 +234,12 @@ impl DefaultMemoryManager {
     ///
     /// All memory subsystems use in-memory storage:
     /// - Episodic: `InMemory` backend (test embeddings, cosine similarity)
-    /// - Semantic: Temporary `SurrealDB` instance
-    /// - Procedural: No-op placeholder
+    /// - Semantic: `SQLite` in-memory backend (`:memory:`)
+    /// - Procedural: `InMemoryPatternTracker`
     ///
     /// # Errors
     ///
-    /// Returns error if temporary `SurrealDB` initialization fails
+    /// Returns error if backends fail to initialize
     ///
     /// # Example
     ///
@@ -253,19 +255,41 @@ impl DefaultMemoryManager {
     pub async fn new_in_memory() -> Result<Self> {
         info!("Initializing DefaultMemoryManager with InMemory backends (testing mode)");
 
-        // Use InMemory backend for testing
-        let config = crate::config::MemoryConfig::for_testing();
-        Self::with_config(config).await
+        // Create in-memory backends directly
+        let episodic = crate::episodic::InMemoryEpisodicMemory::new();
+
+        // Create in-memory SQLite backend for semantic memory
+        let sqlite_backend = Arc::new(
+            llmspell_storage::backends::sqlite::SqliteBackend::new(
+                llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+            )
+            .await
+            .map_err(|e| crate::error::MemoryError::Storage(e.to_string()))?,
+        );
+
+        // Run migrations for semantic backend
+        sqlite_backend
+            .run_migrations()
+            .await
+            .map_err(|e| crate::error::MemoryError::Storage(e.to_string()))?;
+
+        let semantic = Arc::new(crate::semantic::GraphSemanticMemory::new_with_sqlite(
+            Arc::clone(&sqlite_backend),
+        ));
+
+        let procedural = Arc::new(crate::procedural::InMemoryPatternTracker::new());
+
+        Ok(Self::new(Arc::new(episodic), semantic, procedural))
     }
 
     /// Create memory manager with in-memory backends and real embeddings (production)
     ///
-    /// Uses HNSW episodic backend (O(log n) vector search) with real embeddings.
+    /// Uses `SQLite` episodic backend (O(log n) vector search via vectorlite-rs) with real embeddings.
     /// This is the recommended production configuration.
     ///
     /// All memory subsystems use in-memory storage:
-    /// - Episodic: HNSW vector index (real embeddings via `EmbeddingService`)
-    /// - Semantic: Temporary `SurrealDB` instance
+    /// - Episodic: `SQLite` vector index (real embeddings via `EmbeddingService`)
+    /// - Semantic: Requires explicit `SQLite` backend configuration
     /// - Procedural: No-op placeholder
     ///
     /// # Arguments
@@ -274,7 +298,7 @@ impl DefaultMemoryManager {
     ///
     /// # Errors
     ///
-    /// Returns error if temporary `SurrealDB` initialization fails
+    /// Returns error if `SQLite` backend is not configured
     ///
     /// # Example
     ///
@@ -310,13 +334,25 @@ impl DefaultMemoryManager {
         embedding_service: Arc<crate::embeddings::EmbeddingService>,
     ) -> Result<Self> {
         info!(
-            "Initializing DefaultMemoryManager with HNSW backend and embedding service: {}",
+            "Initializing DefaultMemoryManager with InMemory backend and embedding service: {}",
             embedding_service.provider_name()
         );
 
-        // Use HNSW backend for production
-        let config = crate::config::MemoryConfig::for_production(embedding_service);
-        Self::with_config(config).await
+        // Create in-memory SQLite backend for semantic memory
+        let sqlite_backend = Arc::new(
+            llmspell_storage::backends::sqlite::SqliteBackend::new(
+                llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+            )
+            .await
+            .map_err(|e| crate::error::MemoryError::Storage(e.to_string()))?,
+        );
+
+        // Use InMemory backend for episodic, SQLite for semantic (both in-memory)
+        let config = crate::config::MemoryConfig::default()
+            .with_backend(crate::config::EpisodicBackendType::InMemory)
+            .with_embedding_service(embedding_service)
+            .with_semantic_sqlite(Arc::clone(&sqlite_backend));
+        Self::with_config(&config).await
     }
 
     /// Helper: Create semantic memory from configuration
@@ -331,12 +367,40 @@ impl DefaultMemoryManager {
         );
 
         let semantic = match config.semantic_backend {
-            SemanticBackendType::SurrealDB => {
-                debug!("Initializing SurrealDB semantic memory");
-                GraphSemanticMemory::new_temp().await.map_err(|e| {
-                    error!("Failed to initialize SurrealDB semantic memory: {}", e);
-                    e
-                })?
+            SemanticBackendType::InMemory => {
+                debug!("Initializing in-memory SQLite semantic memory for testing");
+                let sqlite_backend = Arc::new(
+                    llmspell_storage::backends::sqlite::SqliteBackend::new(
+                        llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to create in-memory SQLite backend: {}", e);
+                        crate::error::MemoryError::Storage(e.to_string())
+                    })?,
+                );
+                GraphSemanticMemory::new_with_sqlite(sqlite_backend)
+            }
+            SemanticBackendType::Sqlite => {
+                // Auto-create in-memory SQLite backend if not provided
+                let sqlite_backend = if let Some(backend) = config.semantic_sqlite_backend.as_ref()
+                {
+                    debug!("Using provided SQLite semantic backend (user-configured storage)");
+                    Arc::clone(backend)
+                } else {
+                    debug!("Auto-creating in-memory SQLite semantic backend (bi-temporal graph storage)");
+                    let backend = llmspell_storage::backends::sqlite::SqliteBackend::new(
+                        llmspell_storage::backends::sqlite::SqliteConfig::in_memory(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to create in-memory SQLite semantic backend: {}", e);
+                        crate::error::MemoryError::Storage(e.to_string())
+                    })?;
+
+                    Arc::new(backend)
+                };
+                GraphSemanticMemory::new_with_sqlite(sqlite_backend)
             }
             #[cfg(feature = "postgres")]
             SemanticBackendType::PostgreSQL => {
@@ -695,7 +759,7 @@ mod tests {
     async fn test_semantic_memory_integration() {
         let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
 
-        let entity = llmspell_graph::types::Entity::new(
+        let entity = llmspell_graph::Entity::new(
             "Rust".into(),
             "programming_language".into(),
             json!({"paradigm": "systems"}),
@@ -818,20 +882,21 @@ mod tests {
     async fn test_has_consolidation_with_real_engine() {
         use crate::consolidation::ManualConsolidationEngine;
         use llmspell_graph::extraction::RegexExtractor;
-        use llmspell_graph::storage::surrealdb::SurrealDBBackend;
-        use tempfile::TempDir;
+        use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 
-        let temp = TempDir::new().unwrap();
         let episodic = Arc::new(InMemoryEpisodicMemory::new());
-        let semantic = Arc::new(GraphSemanticMemory::new_temp().await.unwrap());
-        let procedural = Arc::new(NoopProceduralMemory);
-
-        let extractor = Arc::new(RegexExtractor::new());
-        let graph = Arc::new(
-            SurrealDBBackend::new(temp.path().to_path_buf())
+        let sqlite_backend = Arc::new(
+            SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory())
                 .await
                 .unwrap(),
         );
+        let semantic = Arc::new(GraphSemanticMemory::new_with_sqlite(Arc::clone(
+            &sqlite_backend,
+        )));
+        let procedural = Arc::new(NoopProceduralMemory);
+
+        let extractor = Arc::new(RegexExtractor::new());
+        let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
         let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
 
         let mgr = DefaultMemoryManager::with_consolidation(episodic, semantic, procedural, engine);

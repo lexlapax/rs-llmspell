@@ -108,7 +108,6 @@ fn test_document_binary_size() {
         // Phase 13: ~66MB (memory + graph + context + local LLM + workflow-template delegation)
         //   - Candle ML framework with Metal GPU support (~15MB)
         //   - Tokenizers with embedded models (~10MB)
-        //   - RocksDB native bindings (~5MB)
         //   - ZeroMQ native bindings (~3MB)
         //   - Workflow-template delegation (Task 13.13) (~3MB)
         // Threshold updated after Phase 13.13 completion (workflow-template delegation)
@@ -122,7 +121,7 @@ fn test_document_binary_size() {
 /// Test app command with nonexistent app to document error handling
 #[test]
 fn test_app_nonexistent_app() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("app")
         .arg("run")
         .arg("nonexistent-app")
@@ -157,7 +156,7 @@ fn test_binary_startup_performance() {
 
     let start = Instant::now();
 
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("--help").assert().success();
 
     let duration = start.elapsed();

@@ -67,6 +67,135 @@ use tracing::{debug, error, info, trace};
 ///     }
 /// }
 /// ```
+///
+/// ## Concurrent Agent Execution
+///
+/// Execute multiple agents in parallel using `tokio::join!`:
+///
+/// ```
+/// use llmspell_core::{
+///     ComponentMetadata, ExecutionContext,
+///     types::{AgentInput, AgentOutput},
+///     traits::base_agent::BaseAgent,
+///     Result, LLMSpellError
+/// };
+/// use async_trait::async_trait;
+///
+/// # struct MockAgent { metadata: ComponentMetadata }
+/// #
+/// # #[async_trait]
+/// # impl BaseAgent for MockAgent {
+/// #     fn metadata(&self) -> &ComponentMetadata { &self.metadata }
+/// #     async fn execute_impl(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+/// #         Ok(AgentOutput::text(format!("Processed: {}", input.text)))
+/// #     }
+/// #     async fn validate_input(&self, _input: &AgentInput) -> Result<()> { Ok(()) }
+/// #     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> { Err(error) }
+/// # }
+/// # tokio_test::block_on(async {
+/// let agent1 = MockAgent { metadata: ComponentMetadata::new("agent1".to_string(), "Agent 1".to_string()) };
+/// let agent2 = MockAgent { metadata: ComponentMetadata::new("agent2".to_string(), "Agent 2".to_string()) };
+/// let agent3 = MockAgent { metadata: ComponentMetadata::new("agent3".to_string(), "Agent 3".to_string()) };
+///
+/// let ctx = ExecutionContext::new();
+///
+/// // Execute all three agents concurrently
+/// let (result1, result2, result3) = tokio::join!(
+///     agent1.execute(AgentInput::text("task1"), ctx.clone()),
+///     agent2.execute(AgentInput::text("task2"), ctx.clone()),
+///     agent3.execute(AgentInput::text("task3"), ctx.clone())
+/// );
+///
+/// assert!(result1.is_ok());
+/// assert!(result2.is_ok());
+/// assert!(result3.is_ok());
+/// # })
+/// ```
+///
+/// ## Timeout Patterns
+///
+/// Use `tokio::time::timeout` to limit agent execution time:
+///
+/// ```
+/// use llmspell_core::{
+///     ComponentMetadata, ExecutionContext,
+///     types::{AgentInput, AgentOutput},
+///     traits::base_agent::BaseAgent,
+///     Result, LLMSpellError
+/// };
+/// use async_trait::async_trait;
+/// use std::time::Duration;
+///
+/// # struct MockAgent { metadata: ComponentMetadata }
+/// #
+/// # #[async_trait]
+/// # impl BaseAgent for MockAgent {
+/// #     fn metadata(&self) -> &ComponentMetadata { &self.metadata }
+/// #     async fn execute_impl(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+/// #         Ok(AgentOutput::text(format!("Processed: {}", input.text)))
+/// #     }
+/// #     async fn validate_input(&self, _input: &AgentInput) -> Result<()> { Ok(()) }
+/// #     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> { Err(error) }
+/// # }
+/// # tokio_test::block_on(async {
+/// let agent = MockAgent { metadata: ComponentMetadata::new("agent".to_string(), "Agent".to_string()) };
+/// let ctx = ExecutionContext::new();
+///
+/// // Execute with 5-second timeout
+/// let result = tokio::time::timeout(
+///     Duration::from_secs(5),
+///     agent.execute(AgentInput::text("task"), ctx)
+/// ).await;
+///
+/// match result {
+///     Ok(Ok(output)) => println!("Success: {}", output.text),
+///     Ok(Err(e)) => println!("Agent error: {}", e),
+///     Err(_) => println!("Timeout after 5 seconds"),
+/// }
+/// # })
+/// ```
+///
+/// ## Select Patterns (First-to-Complete)
+///
+/// Use `tokio::select!` to race multiple agents:
+///
+/// ```
+/// use llmspell_core::{
+///     ComponentMetadata, ExecutionContext,
+///     types::{AgentInput, AgentOutput},
+///     traits::base_agent::BaseAgent,
+///     Result, LLMSpellError
+/// };
+/// use async_trait::async_trait;
+///
+/// # struct MockAgent { metadata: ComponentMetadata }
+/// #
+/// # #[async_trait]
+/// # impl BaseAgent for MockAgent {
+/// #     fn metadata(&self) -> &ComponentMetadata { &self.metadata }
+/// #     async fn execute_impl(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+/// #         Ok(AgentOutput::text(format!("Processed: {}", input.text)))
+/// #     }
+/// #     async fn validate_input(&self, _input: &AgentInput) -> Result<()> { Ok(()) }
+/// #     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> { Err(error) }
+/// # }
+/// # tokio_test::block_on(async {
+/// let agent1 = MockAgent { metadata: ComponentMetadata::new("fast".to_string(), "Fast Agent".to_string()) };
+/// let agent2 = MockAgent { metadata: ComponentMetadata::new("slow".to_string(), "Slow Agent".to_string()) };
+///
+/// let ctx = ExecutionContext::new();
+///
+/// // Race two agents - use whichever completes first
+/// tokio::select! {
+///     result1 = agent1.execute(AgentInput::text("task"), ctx.clone()) => {
+///         println!("Agent 1 completed first: {:?}", result1.is_ok());
+///     }
+///     result2 = agent2.execute(AgentInput::text("task"), ctx.clone()) => {
+///         println!("Agent 2 completed first: {:?}", result2.is_ok());
+///     }
+/// }
+/// # })
+/// ```
 #[async_trait]
 pub trait BaseAgent: Send + Sync {
     /// Get component metadata.

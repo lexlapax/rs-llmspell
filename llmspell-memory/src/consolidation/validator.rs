@@ -86,7 +86,7 @@ impl DecisionValidator {
                     "Decision {idx}: Cannot ADD entity {entity_id} - already exists in knowledge graph"
                 )))
             }
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
+            Err(e) if e.to_string().contains("Entity not found") => {
                 // Entity doesn't exist, ADD is valid
                 debug!("Decision {}: ADD validation passed for {}", idx, entity_id);
 
@@ -125,7 +125,7 @@ impl DecisionValidator {
                 );
                 Ok(())
             }
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
+            Err(e) if e.to_string().contains("Entity not found") => {
                 warn!(
                     "Decision {}: Entity {} does not exist, cannot UPDATE",
                     idx, entity_id
@@ -157,7 +157,7 @@ impl DecisionValidator {
                 );
                 Ok(())
             }
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
+            Err(e) if e.to_string().contains("Entity not found") => {
                 warn!(
                     "Decision {}: Entity {} does not exist, cannot DELETE",
                     idx, entity_id
@@ -207,11 +207,9 @@ impl DecisionValidator {
     ) -> Result<()> {
         match self.knowledge_graph.get_entity(entity_id).await {
             Ok(_) => Ok(()),
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
-                Err(MemoryError::InvalidInput(format!(
-                    "Relationship {idx}: {entity_type} entity {entity_id} does not exist"
-                )))
-            }
+            Err(e) if e.to_string().contains("Entity not found") => Err(MemoryError::InvalidInput(
+                format!("Relationship {idx}: {entity_type} entity {entity_id} does not exist"),
+            )),
             Err(e) => Err(MemoryError::KnowledgeGraph(format!(
                 "Relationship {idx}: Failed to validate {entity_type} entity {entity_id}: {e}"
             ))),
@@ -225,7 +223,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use chrono::Utc;
-    use llmspell_graph::types::{Entity, TemporalQuery};
+    use llmspell_graph::{Entity, TemporalQuery};
     use std::collections::HashMap;
 
     // Mock knowledge graph for testing
@@ -243,7 +241,7 @@ mod tests {
 
     #[async_trait]
     impl KnowledgeGraph for MockKnowledgeGraph {
-        async fn add_entity(&self, _entity: Entity) -> llmspell_graph::error::Result<String> {
+        async fn add_entity(&self, _entity: Entity) -> anyhow::Result<String> {
             Ok("mock-id".to_string())
         }
 
@@ -251,11 +249,11 @@ mod tests {
             &self,
             _id: &str,
             _changes: HashMap<String, serde_json::Value>,
-        ) -> llmspell_graph::error::Result<()> {
+        ) -> anyhow::Result<()> {
             Ok(())
         }
 
-        async fn get_entity(&self, id: &str) -> llmspell_graph::error::Result<Entity> {
+        async fn get_entity(&self, id: &str) -> anyhow::Result<Entity> {
             if self.existing_entities.contains(&id.to_string()) {
                 Ok(Entity {
                     id: id.to_string(),
@@ -266,9 +264,7 @@ mod tests {
                     ingestion_time: Utc::now(),
                 })
             } else {
-                Err(llmspell_graph::error::GraphError::EntityNotFound(
-                    id.to_string(),
-                ))
+                Err(anyhow::anyhow!("Entity not found: {id}"))
             }
         }
 
@@ -276,16 +272,14 @@ mod tests {
             &self,
             _id: &str,
             _event_time: chrono::DateTime<Utc>,
-        ) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound(
-                "mock".to_string(),
-            ))
+        ) -> anyhow::Result<Entity> {
+            Err(anyhow::anyhow!("Entity not found: mock"))
         }
 
         async fn add_relationship(
             &self,
-            _relationship: llmspell_graph::types::Relationship,
-        ) -> llmspell_graph::error::Result<String> {
+            _relationship: llmspell_graph::Relationship,
+        ) -> anyhow::Result<String> {
             Ok("mock-rel-id".to_string())
         }
 
@@ -293,22 +287,33 @@ mod tests {
             &self,
             _entity_id: &str,
             _relationship_type: &str,
-        ) -> llmspell_graph::error::Result<Vec<Entity>> {
+        ) -> anyhow::Result<Vec<Entity>> {
             Ok(vec![])
         }
 
-        async fn query_temporal(
+        async fn get_relationships(
             &self,
-            _query: TemporalQuery,
-        ) -> llmspell_graph::error::Result<Vec<Entity>> {
+            _entity_id: &str,
+        ) -> anyhow::Result<Vec<llmspell_graph::Relationship>> {
             Ok(vec![])
         }
 
-        async fn delete_before(
-            &self,
-            _timestamp: chrono::DateTime<Utc>,
-        ) -> llmspell_graph::error::Result<usize> {
+        async fn query_temporal(&self, _query: TemporalQuery) -> anyhow::Result<Vec<Entity>> {
+            Ok(vec![])
+        }
+
+        async fn delete_before(&self, _timestamp: chrono::DateTime<Utc>) -> anyhow::Result<usize> {
             Ok(0)
+        }
+
+        async fn traverse(
+            &self,
+            _start_entity: &str,
+            _relationship_type: Option<&str>,
+            _max_depth: usize,
+            _at_time: Option<chrono::DateTime<Utc>>,
+        ) -> anyhow::Result<Vec<(Entity, usize, String)>> {
+            Ok(vec![])
         }
     }
 

@@ -3,13 +3,14 @@
 //! Phase 13.7.4: Pattern tracking via state transitions
 //! Future: Full pattern learning (Phase 13.3+)
 
+use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::error::Result;
-use crate::traits::{Pattern, ProceduralMemory};
+use llmspell_core::traits::storage::ProceduralMemory;
+use llmspell_core::types::storage::Pattern;
 
 /// In-memory pattern tracker for state transition learning
 ///

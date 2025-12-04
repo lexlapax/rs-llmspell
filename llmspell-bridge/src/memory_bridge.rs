@@ -40,7 +40,7 @@ impl MemoryBridge {
     /// use llmspell_bridge::MemoryBridge;
     /// use std::sync::Arc;
     ///
-    /// let memory = Arc::new(DefaultMemoryManager::new_in_memory().await?);
+    /// let memory = Arc::new(DefaultMemoryManager::new_in_memory()?);
     /// let bridge = MemoryBridge::new(memory);
     /// ```
     #[must_use]

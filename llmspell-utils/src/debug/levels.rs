@@ -11,7 +11,7 @@ use std::str::FromStr;
 ///
 /// Levels are ordered from least to most verbose.
 /// When a level is set, all messages at that level and below are shown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum DebugLevel {
     /// No debug output at all
     Off = 0,
@@ -20,6 +20,7 @@ pub enum DebugLevel {
     /// Errors and warnings
     Warn = 2,
     /// Errors, warnings, and informational messages
+    #[default]
     Info = 3,
     /// All above plus debug messages
     Debug = 4,
@@ -65,12 +66,6 @@ impl DebugLevel {
             Self::Debug => "\x1b[36mDEBUG\x1b[0m", // Cyan
             Self::Trace => "\x1b[35mTRACE\x1b[0m", // Magenta
         }
-    }
-}
-
-impl Default for DebugLevel {
-    fn default() -> Self {
-        Self::Info
     }
 }
 

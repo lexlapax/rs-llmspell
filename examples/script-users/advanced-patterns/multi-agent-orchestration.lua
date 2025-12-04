@@ -1,8 +1,14 @@
+-- Profile: research (recommended)
+-- Run with: llmspell -p research run multi-agent-orchestration.lua
+-- Full stack with trace logging for complex patterns
+
 -- ============================================================
 -- LLMSPELL ADVANCED PATTERNS SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: advanced-patterns
 -- Pattern ID: 01 - Multi-Agent Orchestration v0.7.0
--- Complexity Level: ADVANCED
+-- Complexity: ADVANCED
 -- Real-World Use Case: Complex AI systems with specialized agents
 -- Pattern Category: Agent Orchestration
 --

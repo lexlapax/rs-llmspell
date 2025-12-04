@@ -2,7 +2,8 @@
 
 use anyhow::Result;
 use llmspell_core::state::StateScope;
-use llmspell_storage::vector_storage::{VectorQuery, VectorResult, VectorStorage};
+use llmspell_core::traits::storage::VectorStorage;
+use llmspell_core::types::storage::{VectorQuery, VectorResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -507,11 +508,12 @@ pub enum ScoreFusion {
 mod tests {
     use super::*;
     use crate::embeddings::{CacheConfig, EmbeddingProviderConfig, EmbeddingProviderType};
-    use llmspell_storage::backends::vector::HNSWVectorStorage;
-    use llmspell_storage::vector_storage::HNSWConfig;
+    use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 
-    fn create_test_retrieval_flow() -> RetrievalFlow {
-        let storage = Arc::new(HNSWVectorStorage::new(384, HNSWConfig::default()));
+    async fn create_test_retrieval_flow() -> RetrievalFlow {
+        let config = SqliteConfig::in_memory();
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let embedding_config = EmbeddingProviderConfig {
             provider_type: EmbeddingProviderType::HuggingFace,
             model: "test-model".to_string(),
@@ -530,9 +532,9 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_similarity_calculation() {
-        let _flow = create_test_retrieval_flow();
+    #[tokio::test]
+    async fn test_similarity_calculation() {
+        let _flow = create_test_retrieval_flow().await;
 
         let similarity =
             RetrievalFlow::calculate_similarity("the quick brown fox", "quick brown fox jumps");
@@ -541,9 +543,9 @@ mod tests {
         assert!(similarity < 1.0);
     }
 
-    #[test]
-    fn test_metadata_boost() {
-        let _flow = create_test_retrieval_flow();
+    #[tokio::test]
+    async fn test_metadata_boost() {
+        let _flow = create_test_retrieval_flow().await;
         let mut metadata = HashMap::new();
         metadata.insert(
             "title".to_string(),
@@ -559,9 +561,9 @@ mod tests {
         assert!(boost <= 1.0);
     }
 
-    #[test]
-    fn test_config_merging() {
-        let flow = create_test_retrieval_flow();
+    #[tokio::test]
+    async fn test_config_merging() {
+        let flow = create_test_retrieval_flow().await;
 
         let query_config = QueryConfig {
             max_results: Some(20),

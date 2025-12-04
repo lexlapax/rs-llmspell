@@ -25,9 +25,11 @@ use dashmap::DashMap;
 #[cfg(feature = "postgres")]
 use llmspell_core::state::StateScope;
 #[cfg(feature = "postgres")]
-use llmspell_storage::{
-    PostgreSQLVectorStorage, PostgresBackend, VectorEntry, VectorQuery, VectorStorage,
-};
+use llmspell_core::traits::storage::VectorStorage;
+#[cfg(feature = "postgres")]
+use llmspell_core::types::storage::{VectorEntry, VectorQuery};
+#[cfg(feature = "postgres")]
+use llmspell_storage::backends::postgres::{PostgreSQLVectorStorage, PostgresBackend};
 #[cfg(feature = "postgres")]
 use serde_json::Value;
 #[cfg(feature = "postgres")]

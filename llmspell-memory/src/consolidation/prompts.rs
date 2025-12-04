@@ -22,18 +22,13 @@ use super::prompt_schema::{ConsolidationResponse, DecisionPayload, OutputFormat}
 ///
 /// Each version represents a distinct prompt template iteration.
 /// Tracked in consolidation metrics for performance comparison.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum PromptVersion {
     /// Initial implementation (JSON schema, 4 few-shot examples)
+    #[default]
     V1,
     // Future versions: V2, V3, etc.
-}
-
-impl Default for PromptVersion {
-    fn default() -> Self {
-        Self::V1
-    }
 }
 
 impl std::fmt::Display for PromptVersion {

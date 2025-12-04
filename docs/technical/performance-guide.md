@@ -95,8 +95,8 @@ llmspell prioritizes **rapid experimentation velocity** over raw performance, bu
 
 **Memory Backend Performance**:
 - **InMemory**: 71.68ms (baseline, development/testing)
-- **HNSW**: 8.47ms (8.47x faster, production)
-- **SurrealDB**: Not yet benchmarked (graph queries, bi-temporal)
+- **HNSW**: 8.47ms (8.47x faster, production via vectorlite-rs)
+- **SQLite/PostgreSQL**: Production backends for graph storage (bi-temporal support)
 
 #### Template System (Phase 12)
 
@@ -155,7 +155,7 @@ To ensure measurement reliability, benchmarks are executed 3+ times independentl
 
 #### llmspell-memory (Phase 13)
 - **memory_operations** - Storage, retrieval, search performance
-- **backend_comparison** - InMemory vs HNSW vs SurrealDB
+- **backend_comparison** - InMemory vs HNSW (vectorlite-rs) vs SQLite/PostgreSQL
 
 #### llmspell-templates (Phase 12)
 - **template_operations** - Registry, instantiation, execution
@@ -505,12 +505,13 @@ cargo run --features tokio-console
 
 **Scaling Strategy**:
 - **InMemory**: Development/testing, unlimited scale for experiments
-- **HNSW**: Production, 1M+ vectors with 8.47x speedup
-- **SurrealDB**: Bi-temporal graph queries, relationship-rich data
+- **HNSW (vectorlite-rs)**: Production vector search, 1M+ vectors with 8.47x speedup
+- **SQLite**: Embedded production backend for single-node deployments
+- **PostgreSQL**: Scalable production backend for bi-temporal graph queries and relationship-rich data
 
 **Optimization Opportunities**:
-- HNSW index tuning (M parameter, ef_construction)
-- SurrealDB query optimization (when benchmarks available)
+- HNSW index tuning via vectorlite-rs (M parameter, ef_construction)
+- SQLite/PostgreSQL query optimization for graph traversal
 - Parallel retrieval for context assembly (already implemented)
 
 #### Template System Optimization (Phase 12)

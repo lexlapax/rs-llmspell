@@ -1,0 +1,25 @@
+# SQLite Backend Layer
+# libsql-based persistence with WAL mode and vectorlite-rs
+
+[profile]
+name = "SQLite Backend"
+description = "Persistent storage using libsql with vectorlite-rs integration"
+
+[runtime.state_persistence]
+enabled = true
+backend_type = "sqlite"
+migration_enabled = true
+backup_enabled = true
+backup_on_migration = true
+
+[runtime.state_persistence.backup]
+compression_enabled = true
+compression_type = "gzip"
+compression_level = 6
+incremental_enabled = false
+
+[runtime.memory]
+enabled = true
+
+[rag.vector_storage]
+backend = "hnsw"

@@ -1,8 +1,14 @@
+-- Profile: minimal
+-- Run with: llmspell -p development run caching.lua
+-- Development environment with debug logging
+
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 03 - Caching Patterns v0.7.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: High-performance caching for reduced latency and API costs
 -- Pattern Category: Performance & Optimization
 --

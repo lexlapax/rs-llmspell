@@ -1,18 +1,18 @@
 // ABOUTME: Sensitive data protection for agent state serialization
 // ABOUTME: Redacts API keys and credentials during state persistence
 
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 /// Patterns for detecting sensitive data
-static API_KEY_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+static API_KEY_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
         // OpenAI API keys
         Regex::new(r"sk-[a-zA-Z0-9]{48}").unwrap(),
-        // Anthropic API keys  
+        // Anthropic API keys
         Regex::new(r"sk-ant-[a-zA-Z0-9-]{95}").unwrap(),
         // Generic API key patterns
         Regex::new(r#"(?i)(api[_-]?key|apikey|api[_-]?secret|access[_-]?token|auth[_-]?token|bearer)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-\.]{20,})['\"]?"#).unwrap(),
@@ -29,7 +29,7 @@ static API_KEY_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
 });
 
 /// Sensitive field names to redact
-static SENSITIVE_FIELD_NAMES: Lazy<Vec<&'static str>> = Lazy::new(|| {
+static SENSITIVE_FIELD_NAMES: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     vec![
         "api_key",
         "apikey",

@@ -427,11 +427,12 @@ pub struct SessionQuery {
 }
 
 /// Sort options for session queries
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SessionSortBy {
     /// Sort by creation date
     CreatedAt,
     /// Sort by update date
+    #[default]
     UpdatedAt,
     /// Sort by session name
     Name,
@@ -439,12 +440,6 @@ pub enum SessionSortBy {
     ArtifactCount,
     /// Sort by operation count
     OperationCount,
-}
-
-impl Default for SessionSortBy {
-    fn default() -> Self {
-        Self::UpdatedAt
-    }
 }
 
 #[cfg(test)]

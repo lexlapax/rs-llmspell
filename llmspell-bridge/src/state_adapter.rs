@@ -53,25 +53,17 @@ impl StateManagerAdapter {
         // Convert string backend type to enum
         let backend_type = match config.backend_type.as_str() {
             "memory" => StorageBackendType::Memory,
-            "sled" => {
-                // Create sled config from settings
-                StorageBackendType::Sled(llmspell_kernel::state::config::SledConfig {
-                    path: std::path::PathBuf::from("./data/sled"),
-                    cache_capacity: 64 * 1024 * 1024, // 64MB
-                    use_compression: true,
-                })
+            "sqlite" => {
+                warn!("SQLite backend not yet supported via Lua bridge, defaulting to memory");
+                StorageBackendType::Memory
             }
-            "rocksdb" => {
-                // Create rocksdb config from settings
-                StorageBackendType::RocksDB(llmspell_kernel::state::config::RocksDBConfig {
-                    path: std::path::PathBuf::from("./data/rocksdb"),
-                    create_if_missing: true,
-                    optimize_for_point_lookup: false,
-                })
+            "postgres" => {
+                warn!("PostgreSQL backend not yet supported via Lua bridge, defaulting to memory");
+                StorageBackendType::Memory
             }
             _ => {
                 warn!(
-                    "Unknown backend type '{}', defaulting to memory",
+                    "Backend type '{}' not supported (use 'memory'), defaulting to memory",
                     config.backend_type
                 );
                 StorageBackendType::Memory

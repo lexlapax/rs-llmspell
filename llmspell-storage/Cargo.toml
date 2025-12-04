@@ -18,17 +18,14 @@ toml.workspace = true # Phase 13b.14: For migration plan TOML (replaced YAML)
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-sled.workspace = true
 dashmap = "5.5"
 parking_lot = "0.12"
 uuid = { workspace = true }
 chrono = { workspace = true } # Phase 13b.5.2: For bi-temporal timestamps
 tempfile = { workspace = true, optional = true }
 rand.workspace = true # Phase 13b.14: For checksum sampling
-
-# HNSW implementation dependencies
-hnsw_rs = { version = "0.3.2" }
-rmp-serde = { version = "1.1" }
+lz4_flex.workspace = true # Phase 13c.2.7: For hook history compression
+base64 = "0.22" # Phase 13c.3.2.1: For export/import large object base64 encoding
 
 # PostgreSQL dependencies (Phase 13b.2 - optional)
 tokio-postgres = { workspace = true, optional = true }
@@ -36,19 +33,36 @@ deadpool-postgres = { workspace = true, optional = true }
 pgvector = { workspace = true, optional = true }
 refinery = { workspace = true, optional = true }
 
+# SQLite dependencies (Phase 13c.2 - optional)
+libsql = { workspace = true, optional = true }
+r2d2 = { workspace = true, optional = true }
+# Phase 13c.2.2a: Vector search - vectorlite-rs only (sqlite-vec removed Task 13c.2.8.16)
+zerocopy = { workspace = true, optional = true }
+vectorlite-rs = { path = "../vectorlite-rs", optional = true }
+
 # Phase 13b.14: sha2 required for migration checksums (not postgres-only)
 sha2 = "0.10"
 
 [features]
 default = []
-postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph"]
+postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph", "llmspell-core/postgres"]
+sqlite = ["libsql", "r2d2", "zerocopy", "vectorlite-rs", "llmspell-graph"]
 
 [dev-dependencies]
 tempfile.workspace = true
 rand = "0.8"
 criterion = { workspace = true }
-blake3 = { workspace = true }
+# Phase 13c.1.6: blake3 removed (use sha2 for content hashing in tests)
+sha2 = "0.10"
+# Phase 13c.2.2: libsql-rusqlite for test consistency (no symbol conflicts)
+# Note: Using libsql-rusqlite instead of rusqlite to avoid libsqlite3-sys conflicts
+rusqlite = { package = "libsql-rusqlite", version = "0.9", default-features = false }
 
 [[bench]]
 name = "graph_bench"
 harness = false
+
+[[bench]]
+name = "sqlite_vector_bench"
+harness = false
+required-features = ["sqlite"]

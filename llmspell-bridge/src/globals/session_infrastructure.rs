@@ -3,12 +3,13 @@
 
 use crate::globals::GlobalContext;
 use llmspell_config::SessionConfig;
+use llmspell_core::traits::storage::StorageBackend;
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
 use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
 use llmspell_kernel::state::StateManager;
-use llmspell_storage::{MemoryBackend, SledBackend, StorageBackend};
+use llmspell_storage::backends::MemoryBackend;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -40,7 +41,7 @@ pub async fn get_or_create_session_infrastructure(
     let event_bus = get_or_create_event_bus(context);
 
     // Create storage backend based on configuration
-    let storage_backend = create_storage_backend(&config.storage_backend)?;
+    let storage_backend = create_storage_backend(&config.storage_backend);
 
     // Create SessionManagerConfig from runtime config using builder pattern
     let session_config = SessionManagerConfig::builder()
@@ -140,30 +141,21 @@ fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
 
 /// Create storage backend based on configuration
 ///
-/// # Errors
-///
-/// Returns an error if:
-/// - Unknown backend type is specified
-/// - Backend creation fails
-fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
+/// Always returns `MemoryBackend` - only memory backend supported via Lua bridge.
+/// For persistent storage, use Rust API with `SQLite` or `PostgreSQL`.
+fn create_storage_backend(backend_type: &str) -> Arc<dyn StorageBackend> {
     match backend_type {
         "memory" => {
             debug!("Creating in-memory storage backend for sessions");
-            Ok(Arc::new(MemoryBackend::new()))
-        }
-        "sled" => {
-            debug!("Creating sled storage backend for sessions");
-            // TODO: When SledBackend supports path configuration, use config.storage_path
-            // For now, SledBackend::new() uses its default path
-            let backend = SledBackend::new().map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create sled backend: {e}"),
-                source: None,
-            })?;
-            Ok(Arc::new(backend))
+            Arc::new(MemoryBackend::new())
         }
         backend => {
-            warn!("Unknown backend type '{}', falling back to memory", backend);
-            Ok(Arc::new(MemoryBackend::new()))
+            warn!(
+                "Backend type '{}' not supported via Lua bridge (only 'memory'), falling back to memory. \
+                 For persistent storage, use Rust API with SQLite or PostgreSQL.",
+                backend
+            );
+            Arc::new(MemoryBackend::new())
         }
     }
 }

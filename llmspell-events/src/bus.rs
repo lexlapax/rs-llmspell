@@ -7,7 +7,7 @@ use crate::pattern::{EventPattern, PatternMatcher};
 use crate::storage_adapter::{EventPersistenceManager, EventStorage, PersistenceConfig};
 use crate::universal_event::UniversalEvent;
 use dashmap::DashMap;
-use llmspell_storage::StorageBackend;
+use llmspell_core::traits::storage::StorageBackend;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, info};

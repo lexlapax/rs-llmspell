@@ -420,7 +420,7 @@ echo "Session ID: $SESSION_ID"
 ```
 
 **How it works:**
-- Sessions are persisted to `./sessions/` using SledBackend (embedded database)
+- Sessions are persisted to `./sessions/` using SqliteBackend (embedded database)
 - Session state includes full conversation history
 - `session_id` parameter enables context continuity across separate executions
 - Useful for stateful CLI workflows and automation scripts
@@ -471,7 +471,7 @@ print(result.result)
 **Default Behavior**: Sessions are **automatically created** with UUID identifiers.
 
 **Session Reuse** (v0.11.2+): Provide `session_id` parameter to reuse existing conversation:
-- Sessions persisted to `./sessions/` directory (SledBackend embedded database)
+- Sessions persisted to `./sessions/` directory (SqliteBackend embedded database)
 - Conversation history and state maintained across separate CLI invocations
 - Enables stateful workflows and automation scripts
 - See **Example 4** for session reuse workflow
@@ -605,7 +605,7 @@ SESSION_ID=$(./target/debug/llmspell template exec interactive-chat \
   --param session_id="$SESSION_ID"
 ```
 
-See **Example 4** for complete session reuse workflow. Sessions automatically persist to `./sessions/` directory using SledBackend.
+See **Example 4** for complete session reuse workflow. Sessions automatically persist to `./sessions/` directory using SqliteBackend.
 
 ### REPL-Specific Issues (Phase 12.9)
 

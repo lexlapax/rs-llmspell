@@ -1,8 +1,14 @@
+-- Profile: minimal
+-- Run with: llmspell -p development run sandbox-permissions.lua
+-- Development environment with debug logging
+
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: 11 - Sandbox Permissions v0.11.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Configuring security sandbox permissions
 -- Pattern Category: Security & Configuration
 --

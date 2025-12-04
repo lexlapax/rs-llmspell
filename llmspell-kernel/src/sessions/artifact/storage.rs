@@ -8,7 +8,7 @@ use super::versioning::VersionManager;
 use crate::sessions::{Result, SessionError, SessionId};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use llmspell_storage::traits::StorageBackend;
+use llmspell_storage::StorageBackend;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -1045,6 +1045,8 @@ impl ArtifactStorageOps for ArtifactStorage {
 
     #[allow(clippy::manual_let_else)]
     async fn get_artifact(&self, artifact_id: &ArtifactId) -> Result<Option<SessionArtifact>> {
+        use sha2::{Digest, Sha256};
+
         // Load metadata first
         let metadata = match self.load_metadata(artifact_id).await? {
             Some(metadata) => metadata,
@@ -1057,7 +1059,7 @@ impl ArtifactStorageOps for ArtifactStorage {
             .await?;
 
         // Verify content integrity
-        let calculated_hash = blake3::hash(&content).to_string();
+        let calculated_hash = format!("{:x}", Sha256::digest(&content));
         if calculated_hash != metadata.artifact_id.content_hash {
             return Err(SessionError::IntegrityError {
                 message: format!(

@@ -8,7 +8,7 @@ use std::fs;
 use tempfile::tempdir;
 #[test]
 fn test_cli_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("--help")
         .assert()
         .success()
@@ -18,7 +18,7 @@ fn test_cli_help() {
 }
 #[test]
 fn test_cli_version() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("--version")
         .assert()
         .success()
@@ -26,7 +26,7 @@ fn test_cli_version() {
 }
 #[test]
 fn test_run_command_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("run")
         .arg("--help")
         .assert()
@@ -35,7 +35,7 @@ fn test_run_command_help() {
 }
 #[test]
 fn test_invalid_engine() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("run")
         .arg("--engine")
         .arg("ruby")
@@ -51,7 +51,7 @@ fn test_javascript_not_implemented() {
     let script_path = dir.path().join("test.js");
     fs::write(&script_path, "console.log('test')").unwrap();
 
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("run")
         .arg("--engine")
         .arg("javascript")
@@ -67,7 +67,7 @@ fn test_python_not_implemented() {
     let script_path = dir.path().join("test.py");
     fs::write(&script_path, "print('test')").unwrap();
 
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("run")
         .arg("--engine")
         .arg("python")
@@ -79,7 +79,7 @@ fn test_python_not_implemented() {
 #[test]
 #[serial]
 fn test_run_missing_file() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("run")
         .arg("nonexistent.lua")
         .assert()
@@ -93,13 +93,13 @@ fn test_run_simple_lua_script() {
     let script_path = dir.path().join("test.lua");
     fs::write(&script_path, "print('Hello from test!')").unwrap();
 
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("run").arg(&script_path).assert().success();
 }
 #[test]
 #[serial]
 fn test_exec_inline_code() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("exec")
         .arg("print('Inline execution works!')")
         .assert()
@@ -109,7 +109,7 @@ fn test_exec_inline_code() {
 #[test]
 #[serial]
 fn test_output_format_json() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("--output")
         .arg("json")
         .arg("exec")
@@ -120,7 +120,7 @@ fn test_output_format_json() {
 }
 #[test]
 fn test_validate_missing_config() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("config")
         .arg("validate")
         .arg("--file")
@@ -132,7 +132,7 @@ fn test_validate_missing_config() {
 // Memory command tests
 #[test]
 fn test_memory_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("memory")
         .arg("--help")
         .assert()
@@ -142,7 +142,7 @@ fn test_memory_help() {
 
 #[test]
 fn test_memory_add_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("memory")
         .arg("add")
         .arg("--help")
@@ -153,7 +153,7 @@ fn test_memory_add_help() {
 
 #[test]
 fn test_memory_search_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("memory")
         .arg("search")
         .arg("--help")
@@ -164,7 +164,7 @@ fn test_memory_search_help() {
 
 #[test]
 fn test_memory_query_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("memory")
         .arg("query")
         .arg("--help")
@@ -175,7 +175,7 @@ fn test_memory_query_help() {
 
 #[test]
 fn test_memory_stats_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("memory")
         .arg("stats")
         .arg("--help")
@@ -186,7 +186,7 @@ fn test_memory_stats_help() {
 
 #[test]
 fn test_memory_consolidate_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("memory")
         .arg("consolidate")
         .arg("--help")
@@ -198,7 +198,7 @@ fn test_memory_consolidate_help() {
 // Context command tests
 #[test]
 fn test_context_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("context")
         .arg("--help")
         .assert()
@@ -208,7 +208,7 @@ fn test_context_help() {
 
 #[test]
 fn test_context_assemble_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("context")
         .arg("assemble")
         .arg("--help")
@@ -219,7 +219,7 @@ fn test_context_assemble_help() {
 
 #[test]
 fn test_context_strategies_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("context")
         .arg("strategies")
         .arg("--help")
@@ -232,7 +232,7 @@ fn test_context_strategies_help() {
 
 #[test]
 fn test_context_analyze_help() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("context")
         .arg("analyze")
         .arg("--help")

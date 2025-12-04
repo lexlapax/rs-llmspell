@@ -1,0 +1,5 @@
+# RAG Development Preset
+[profile]
+name = "RAG Development"
+description = "RAG with vector search for development"
+extends = ["bases/cli", "features/rag", "envs/dev", "backends/sqlite"]

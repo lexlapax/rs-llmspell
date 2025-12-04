@@ -98,9 +98,6 @@ pub mod security;
 /// API key management system
 pub mod api_key_manager;
 
-/// Persistent storage for API keys
-pub mod api_key_persistent_storage;
-
 /// Provider-specific rate limiting framework
 pub mod rate_limiting;
 
@@ -231,7 +228,6 @@ pub use security::{
 pub use api_key_manager::{
     ApiKeyAction, ApiKeyAuditEntry, ApiKeyManager, ApiKeyMetadata, ApiKeyStorage, InMemoryStorage,
 };
-pub use api_key_persistent_storage::PersistentApiKeyStorage;
 
 // Re-export provider rate limiting utilities
 pub use rate_limiting::{

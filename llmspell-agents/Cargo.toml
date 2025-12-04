@@ -18,6 +18,8 @@ llmspell-storage = { path = "../llmspell-storage" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-hooks = { path = "../llmspell-hooks" }
 tokio.workspace = true
+# Phase 13c.1.3: tokio-util kept for agent lifecycle management (state_machine.rs)
+# Provides CancellationToken for graceful cancellation not available in tokio core
 tokio-util.workspace = true
 async-trait.workspace = true
 serde.workspace = true
@@ -25,7 +27,6 @@ serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-once_cell.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 futures.workspace = true

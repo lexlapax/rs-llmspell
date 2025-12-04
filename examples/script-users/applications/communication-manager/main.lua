@@ -1,6 +1,14 @@
--- Application: Communication Manager v3.0 (Business Layer)
--- Purpose: Comprehensive business communication management with state persistence
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
+-- Profile: gemini-prod (recommended)
+-- Run with: llmspell -p gemini-prod run main.lua
+-- Full Phase 13 stack with Gemini
+
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
+-- Application ID: 04 - Communication Manager v3.0.0
+-- Complexity: ADVANCED
 -- Expected Output: Business communication automation with thread tracking and scheduling
 -- Version: 3.0.0
 -- Tags: application, communication-manager, business, state-persistence, sessions

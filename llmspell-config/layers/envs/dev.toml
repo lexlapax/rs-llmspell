@@ -1,0 +1,25 @@
+# Development Environment Layer
+# Debug logging, strict validation, helpful error messages
+
+[profile]
+name = "Development Environment"
+description = "Debug logging with strict validation for development"
+
+[debug]
+enabled = true
+level = "debug"
+
+[debug.output]
+stdout = true
+colored = true
+format = "text"
+
+[debug.performance]
+enabled = true
+auto_report_interval = 60
+include_children = true
+min_duration_ms = 10
+
+[runtime]
+script_timeout_seconds = 600
+max_concurrent_scripts = 10

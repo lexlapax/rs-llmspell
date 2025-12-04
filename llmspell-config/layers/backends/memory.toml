@@ -1,0 +1,12 @@
+# Memory Backend Layer
+# Ephemeral in-memory storage, no persistence
+
+[profile]
+name = "Memory Backend"
+description = "Fast in-memory storage with no persistence"
+
+[runtime.state_persistence]
+enabled = false
+
+[runtime.memory]
+enabled = false

@@ -5,7 +5,8 @@ use crate::universal_event::UniversalEvent;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use llmspell_storage::{StorageBackend, StorageSerialize};
+use llmspell_core::traits::storage::StorageBackend;
+use llmspell_storage::StorageSerialize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -441,7 +442,7 @@ impl<B: StorageBackend> Drop for EventPersistenceManager<B> {
 mod tests {
     use super::*;
     use crate::universal_event::{Language, UniversalEvent};
-    use llmspell_storage::MemoryBackend;
+    use llmspell_storage::backends::MemoryBackend;
     use serde_json::Value;
 
     fn create_test_event(event_type: &str) -> UniversalEvent {

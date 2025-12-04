@@ -7,7 +7,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use llmspell_core::state::StateScope;
-use llmspell_storage::{VectorResult, VectorStorage};
+use llmspell_core::traits::storage::VectorStorage;
+use llmspell_core::types::storage::VectorResult;
 
 /// Hybrid storage supporting multiple retrieval methods
 #[async_trait]
@@ -220,9 +221,10 @@ impl RetrievalWeights {
 }
 
 /// Retrieval strategy
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum RetrievalStrategy {
     /// Combine all methods with weighted scores
+    #[default]
     Fusion,
 
     /// Use vector search, fall back to keyword if no results
@@ -236,12 +238,6 @@ pub enum RetrievalStrategy {
 
     /// Use all methods in parallel and merge
     Parallel,
-}
-
-impl Default for RetrievalStrategy {
-    fn default() -> Self {
-        Self::Fusion
-    }
 }
 
 /// Reranking strategy for results

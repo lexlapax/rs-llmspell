@@ -1,0 +1,24 @@
+# Local LLM Feature Layer
+# Local LLM providers (Ollama, Candle)
+
+[profile]
+name = "Local LLM Features"
+description = "Ollama and Candle local provider support"
+
+# Provider configuration
+[providers]
+default_provider = "ollama"
+
+[providers.ollama]
+name = "ollama"
+provider_type = "ollama"
+enabled = true
+base_url = "http://localhost:11434"
+default_model = "llama3.2"
+timeout_seconds = 300
+
+[providers.candle]
+name = "candle"
+provider_type = "candle"
+enabled = false  # Requires explicit enablement
+default_model = "microsoft/phi-2"

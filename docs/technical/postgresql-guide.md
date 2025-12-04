@@ -78,8 +78,8 @@ LLMSpell implements a hot-swappable storage backend system with PostgreSQL as th
 
 ### Backend Comparison
 
-| Feature | Memory | Sled | **PostgreSQL** |
-|---------|--------|------|---------------|
+| Feature | Memory | SQLite | **PostgreSQL** |
+|---------|--------|--------|---------------|
 | **Persistent** | ❌ No | ✅ Yes | ✅ Yes |
 | **Transactional** | ✅ Yes (RwLock) | ✅ Yes | ✅ Yes (ACID) |
 | **Multi-tenant** | ❌ No | ❌ No | ✅ Yes (RLS) |
@@ -296,7 +296,8 @@ effective_io_concurrency = 200 # SSD parallel I/O
 **Basic Usage**:
 
 ```rust
-use llmspell_storage::{PostgresBackend, PostgresConfig, StorageBackend};
+use llmspell_storage::{PostgresBackend, PostgresConfig};
+use llmspell_core::traits::storage::StorageBackend;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -1258,34 +1259,274 @@ ALTER TABLE event_log ATTACH PARTITION event_log_2024_01
     FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
 ```
 
-### Data Migration (Sled → PostgreSQL)
+### Data Migration (PostgreSQL ↔ SQLite) - Phase 13c.3.2
 
-**Phase 1: Plan-Based Migration**
+**Bidirectional Lossless Migration**
 
-See [Storage Migration Guide](migration-internals.md) for detailed procedures.
+rs-llmspell provides built-in export/import tools for PostgreSQL ↔ SQLite migration with zero data loss.
 
-**Quick Start**:
+**Key Features**:
+- ✅ **Lossless roundtrip migration** (verified via integration tests)
+- ✅ **All 10 data types** (V3-V11, V13: vectors, graph, patterns, agent/workflow/KV state, sessions, artifacts, events, hooks)
+- ✅ **Transaction-safe import** with automatic rollback on errors
+- ✅ **Versioned JSON format** for compatibility tracking
+- ✅ **Base64 encoding** for binary data (BLOB/BYTEA) preservation
+
+**Migration Commands**:
 
 ```bash
-# 1. Generate migration plan
-llmspell storage migrate plan \
-  --from sled \
-  --to postgres \
-  --components agent_state,workflow_state,sessions \
-  --output migration.toml
+# Export from PostgreSQL
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell_prod"
+llmspell storage export --backend postgres --output pg-export.json
 
-# 2. Dry-run validation
-llmspell storage migrate execute --plan migration.toml --dry-run
+# Export from SQLite
+llmspell storage export --backend sqlite --output sqlite-export.json
 
-# 3. Execute migration
-llmspell storage migrate execute --plan migration.toml
+# Import to PostgreSQL
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell_prod"
+llmspell storage import --backend postgres --input sqlite-export.json
+
+# Import to SQLite
+llmspell storage import --backend sqlite --input pg-export.json
 ```
 
-**Migration Features**:
-- Automatic backup before migration
-- Semantic validation (handles JSONB normalization)
-- Automatic rollback on failure
-- Zero-downtime (source never modified)
+**Export Format**:
+
+```json
+{
+  "version": "1.0",
+  "exported_at": "2025-01-15T10:30:00Z",
+  "source_backend": "postgresql",
+  "migrations": ["V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V13"],
+  "data": {
+    "vector_embeddings": {
+      "384": [...],
+      "768": [...],
+      "1536": [...],
+      "3072": [...]
+    },
+    "knowledge_graph": {
+      "entities": [...],
+      "relationships": [...]
+    },
+    "procedural_memory": [...],
+    "agent_state": [...],
+    "kv_store": [...],
+    "workflow_states": [...],
+    "sessions": [...],
+    "artifacts": [...],
+    "event_log": [...],
+    "hook_history": [...]
+  }
+}
+```
+
+**Migration Workflow 1: SQLite → PostgreSQL (Development to Production)**
+
+```bash
+# Step 1: Export from SQLite (development)
+cd /path/to/dev/environment
+llmspell storage export --backend sqlite --output dev-data.json
+
+# Step 2: Validate export
+jq '.version, .source_backend, (.data | keys)' dev-data.json
+# Output:
+# "1.0"
+# "sqlite"
+# ["agent_state", "artifacts", "event_log", "hook_history", "kv_store", ...]
+
+# Step 3: Transfer to production server
+scp dev-data.json prod-server:/tmp/llmspell-import.json
+
+# Step 4: Import to PostgreSQL (production)
+ssh prod-server
+export DATABASE_URL="postgresql://llmspell:pass@localhost:5432/llmspell_prod"
+llmspell storage import --backend postgres --input /tmp/llmspell-import.json
+
+# Expected output:
+# ✅ Imported 1,234 total records:
+#   - Vectors (384-dim): 500
+#   - Vectors (768-dim): 300
+#   - Entities: 100
+#   - Relationships: 150
+#   - Procedural patterns: 20
+#   - Agent states: 5
+#   - Workflow states: 8
+#   - Sessions: 10
+#   - Artifacts: 25
+#   - Events: 100
+#   - Hooks: 16
+
+# Step 5: Verify migration (roundtrip validation)
+llmspell storage export --backend postgres --output prod-verify.json
+diff <(jq -S .data dev-data.json) <(jq -S .data prod-verify.json)
+# No output = perfect match (zero data loss)
+```
+
+**Migration Workflow 2: PostgreSQL → SQLite (Production to Development)**
+
+```bash
+# Step 1: Export from PostgreSQL (production)
+export DATABASE_URL="postgresql://llmspell:pass@localhost:5432/llmspell_prod"
+llmspell storage export --backend postgres --output prod-data.json
+
+# Step 2: Transfer to development machine
+scp prod-server:/tmp/prod-data.json /path/to/dev/llmspell/
+
+# Step 3: Import to SQLite (development)
+cd /path/to/dev/environment
+llmspell storage import --backend sqlite --input prod-data.json
+
+# Step 4: Verify migration
+llmspell storage export --backend sqlite --output dev-verify.json
+diff <(jq -S .data prod-data.json) <(jq -S .data dev-verify.json)
+```
+
+**Performance Benchmarks** (Phase 13c.3.2):
+
+| Operation | Dataset Size | PostgreSQL Time | SQLite Time |
+|-----------|--------------|-----------------|-------------|
+| **Export** | 10K vectors + 1K entities | ~8s | ~5s |
+| **Import** | 10K vectors + 1K entities | ~10s | ~6s |
+| **Roundtrip** | Full dataset | ~18s | ~11s |
+| **Throughput** | Export | 1.4K records/sec | 2.2K records/sec |
+| **Throughput** | Import | 1.1K records/sec | 1.8K records/sec |
+
+**Common Migration Scenarios**:
+
+**Scenario 1: Pre-Production Testing**
+```bash
+# Export production data
+ssh prod-server "llmspell storage export --backend postgres --output /tmp/prod.json"
+scp prod-server:/tmp/prod.json ./
+
+# Import to staging PostgreSQL
+export DATABASE_URL="postgresql://user:pass@staging-db/llmspell_staging"
+llmspell storage import --backend postgres --input prod.json
+```
+
+**Scenario 2: Disaster Recovery**
+```bash
+# If PostgreSQL database is lost but JSON export exists
+export DATABASE_URL="postgresql://user:pass@new-db-server/llmspell_prod"
+
+# Initialize new PostgreSQL backend (runs migrations)
+llmspell storage validate --backend postgres
+
+# Restore from JSON export
+llmspell storage import --backend postgres --input last-backup.json
+```
+
+**Scenario 3: Backend Switching (Scale Down)**
+```bash
+# Migrate from PostgreSQL to SQLite (e.g., single-tenant deployment)
+export DATABASE_URL="postgresql://user:pass@localhost/llmspell_prod"
+llmspell storage export --backend postgres --output pre-switch.json
+llmspell storage import --backend sqlite --input pre-switch.json
+```
+
+**Troubleshooting Migration Issues**:
+
+**Issue 1: Import Fails with "Dimension mismatch"**
+
+**Symptom**: `Error: Vector dimension 768 does not match table dimension 384`
+
+**Cause**: Exporting vector from one dimension table, importing to another
+
+**Solution**: Import preserves dimension mapping automatically. Check export data:
+```bash
+jq '.data.vector_embeddings | keys' export.json
+# Should show: ["384", "768", "1536", "3072"]
+```
+
+**Issue 2: Import Fails with "Transaction rolled back"**
+
+**Symptom**: `Error: Import transaction rolled back due to constraint violation`
+
+**Cause**: Data integrity constraint violation (e.g., duplicate primary keys)
+
+**Diagnosis**:
+```bash
+# Check export for duplicate IDs
+jq '.data.agent_state | group_by(.state_id) | map(select(length > 1))' export.json
+```
+
+**Solution**: Import is transaction-safe and rolls back automatically. Fix data in source backend and re-export.
+
+**Issue 3: Export File Too Large (>1GB)**
+
+**Symptom**: `Error: Ran out of disk space writing export file`
+
+**Solution**:
+```bash
+# Use compression
+llmspell storage export --backend postgres --output /tmp/export.json
+gzip /tmp/export.json
+# Transfer compressed file
+scp /tmp/export.json.gz prod-server:/tmp/
+ssh prod-server "gunzip /tmp/export.json.gz && llmspell storage import --backend postgres --input /tmp/export.json"
+```
+
+**Issue 4: Binary Data Corruption**
+
+**Symptom**: Artifacts or hook context data differs after import
+
+**Diagnosis**: Check base64 encoding in export
+```bash
+jq '.data.artifacts[0].content_data' export.json
+# Should be base64 string, not raw binary
+```
+
+**Fix**: Export uses base64 encoding automatically. If corruption occurs, file was modified during transfer. Use `scp -p` to preserve file integrity.
+
+**Rollback Procedure**:
+
+Import is transaction-safe and automatically rolls back on errors. To manually rollback after successful import:
+
+```bash
+# PostgreSQL: Restore from backup
+pg_restore -d llmspell_prod -c /backups/pre-migration.dump
+
+# SQLite: Restore from backup
+cp /backups/llmspell_pre_migration.db ~/.local/share/llmspell/llmspell.db
+```
+
+**Best Practices**:
+
+1. **Always backup before migration**:
+   ```bash
+   # PostgreSQL
+   pg_dump -F c llmspell_prod > pre-migration.dump
+
+   # SQLite
+   cp ~/.local/share/llmspell/llmspell.db llmspell_pre_migration.db
+   ```
+
+2. **Verify roundtrip integrity**:
+   ```bash
+   # Export → Import → Export → Compare
+   diff <(jq -S .data export1.json) <(jq -S .data export2.json)
+   ```
+
+3. **Use compression for large datasets**:
+   ```bash
+   gzip export.json  # 10:1 compression ratio typical
+   ```
+
+4. **Monitor import progress**: Import outputs per-table statistics
+   ```bash
+   llmspell storage import --backend postgres --input large.json
+   # Importing vectors (384-dim): 10000/10000 ✅
+   # Importing vectors (768-dim): 5000/5000 ✅
+   # ...
+   ```
+
+5. **Test on non-production first**: Always validate migration on staging before production
+
+**See Also**:
+- [Storage Migration Internals](storage-migration-internals.md) - Technical deep dive
+- [User Guide: Data Migration](../user-guide/11-data-migration.md) - Complete user guide
+- [Developer Guide: Storage Backends](../developer-guide/reference/storage-backends.md) - Export/Import API
 
 ### Maintenance Tasks
 
@@ -1408,7 +1649,7 @@ LIMIT 10;
 - **Phase 13b Design**: `/docs/in-progress/phase-13-design-doc.md` - Memory system architecture
 - **Current Architecture**: `/docs/technical/current-architecture.md` - System overview
 - **Storage Architecture**: `/docs/technical/storage-architecture.md` - 3-tier storage design
-- **Migration Guide**: `/docs/technical/migration-internals.md` - Sled → PostgreSQL migration
+- **Migration Guide**: `/docs/technical/migration-internals.md` - SQLite → PostgreSQL migration
 
 ### PostgreSQL Documentation
 

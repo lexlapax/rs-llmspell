@@ -1,3 +1,7 @@
+-- Recommended profile: rag-perf
+-- Run with: llmspell -p rag-perf run rag-benchmark.lua
+-- RAG performance benchmarking
+
 -- RAG End-to-End Performance Benchmark
 -- Measures performance of various RAG operations
 

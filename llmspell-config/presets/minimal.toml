@@ -1,0 +1,5 @@
+# Minimal Preset - Basic tools and agents only
+[profile]
+name = "Minimal"
+description = "Minimal configuration for quick scripting"
+extends = ["bases/cli", "features/minimal", "envs/dev", "backends/memory"]

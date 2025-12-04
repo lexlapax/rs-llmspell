@@ -17,6 +17,7 @@
 use chrono::Utc;
 use llmspell_storage::{PostgresBackend, PostgresConfig};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::OnceCell;
 use uuid::Uuid;
@@ -99,7 +100,7 @@ async fn test_store_and_retrieve_small_content() {
 
     // Small content (should use BYTEA)
     let content = b"Hello, World! This is a small artifact.";
-    let content_hash = blake3::hash(content).to_hex().to_string();
+    let content_hash = format!("{:x}", Sha256::digest(content));
 
     // Store content
     backend
@@ -139,7 +140,7 @@ async fn test_store_and_retrieve_large_content() {
 
     // Large content (2MB - should use Large Object)
     let content = vec![42u8; 2 * 1024 * 1024];
-    let content_hash = blake3::hash(&content).to_hex().to_string();
+    let content_hash = format!("{:x}", Sha256::digest(&content));
 
     // Store content
     backend
@@ -188,7 +189,7 @@ async fn test_content_deduplication() {
     let tenant_id = unique_tenant_id();
 
     let content = b"Duplicate content test";
-    let content_hash = blake3::hash(content).to_hex().to_string();
+    let content_hash = format!("{:x}", Sha256::digest(content));
 
     // Store content first time
     backend
@@ -226,7 +227,7 @@ async fn test_store_and_retrieve_metadata() {
 
     let session_id = Uuid::new_v4();
     let content = b"Test artifact content";
-    let content_hash = blake3::hash(content).to_hex().to_string();
+    let content_hash = format!("{:x}", Sha256::digest(content));
     let artifact_id = format!("{}:1:{}", session_id, content_hash);
 
     // Create session first (required by foreign key)
@@ -296,7 +297,7 @@ async fn test_list_session_artifacts() {
     // Create 3 artifacts with different sequences
     for seq in 1..=3 {
         let content = format!("Artifact {}", seq);
-        let content_hash = blake3::hash(content.as_bytes()).to_hex().to_string();
+        let content_hash = format!("{:x}", Sha256::digest(content.as_bytes()));
         let artifact_id = format!("{}:{}:{}", session_id, seq, content_hash);
 
         backend
@@ -352,7 +353,7 @@ async fn test_delete_artifact_with_unique_content() {
 
     let session_id = Uuid::new_v4();
     let content = b"Unique content for deletion";
-    let content_hash = blake3::hash(content).to_hex().to_string();
+    let content_hash = format!("{:x}", Sha256::digest(content));
     let artifact_id = format!("{}:1:{}", session_id, content_hash);
 
     // Create session first (required by foreign key)
@@ -434,7 +435,7 @@ async fn test_reference_counting() {
 
     let session_id = Uuid::new_v4();
     let content = b"Shared content";
-    let content_hash = blake3::hash(content).to_hex().to_string();
+    let content_hash = format!("{:x}", Sha256::digest(content));
 
     // Create session first (required by foreign key)
     create_session(&backend, &tenant_id, session_id).await;
@@ -575,7 +576,7 @@ async fn test_get_artifact_stats() {
     // Create 3 artifacts: 2 small (BYTEA), 1 large (Large Object)
     // First 2 share same content (deduplication)
     let small_content = b"Small shared content";
-    let small_hash = blake3::hash(small_content).to_hex().to_string();
+    let small_hash = format!("{:x}", Sha256::digest(small_content));
 
     backend
         .store_artifact_content(&tenant_id, &small_hash, small_content, false)
@@ -624,7 +625,7 @@ async fn test_get_artifact_stats() {
 
     // Third artifact with large content
     let large_content = vec![42u8; 2 * 1024 * 1024];
-    let large_hash = blake3::hash(&large_content).to_hex().to_string();
+    let large_hash = format!("{:x}", Sha256::digest(&large_content));
 
     backend
         .store_artifact_content(&tenant_id, &large_hash, &large_content, false)
@@ -681,7 +682,7 @@ async fn test_automatic_storage_type_selection() {
 
     // Test at boundary: 1MB - 1 byte (should be BYTEA)
     let just_under_threshold = vec![0u8; (1024 * 1024) - 1];
-    let hash_under = blake3::hash(&just_under_threshold).to_hex().to_string();
+    let hash_under = format!("{:x}", Sha256::digest(&just_under_threshold));
 
     backend
         .store_artifact_content(&tenant_id, &hash_under, &just_under_threshold, false)
@@ -702,7 +703,7 @@ async fn test_automatic_storage_type_selection() {
 
     // Test at boundary: 1MB exactly (should be Large Object)
     let exactly_threshold = vec![0u8; 1024 * 1024];
-    let hash_exact = blake3::hash(&exactly_threshold).to_hex().to_string();
+    let hash_exact = format!("{:x}", Sha256::digest(&exactly_threshold));
 
     backend
         .store_artifact_content(&tenant_id, &hash_exact, &exactly_threshold, false)
@@ -733,7 +734,7 @@ async fn test_compressed_content_storage() {
     let tenant_id = unique_tenant_id();
 
     let content = b"This content is compressed";
-    let content_hash = blake3::hash(content).to_hex().to_string();
+    let content_hash = format!("{:x}", Sha256::digest(content));
 
     // Store as compressed
     backend

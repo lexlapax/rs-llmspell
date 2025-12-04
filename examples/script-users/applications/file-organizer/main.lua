@@ -1,6 +1,14 @@
--- Application: File Organizer v1.0 (Universal Layer)
--- Purpose: Organize messy file collections with AI-powered categorization
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
+-- Profile: gemini-prod (recommended)
+-- Run with: llmspell -p gemini-prod run main.lua
+-- Full Phase 13 stack with Gemini
+
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
+-- Application ID: 05 - File Organizer v2.0.0
+-- Complexity: ADVANCED
 -- Expected Output: Organized file structure with smart folder suggestions
 -- Version: 1.0.0
 -- Tags: application, file-organizer, universal, sequential, file-management

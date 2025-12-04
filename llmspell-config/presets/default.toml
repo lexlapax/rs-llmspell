@@ -1,0 +1,5 @@
+# Default Preset - Alias for minimal
+[profile]
+name = "Default"
+description = "Default configuration (minimal)"
+extends = ["minimal"]

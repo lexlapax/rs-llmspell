@@ -605,7 +605,7 @@ impl LLMConsolidationEngine {
             })?;
 
         // Convert to graph entity
-        let entity = llmspell_graph::types::Entity {
+        let entity = llmspell_graph::Entity {
             id: entity_payload.id.clone(),
             name: entity_payload.name.clone(),
             entity_type: entity_payload.entity_type.clone(),
@@ -681,7 +681,7 @@ impl LLMConsolidationEngine {
                 idx, rel.from_entity, rel.to_entity, rel.relationship_type
             );
 
-            let relationship = llmspell_graph::types::Relationship {
+            let relationship = llmspell_graph::Relationship {
                 id: uuid::Uuid::new_v4().to_string(),
                 from_entity: rel.from_entity.clone(),
                 to_entity: rel.to_entity.clone(),
@@ -710,7 +710,7 @@ mod tests {
     use chrono::Utc;
     use llmspell_core::error::LLMSpellError;
     use llmspell_core::types::AgentOutput;
-    use llmspell_graph::types::{Entity, TemporalQuery};
+    use llmspell_graph::{Entity, TemporalQuery};
     use llmspell_providers::ProviderCapabilities;
     use std::collections::HashMap;
 
@@ -760,7 +760,7 @@ mod tests {
 
     #[async_trait]
     impl KnowledgeGraph for MockKnowledgeGraph {
-        async fn add_entity(&self, _entity: Entity) -> llmspell_graph::error::Result<String> {
+        async fn add_entity(&self, _entity: Entity) -> anyhow::Result<String> {
             Ok("mock-id".to_string())
         }
 
@@ -768,30 +768,26 @@ mod tests {
             &self,
             _id: &str,
             _changes: HashMap<String, serde_json::Value>,
-        ) -> llmspell_graph::error::Result<()> {
+        ) -> anyhow::Result<()> {
             Ok(())
         }
 
-        async fn get_entity(&self, _id: &str) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound(
-                "mock".to_string(),
-            ))
+        async fn get_entity(&self, _id: &str) -> anyhow::Result<Entity> {
+            Err(anyhow::anyhow!("Entity not found: mock"))
         }
 
         async fn get_entity_at(
             &self,
             _id: &str,
             _event_time: chrono::DateTime<Utc>,
-        ) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound(
-                "mock".to_string(),
-            ))
+        ) -> anyhow::Result<Entity> {
+            Err(anyhow::anyhow!("Entity not found: mock"))
         }
 
         async fn add_relationship(
             &self,
-            _relationship: llmspell_graph::types::Relationship,
-        ) -> llmspell_graph::error::Result<String> {
+            _relationship: llmspell_graph::Relationship,
+        ) -> anyhow::Result<String> {
             Ok("mock-rel-id".to_string())
         }
 
@@ -799,22 +795,33 @@ mod tests {
             &self,
             _entity_id: &str,
             _relationship_type: &str,
-        ) -> llmspell_graph::error::Result<Vec<Entity>> {
+        ) -> anyhow::Result<Vec<Entity>> {
             Ok(vec![])
         }
 
-        async fn query_temporal(
+        async fn get_relationships(
             &self,
-            _query: TemporalQuery,
-        ) -> llmspell_graph::error::Result<Vec<Entity>> {
+            _entity_id: &str,
+        ) -> anyhow::Result<Vec<llmspell_graph::Relationship>> {
             Ok(vec![])
         }
 
-        async fn delete_before(
-            &self,
-            _timestamp: chrono::DateTime<Utc>,
-        ) -> llmspell_graph::error::Result<usize> {
+        async fn query_temporal(&self, _query: TemporalQuery) -> anyhow::Result<Vec<Entity>> {
+            Ok(vec![])
+        }
+
+        async fn delete_before(&self, _timestamp: chrono::DateTime<Utc>) -> anyhow::Result<usize> {
             Ok(0)
+        }
+
+        async fn traverse(
+            &self,
+            _start_entity: &str,
+            _relationship_type: Option<&str>,
+            _max_depth: usize,
+            _at_time: Option<chrono::DateTime<Utc>>,
+        ) -> anyhow::Result<Vec<(Entity, usize, String)>> {
+            Ok(vec![])
         }
     }
 

@@ -1,12 +1,12 @@
 //! ABOUTME: Database migration management using Refinery
 //! ABOUTME: Versioned schema migrations for PostgreSQL with VectorChord
 
-use super::error::{PostgresError, Result};
 use super::PostgresBackend;
 use refinery::embed_migrations;
 
-// Embed migrations from migrations/ directory at compile time
-embed_migrations!("migrations");
+// Embed PostgreSQL migrations from migrations/postgres/ directory at compile time
+// Phase 13c.2.1: Migrated from migrations/ to migrations/postgres/ for backend-specific SQL
+embed_migrations!("migrations/postgres");
 
 impl PostgresBackend {
     /// Run all pending database migrations
@@ -28,7 +28,7 @@ impl PostgresBackend {
     ///     backend.run_migrations().await.unwrap();
     /// }
     /// ```
-    pub async fn run_migrations(&self) -> Result<()> {
+    pub async fn run_migrations(&self) -> anyhow::Result<()> {
         // Get connection from pool
         let mut client = self.get_client().await?;
 
@@ -37,13 +37,13 @@ impl PostgresBackend {
         client
             .execute("SET search_path TO llmspell, public", &[])
             .await
-            .map_err(|e| PostgresError::Migration(format!("Failed to set search_path: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!("Failed to set search_path: {}", e))?;
 
         // Run migrations using refinery
         self::migrations::runner()
             .run_async(&mut **client)
             .await
-            .map_err(|e| PostgresError::Migration(format!("Migration failed: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!("Migration failed: {}", e))?;
 
         Ok(())
     }
@@ -55,7 +55,7 @@ impl PostgresBackend {
     ///
     /// # Returns
     /// * `Result<usize>` - Current migration version
-    pub async fn migration_version(&self) -> Result<usize> {
+    pub async fn migration_version(&self) -> anyhow::Result<usize> {
         let client = self.get_client().await?;
 
         // Query refinery_schema_history table for latest version (in llmspell schema)
@@ -65,9 +65,7 @@ impl PostgresBackend {
                 &[],
             )
             .await
-            .map_err(|e| {
-                PostgresError::Query(format!("Failed to query migration version: {}", e))
-            })?;
+            .map_err(|e| anyhow::anyhow!("Failed to query migration version: {}", e))?;
 
         if let Some(row) = row {
             let version: i32 = row.get(0);

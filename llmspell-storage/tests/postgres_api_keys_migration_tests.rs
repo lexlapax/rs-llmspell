@@ -312,7 +312,7 @@ async fn test_api_keys_encryption_decryption() {
         .execute(
             "INSERT INTO llmspell.api_keys
              (key_id, tenant_id, service, encrypted_key, key_metadata)
-             VALUES ($1, $2, 'openai', llmspell.pgp_sym_encrypt($3::TEXT, $4::TEXT), '{}'::jsonb)",
+             VALUES ($1, $2, 'openai', pgp_sym_encrypt($3::TEXT, $4::TEXT), '{}'::jsonb)",
             &[&key_id, &tenant_id, &plaintext_key, &encryption_passphrase],
         )
         .await
@@ -321,7 +321,7 @@ async fn test_api_keys_encryption_decryption() {
     // Retrieve and decrypt (schema-qualified)
     let row = client
         .query_one(
-            "SELECT llmspell.pgp_sym_decrypt(encrypted_key, $2::TEXT) as decrypted_key
+            "SELECT pgp_sym_decrypt(encrypted_key, $2::TEXT) as decrypted_key
              FROM llmspell.api_keys
              WHERE key_id = $1",
             &[&key_id, &encryption_passphrase],
@@ -364,7 +364,7 @@ async fn test_api_keys_rls_tenant_isolation() {
         .execute(
             "INSERT INTO llmspell.api_keys
              (key_id, tenant_id, service, encrypted_key)
-             VALUES ($1, $2, 'anthropic', llmspell.pgp_sym_encrypt('sk-ant-test'::TEXT, $3::TEXT))",
+             VALUES ($1, $2, 'anthropic', pgp_sym_encrypt('sk-ant-test'::TEXT, $3::TEXT))",
             &[&key_id1, &tenant1, &encryption_passphrase],
         )
         .await
@@ -430,7 +430,7 @@ async fn test_api_keys_unique_constraint() {
         .execute(
             "INSERT INTO llmspell.api_keys
              (key_id, tenant_id, service, encrypted_key, is_active)
-             VALUES ($1, $2, $3, llmspell.pgp_sym_encrypt('key1'::TEXT, $4::TEXT), true)",
+             VALUES ($1, $2, $3, pgp_sym_encrypt('key1'::TEXT, $4::TEXT), true)",
             &[&key_id1, &tenant_id, &service, &encryption_passphrase],
         )
         .await
@@ -442,7 +442,7 @@ async fn test_api_keys_unique_constraint() {
         .execute(
             "INSERT INTO llmspell.api_keys
              (key_id, tenant_id, service, encrypted_key, is_active)
-             VALUES ($1, $2, $3, llmspell.pgp_sym_encrypt('key2'::TEXT, $4::TEXT), true)",
+             VALUES ($1, $2, $3, pgp_sym_encrypt('key2'::TEXT, $4::TEXT), true)",
             &[&key_id2, &tenant_id, &service, &encryption_passphrase],
         )
         .await;
@@ -466,7 +466,7 @@ async fn test_api_keys_unique_constraint() {
         .execute(
             "INSERT INTO llmspell.api_keys
              (key_id, tenant_id, service, encrypted_key, is_active)
-             VALUES ($1, $2, $3, llmspell.pgp_sym_encrypt('key2'::TEXT, $4::TEXT), true)",
+             VALUES ($1, $2, $3, pgp_sym_encrypt('key2'::TEXT, $4::TEXT), true)",
             &[&key_id2, &tenant_id, &service, &encryption_passphrase],
         )
         .await

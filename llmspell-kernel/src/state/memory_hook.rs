@@ -121,7 +121,7 @@ impl Hook for StateMemoryHook {
                     "StateMemoryHook: Failed to record transition {scope}:{key}: {}",
                     e
                 );
-                return Err(e.into());
+                return Err(e);
             }
         }
 

@@ -9,6 +9,79 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Dependencies for API injection into script engines
+///
+/// This struct bundles all the dependencies needed to inject APIs into script engines,
+/// replacing the previous 8-parameter approach for better maintainability and clarity.
+#[derive(Clone)]
+pub struct ApiDependencies {
+    /// Component registry for tools/agents/workflows (script layer)
+    pub registry: Arc<crate::ComponentRegistry>,
+    /// Provider manager for LLM access
+    pub providers: Arc<crate::ProviderManager>,
+    /// Tool registry from `ScriptRuntime` (infrastructure layer)
+    pub tool_registry: Arc<llmspell_tools::ToolRegistry>,
+    /// Agent factory registry from `ScriptRuntime` (infrastructure layer)
+    pub agent_registry: Arc<llmspell_agents::FactoryRegistry>,
+    /// Workflow factory from `ScriptRuntime` (infrastructure layer)
+    pub workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+    /// Optional `SessionManager` for template infrastructure (Phase 12.8.2.11)
+    pub session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Optional `StateManager` for state operations (Phase 13c.2.8.15)
+    pub state_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Optional RAG infrastructure (Phase 13c.2.8.15)
+    pub rag: Option<Arc<dyn std::any::Any + Send + Sync>>,
+}
+
+impl ApiDependencies {
+    /// Create new API dependencies with required components
+    pub fn new(
+        registry: Arc<crate::ComponentRegistry>,
+        providers: Arc<crate::ProviderManager>,
+        tool_registry: Arc<llmspell_tools::ToolRegistry>,
+        agent_registry: Arc<llmspell_agents::FactoryRegistry>,
+        workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+    ) -> Self {
+        Self {
+            registry,
+            providers,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+            session_manager: None,
+            state_manager: None,
+            rag: None,
+        }
+    }
+
+    /// Add session manager to dependencies (builder pattern)
+    #[must_use]
+    pub fn with_session_manager(
+        mut self,
+        session_manager: Arc<dyn std::any::Any + Send + Sync>,
+    ) -> Self {
+        self.session_manager = Some(session_manager);
+        self
+    }
+
+    /// Add state manager to dependencies (builder pattern)
+    #[must_use]
+    pub fn with_state_manager(
+        mut self,
+        state_manager: Arc<dyn std::any::Any + Send + Sync>,
+    ) -> Self {
+        self.state_manager = Some(state_manager);
+        self
+    }
+
+    /// Add RAG infrastructure to dependencies (builder pattern)
+    #[must_use]
+    pub fn with_rag(mut self, rag: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.rag = Some(rag);
+        self
+    }
+}
+
 /// Core abstraction for script execution engines
 ///
 /// This trait enables language-agnostic script execution by providing
@@ -32,25 +105,12 @@ pub trait ScriptEngineBridge: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `registry` - Component registry for tools/agents/workflows (script layer)
-    /// * `providers` - Provider manager for LLM access
-    /// * `tool_registry` - Tool registry from `ScriptRuntime` (infrastructure layer)
-    /// * `agent_registry` - Agent factory registry from `ScriptRuntime` (infrastructure layer)
-    /// * `workflow_factory` - Workflow factory from `ScriptRuntime` (infrastructure layer)
-    /// * `session_manager` - Optional `SessionManager` for template infrastructure (Phase 12.8.2.11)
+    /// * `deps` - API dependencies bundled in a struct for cleaner API
     ///
     /// # Errors
     ///
     /// Returns an error if API injection fails
-    fn inject_apis(
-        &mut self,
-        registry: &Arc<crate::ComponentRegistry>,
-        providers: &Arc<crate::ProviderManager>,
-        tool_registry: &Arc<llmspell_tools::ToolRegistry>,
-        agent_registry: &Arc<llmspell_agents::FactoryRegistry>,
-        workflow_factory: &Arc<dyn llmspell_workflows::WorkflowFactory>,
-        session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
-    ) -> Result<(), LLMSpellError>;
+    fn inject_apis(&mut self, deps: &ApiDependencies) -> Result<(), LLMSpellError>;
 
     /// Set script arguments to be made available in the script environment
     ///

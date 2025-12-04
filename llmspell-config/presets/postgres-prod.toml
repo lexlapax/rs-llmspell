@@ -1,0 +1,5 @@
+# PostgreSQL Production Preset - Enterprise full-stack with PostgreSQL
+[profile]
+name = "PostgreSQL Production"
+description = "Full features with PostgreSQL for enterprise production"
+extends = ["bases/cli", "features/full", "envs/prod", "backends/postgres"]

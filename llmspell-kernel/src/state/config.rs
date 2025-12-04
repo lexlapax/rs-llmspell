@@ -124,24 +124,22 @@ impl Default for PersistenceConfigBuilder {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StorageBackendType {
     Memory,
-    Sled(SledConfig),
-    RocksDB(RocksDBConfig),
+    Sqlite(SqliteConfig),
     #[cfg(feature = "postgres")]
     Postgres(PostgresConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SledConfig {
+pub struct SqliteConfig {
     pub path: std::path::PathBuf,
-    pub cache_capacity: u64,
-    pub use_compression: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RocksDBConfig {
-    pub path: std::path::PathBuf,
-    pub create_if_missing: bool,
-    pub optimize_for_point_lookup: bool,
+impl Default for SqliteConfig {
+    fn default() -> Self {
+        Self {
+            path: std::path::PathBuf::from("./data/llmspell.db"),
+        }
+    }
 }
 
 /// `PostgreSQL` configuration for kernel state storage (Phase 13b.2)

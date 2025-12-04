@@ -5,6 +5,7 @@ mod test_helpers;
 #[cfg(all(test, feature = "lua"))]
 mod lua_completion_tests {
     use crate::test_helpers::{create_test_infrastructure, with_runtime_context};
+    use llmspell_bridge::engine::bridge::ApiDependencies;
     use llmspell_bridge::engine::bridge::{CompletionContext, CompletionKind, ScriptEngineBridge};
     use llmspell_bridge::engine::factory::LuaConfig;
     use llmspell_bridge::lua::completion::LuaCompletionProvider;
@@ -25,14 +26,16 @@ mod lua_completion_tests {
         let providers =
             Arc::new(futures::executor::block_on(ProviderManager::new(provider_config)).unwrap());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
-        let _ = engine.inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
+
+        let api_deps = ApiDependencies::new(
+            registry,
+            providers,
+            tool_registry,
+            agent_registry,
+            workflow_factory.clone(),
         );
+
+        let _ = engine.inject_apis(&api_deps);
         engine
     }
 

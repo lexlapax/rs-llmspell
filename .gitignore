@@ -32,6 +32,31 @@ tests/python/venv/
 *.pyc
 __pycache__/
 .pytest_cache
-
-
+hnsw_indices
+node_modules/
+.next/
+next-env.d.ts
 sessions/
+.cargo/config.toml
+*.db
+*.dylib
+*.so
+*.dll
+*.exe
+*.pdb
+*.lib
+
+# Example generated artifacts (Phase 13c.5.4)
+examples/script-users/applications/*/generated/
+examples/**/node_modules/
+examples/**/*.pyc
+
+
+# Benchmark datasets
+benchmarks/graph-dataset/*.json
+
+# Benchmark outputs
+memory_fixed.txt
+refactor.txt
+refactor_vector.txt
+task22_*.txt

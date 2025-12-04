@@ -1,3 +1,7 @@
+-- Recommended profile: minimal
+-- Run with: llmspell -p minimal run user-input-ecommerce.lua
+-- Input file (no execution profile needed)
+
 -- WebApp Creator User Input: E-commerce Platform
 -- Alternative configuration for generating an e-commerce application
 

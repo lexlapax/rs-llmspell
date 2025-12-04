@@ -27,8 +27,7 @@
 //! use llmspell_memory::consolidation::prompts::PromptVersion;
 //! use llmspell_memory::InMemoryEpisodicMemory;
 //! use llmspell_providers::{ProviderConfig, rig::RigProvider};
-//! use llmspell_graph::storage::surrealdb::SurrealDBBackend;
-//! use tempfile::TempDir;
+//! use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteGraphStorage};
 //!
 //! #[tokio::main]
 //! async fn main() -> llmspell_memory::Result<()> {
@@ -41,14 +40,14 @@
 //!         active_session_threshold_secs: 300,
 //!     };
 //!
-//!     let temp = TempDir::new().unwrap();
+//!     let sqlite_backend = Arc::new(SqliteBackend::new(llmspell_storage::backends::sqlite::SqliteConfig::in_memory()).await.unwrap());
 //!     let provider_config = ProviderConfig::new_with_type(
 //!         "test-provider",
 //!         "ollama",
 //!         "llama3.2:3b",
 //!     );
 //!     let provider = Arc::new(RigProvider::new(provider_config).unwrap());
-//!     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+//!     let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
 //!     let llm_config = LLMConsolidationConfig {
 //!         model: "ollama/llama3.2:3b".into(),
 //!         fallback_models: vec![],
@@ -523,7 +522,7 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use llmspell_graph::traits::KnowledgeGraph;
-    use llmspell_graph::types::{Entity, Relationship, TemporalQuery};
+    use llmspell_graph::{Entity, Relationship, TemporalQuery};
     use llmspell_providers::{ProviderCapabilities, ProviderInstance};
     use std::collections::HashMap;
     use std::pin::Pin;
@@ -607,7 +606,7 @@ mod tests {
 
     #[async_trait]
     impl KnowledgeGraph for MockKnowledgeGraph {
-        async fn add_entity(&self, _entity: Entity) -> llmspell_graph::error::Result<String> {
+        async fn add_entity(&self, _entity: Entity) -> anyhow::Result<String> {
             Ok("mock-id".to_string())
         }
 
@@ -615,30 +614,23 @@ mod tests {
             &self,
             _id: &str,
             _changes: HashMap<String, serde_json::Value>,
-        ) -> llmspell_graph::error::Result<()> {
+        ) -> anyhow::Result<()> {
             Ok(())
         }
 
-        async fn get_entity(&self, id: &str) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound(
-                id.to_string(),
-            ))
+        async fn get_entity(&self, id: &str) -> anyhow::Result<Entity> {
+            Err(anyhow::anyhow!("Entity not found: {id}"))
         }
 
         async fn get_entity_at(
             &self,
             _id: &str,
             _event_time: chrono::DateTime<Utc>,
-        ) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound(
-                "mock".to_string(),
-            ))
+        ) -> anyhow::Result<Entity> {
+            Err(anyhow::anyhow!("Entity not found: mock"))
         }
 
-        async fn add_relationship(
-            &self,
-            _relationship: Relationship,
-        ) -> llmspell_graph::error::Result<String> {
+        async fn add_relationship(&self, _relationship: Relationship) -> anyhow::Result<String> {
             Ok("mock-rel-id".to_string())
         }
 
@@ -646,22 +638,33 @@ mod tests {
             &self,
             _entity_id: &str,
             _relationship_type: &str,
-        ) -> llmspell_graph::error::Result<Vec<Entity>> {
+        ) -> anyhow::Result<Vec<Entity>> {
             Ok(vec![])
         }
 
-        async fn query_temporal(
+        async fn get_relationships(
             &self,
-            _query: TemporalQuery,
-        ) -> llmspell_graph::error::Result<Vec<Entity>> {
+            _entity_id: &str,
+        ) -> anyhow::Result<Vec<llmspell_graph::Relationship>> {
             Ok(vec![])
         }
 
-        async fn delete_before(
-            &self,
-            _timestamp: chrono::DateTime<Utc>,
-        ) -> llmspell_graph::error::Result<usize> {
+        async fn query_temporal(&self, _query: TemporalQuery) -> anyhow::Result<Vec<Entity>> {
+            Ok(vec![])
+        }
+
+        async fn delete_before(&self, _timestamp: chrono::DateTime<Utc>) -> anyhow::Result<usize> {
             Ok(0)
+        }
+
+        async fn traverse(
+            &self,
+            _start_entity: &str,
+            _relationship_type: Option<&str>,
+            _max_depth: usize,
+            _at_time: Option<chrono::DateTime<Utc>>,
+        ) -> anyhow::Result<Vec<(Entity, usize, String)>> {
+            Ok(vec![])
         }
     }
 

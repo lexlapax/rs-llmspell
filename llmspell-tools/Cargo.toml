@@ -35,7 +35,7 @@ parquet = { version = "54.0", optional = true }
 
 # Excel support (optional)
 calamine = { version = "0.26", optional = true }
-xlsxwriter = { version = "0.6", optional = true }
+xlsxwriter = { version = "0.6", optional = true, features = ["system-zlib"] }
 
 # Base64 encoding
 base64 = "0.22"
@@ -89,7 +89,6 @@ fasteval = "0.2"
 notify = "6.1"
 
 # Lazy static initialization
-once_cell = "1.20"
 
 # Parking lot for RwLock
 parking_lot.workspace = true
@@ -100,7 +99,7 @@ aws-sdk-ses = { version = "1.61", optional = true }
 aws-config = { version = "1.5", optional = true }
 
 # Database support (optional)
-sqlx = { version = "0.8", optional = true, features = ["runtime-tokio-rustls", "postgres", "mysql", "sqlite", "chrono", "uuid"] }
+sqlx = { version = "0.8", optional = true, features = ["runtime-tokio-rustls", "chrono", "uuid"] }
 
 # Phase 7 Tools Dependencies
 # PDF processing (optional)
@@ -123,7 +122,9 @@ winapi = { version = "0.3", features = ["fileapi"] }
 [features]
 default = []  # Truly minimal - no heavy external dependencies
 common = ["templates", "pdf"]  # Convenient preset for typical usage
-full = ["csv-parquet", "templates", "pdf", "excel", "json-query", "archives", "email", "email-aws", "database"]
+# Phase 13c.2: Removed "database" from full feature to avoid sqlx-sqlite/libsql symbol conflicts
+# Users can opt-in to database-postgres if needed for DatabaseConnectorTool
+full = ["csv-parquet", "templates", "pdf", "excel", "json-query", "archives", "email", "email-aws"]
 
 # Individual feature flags
 csv-parquet = ["dep:arrow", "dep:parquet"]
@@ -140,8 +141,9 @@ email-aws = ["dep:aws-sdk-ses", "dep:aws-config"]
 # Database support
 database = ["dep:sqlx"]
 database-postgres = ["database", "sqlx/postgres"]
-database-mysql = ["database", "sqlx/mysql"]
-database-sqlite = ["database", "sqlx/sqlite"]
+# Phase 13c.2: database-sqlite feature removed due to symbol conflicts with libsql
+# SQLite database access should use libsql-based storage (llmspell-storage) instead
+# database-mysql removed in 13c.1.1 - mock implementation never completed, PostgreSQL is production backend
 
 [dev-dependencies]
 tempfile = "3.20"

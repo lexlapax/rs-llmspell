@@ -1,0 +1,9 @@
+# OpenAI Production Preset - Full Phase 13 stack with OpenAI
+[profile]
+name = "OpenAI Production"
+description = "Production CLI with OpenAI, full features (graph+RAG+memory+context), SQLite persistence"
+extends = ["bases/cli", "features/full", "envs/prod", "backends/sqlite"]
+
+# OpenAI as default provider
+[providers]
+default_provider = "openai"

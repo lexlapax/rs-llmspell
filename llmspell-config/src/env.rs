@@ -26,9 +26,10 @@ pub enum EnvCategory {
 }
 
 /// Isolation mode for environment variable handling
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IsolationMode {
     /// Use process environment (default)
+    #[default]
     Global,
     /// Ignore process env, use overrides only
     Isolated,
@@ -36,12 +37,6 @@ pub enum IsolationMode {
     Layered,
     /// Tenant-specific isolation
     Tenant(String),
-}
-
-impl Default for IsolationMode {
-    fn default() -> Self {
-        Self::Global
-    }
 }
 
 /// Validator function type alias to reduce complexity

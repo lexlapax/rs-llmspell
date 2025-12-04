@@ -4,6 +4,7 @@
 mod test_helpers;
 
 use llmspell_bridge::{
+    engine::bridge::ApiDependencies,
     engine::factory::{EngineFactory, LuaConfig},
     providers::ProviderManager,
     ComponentRegistry,
@@ -30,17 +31,16 @@ async fn test_script_execution_through_bridge() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
     // Inject APIs
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    engine.inject_apis(&api_deps).unwrap();
 
     // Execute a simple script
     let script = r#"
@@ -116,16 +116,15 @@ async fn test_streaming_through_bridge() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Try streaming execution (stub for now)
     let result = engine
@@ -189,16 +188,15 @@ async fn test_provider_integration() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test that we can access provider functionality
     let script = r"
@@ -222,16 +220,15 @@ async fn test_error_propagation() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test various error scenarios
     let error_cases = vec![
@@ -267,16 +264,15 @@ async fn test_multimodal_types_access() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test creating multimodal content (when API is available)
     let script = r"
@@ -311,16 +307,15 @@ async fn test_execution_context_integration() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers,
+        tool_registry,
+        agent_registry,
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Set custom execution context
     let mut context = llmspell_bridge::engine::bridge::ExecutionContext {
@@ -357,16 +352,15 @@ async fn test_bridge_performance_overhead() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Benchmark simple script execution
     let script = "return 1 + 1";
@@ -389,6 +383,7 @@ async fn test_bridge_performance_overhead() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_component_registration_integration() {
     use async_trait::async_trait;
+    use llmspell_bridge::engine::bridge::ApiDependencies;
     use llmspell_core::error::LLMSpellError;
     use llmspell_core::types::{AgentInput, AgentOutput};
     use llmspell_core::ExecutionContext;
@@ -463,16 +458,15 @@ async fn test_component_registration_integration() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers,
+        tool_registry,
+        agent_registry,
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Verify registry works
     assert_eq!(registry.list_agents(), vec!["mock-agent"]);
@@ -491,16 +485,15 @@ async fn test_concurrent_script_execution() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     let engine = Arc::new(engine);
 

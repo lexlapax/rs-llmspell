@@ -1,0 +1,5 @@
+# Memory Preset - Adaptive memory system
+[profile]
+name = "Memory"
+description = "Adaptive memory with SQLite persistence"
+extends = ["bases/cli", "features/memory", "envs/dev", "backends/sqlite"]

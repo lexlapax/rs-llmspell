@@ -478,6 +478,34 @@ ENTRYPOINT ["llmspell"]
 
 ## Common Development Tasks
 
+### Using Profiles for Development
+
+**v0.14.0**: Use builtin profiles for faster development cycles. See [Configuration Guide](../user-guide/03-configuration.md#builtin-profiles) for all 20 presets.
+
+```bash
+# Quick testing (minimal overhead)
+llmspell -p minimal run test-script.lua
+
+# Development with debug logging
+llmspell -p development run agent-dev.lua
+
+# RAG feature development
+llmspell -p rag-dev run doc-indexing.lua
+
+# Full stack development (all Phase 13 features)
+llmspell -p research run full-stack-dev.lua
+
+# Custom composition for specific testing
+llmspell -p bases/testing,features/full,backends/memory run integration-tests.lua
+```
+
+**Profile Recommendations by Task**:
+- **Unit testing**: `minimal` or `bases/testing,features/minimal`
+- **Agent development**: `development` or `providers`
+- **RAG development**: `rag-dev`
+- **Memory/graph testing**: `memory` or `research`
+- **Full integration**: `research` (trace logging)
+
 ### Bug Fix Workflow
 
 ```bash

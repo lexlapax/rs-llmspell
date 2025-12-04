@@ -1,0 +1,22 @@
+Synthetic Graph Dataset Summary
+================================
+
+Entities: 100000
+Relationships: 1000000
+Avg relationships per entity: 10.00
+
+Entity Types:
+  - person: 30000 (30.0%)
+  - concept: 25000 (25.0%)
+  - organization: 20000 (20.0%)
+  - event: 15000 (15.0%)
+  - location: 10000 (10.0%)
+
+Relationship Types:
+  - knows: 199985 (20.0%)
+  - works_at: 201069 (20.1%)
+  - part_of: 200075 (20.0%)
+  - caused_by: 198655 (19.9%)
+  - located_in: 200216 (20.0%)
+
+Temporal Range: 2020-11-13 17:28:18.846757 UTC to 2025-11-12 17:28:18.846757 UTC

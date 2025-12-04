@@ -1,0 +1,5 @@
+# Sessions Preset - Session management
+[profile]
+name = "Sessions"
+description = "Session management for multi-turn conversations"
+extends = ["bases/cli", "features/state", "envs/dev", "backends/memory"]

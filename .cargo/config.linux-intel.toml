@@ -1,0 +1,65 @@
+[alias]
+# Test aliases (use cargo test directly with feature flags)
+test-all = "test --workspace"
+test-unit = "test -p llmspell-testing --features unit-tests --test unit"
+test-integration = "test -p llmspell-testing --features integration-tests --test integration"
+test-agent = "test -p llmspell-testing --features agent-tests --test agents"
+test-scenario = "test -p llmspell-testing --features scenario-tests --test scenarios"
+test-lua = "test -p llmspell-testing --features lua-tests --test lua"
+bench-all = "bench -p llmspell-testing"
+
+# Quality check shortcuts
+fmt-check = "fmt --all -- --check"
+clippy-all = "clippy --workspace --all-features -- -D warnings"
+doc-all = "doc --workspace --no-deps --all-features --document-private-items"
+
+# Build shortcuts
+build-all = "build --workspace --all-features"
+build-release = "build --workspace --all-features --release"
+
+# ================================================================================
+# Optional Fast Linkers (50-80% faster, 60% less memory for large workspaces)
+# ================================================================================
+# PROBLEM: This workspace has 20 crates with deep dependency trees (surrealdb,
+# aws-sdk-*, candle-*, arrow, parquet, rocksdb). With --all-features enabled,
+# test binaries can require 4-8GB RAM just for linking. On limited-RAM systems,
+# the linker gets OOM-killed (signal 9) by the Linux kernel.
+#
+# SOLUTION: Use modern fast linkers that are 2-4x faster and use 60% less memory:
+# - Linux: mold (https://github.com/rui314/mold)
+# - macOS: lld (LLVM linker, separate Homebrew package as of LLVM 21+)
+#
+# INSTALLATION:
+# Linux (Debian/Ubuntu): sudo apt install mold
+# Linux (other): cargo install --locked mold OR build from source
+# macOS: brew install lld
+#
+# USAGE: Uncomment the section for your platform below. If the linker is not
+# installed, cargo will fall back to the default linker gracefully.
+#
+# VERIFICATION after uncommenting:
+# Linux: cargo build 2>&1 | grep mold      # Should show "mold" in linker invocation
+# macOS: cargo build 2>&1 | grep ld64.lld  # Should show "ld64.lld" in linker invocation
+# ================================================================================
+
+# Linux x86_64 - mold linker (50-80% faster than ld, 60% less memory)
+# Uncomment to enable after installing mold:
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# Linux ARM64 - mold linker
+# Uncomment to enable after installing mold:
+# [target.aarch64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# macOS Intel - lld linker (LLVM linker, 2-3x faster than ld64)
+# Uncomment to enable after installing lld via Homebrew (brew install lld):
+# [target.x86_64-apple-darwin]
+# rustflags = ["-C", "link-arg=-fuse-ld=/usr/local/opt/lld/bin/ld64.lld"]
+
+# macOS Apple Silicon - lld linker (LLVM linker, 2-3x faster than ld64)
+# Uncomment to enable after installing lld via Homebrew (brew install lld):
+# [target.aarch64-apple-darwin]
+# rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/opt/lld/bin/ld64.lld"]

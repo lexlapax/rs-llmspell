@@ -34,7 +34,6 @@ chrono.workspace = true
 parking_lot.workspace = true
 dashmap.workspace = true
 jsonschema.workspace = true
-once_cell.workspace = true
 
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }

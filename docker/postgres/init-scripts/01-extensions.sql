@@ -37,7 +37,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO llmspell;
 
 -- Create application user (Phase 13b.3: non-superuser for RLS testing/production)
 -- CRITICAL: Must NOT be superuser (superusers bypass RLS)
-CREATE ROLE llmspell_app WITH LOGIN PASSWORD 'llmspell_dev_pass';
+CREATE ROLE llmspell_app WITH LOGIN PASSWORD 'llmspell_app_pass';
 
 -- Grant application permissions (all CRUD operations, no DDL)
 GRANT CONNECT ON DATABASE llmspell_dev TO llmspell_app;

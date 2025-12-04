@@ -43,6 +43,7 @@ llmspell-testing = { path = "../llmspell-testing" }
 [features]
 default = []
 testing = ["mockall"]
+postgres = []  # Feature gate for PostgreSQL-specific storage types
 
 [[bench]]
 name = "core_benchmarks"

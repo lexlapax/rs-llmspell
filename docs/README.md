@@ -124,7 +124,7 @@
 **Experimental Platform** with **Production-Quality Foundations** (v0.13.0):
 - ✅ **Adaptive Memory System** with 3-tier architecture (episodic/semantic/procedural) (Phase 13) ⭐
 - ✅ **Memory + Context Globals** (17th/18th Lua globals) for experimental memory patterns ⭐
-- ✅ **Hot-Swappable Backends** (InMemory/HNSW/SurrealDB) with 8.47x speedup ⭐
+- ✅ **Hot-Swappable Backends** (InMemory/vectorlite-rs HNSW/SQLite/PostgreSQL) with 8.47x speedup ⭐
 - ✅ **10 Experimental Workflows** with 6 base + 4 advanced templates (Phase 12)
 - ✅ **Template CLI** (5 subcommands: list, info, exec, search, schema)
 - ✅ **Template Lua API** (Template global, 16th of 18, with 6 methods)
@@ -165,8 +165,8 @@
 - ✅ **64+ production examples** across 7 categories (including templates and local LLM)
 
 **Phase 13 Achievements** (v0.13.0 - Experimental Infrastructure):
-- ✅ **3-Tier Memory System**: Episodic (HNSW), Semantic (SurrealDB graph), Procedural (patterns)
-- ✅ **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SurrealDB (bi-temporal graph)
+- ✅ **3-Tier Memory System**: Episodic (vectorlite-rs HNSW), Semantic (SQLite/PostgreSQL bi-temporal graph), Procedural (patterns)
+- ✅ **Hot-Swappable Backends**: InMemory (dev), vectorlite-rs HNSW (8.47x speedup), SQLite/PostgreSQL (bi-temporal graph)
 - ✅ **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
 - ✅ **<2ms Memory Overhead**: 50x faster than target, production-quality validation at scale
 - ✅ **149 Tests**: 100% pass rate, zero warnings, comprehensive validation

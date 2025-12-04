@@ -1,26 +1,27 @@
 # Service Deployment Guide
 
-**Version**: 0.9.0
-**Last Updated**: December 2024
+**Version**: 0.13.x (Phase 13)
+**Last Updated**: December 2025
 
-> **🚀 Production Deployment**: Deploy LLMSpell kernel as a system service with systemd (Linux) or launchd (macOS).
+> **🚀 Production Deployment**: Deploy LLMSpell kernel as a system service with systemd (Linux) or launchd (macOS). Use builtin profiles for zero-config deployment.
 
-**🔗 Navigation**: [← User Guide](README.md) | [Configuration →](configuration.md) | [Troubleshooting →](troubleshooting.md)
+**🔗 Navigation**: [← User Guide](README.md) | [Profile Guide →](profile-layers-guide.md) | [Configuration →](03-configuration.md) | [Troubleshooting →](10-troubleshooting.md)
 
 ---
 
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Deployment Modes](#deployment-modes)
-3. [systemd Deployment (Linux)](#systemd-deployment-linux)
-4. [launchd Deployment (macOS)](#launchd-deployment-macos)
-5. [Configuration](#configuration)
-6. [Managing Services](#managing-services)
-7. [Monitoring & Logging](#monitoring--logging)
-8. [Security Best Practices](#security-best-practices)
-9. [Troubleshooting](#troubleshooting)
-10. [Programmatic Deployment](#programmatic-deployment)
+2. [Profile Selection by Environment](#profile-selection-by-environment)
+3. [Deployment Modes](#deployment-modes)
+4. [systemd Deployment (Linux)](#systemd-deployment-linux)
+5. [launchd Deployment (macOS)](#launchd-deployment-macos)
+6. [Configuration](#configuration)
+7. [Managing Services](#managing-services)
+8. [Monitoring & Logging](#monitoring--logging)
+9. [Security Best Practices](#security-best-practices)
+10. [Troubleshooting](#troubleshooting)
+11. [Programmatic Deployment](#programmatic-deployment)
     - [Architecture Overview](#architecture-overview)
     - [Basic Embedded Service](#basic-embedded-service)
     - [HTTP Service Example](#http-service-example)
@@ -46,6 +47,58 @@ Install LLMSpell kernel as a service with auto-detection:
 # Enable and start immediately
 ./target/release/llmspell kernel install-service --enable --start
 ```
+
+## Profile Selection by Environment
+
+Use **builtin profiles** for zero-config deployment. See [Profile Guide](profile-layers-guide.md) for full details.
+
+### Development
+```bash
+# Quick iteration with debug logging
+llmspell -p development run script.lua
+
+# Memory system debugging
+llmspell -p memory-development run script.lua
+
+# RAG development with verbose output
+llmspell -p rag-dev run script.lua
+```
+
+### Staging
+```bash
+# PostgreSQL backend validation
+export LLMSPELL_POSTGRES_URL="postgresql://user:pass@host:5432/llmspell_staging"
+llmspell -p postgres-prod run script.lua
+
+# Production RAG settings test
+llmspell -p rag-prod run script.lua
+```
+
+### Production
+```bash
+# PostgreSQL with production settings (recommended)
+export LLMSPELL_POSTGRES_URL="postgresql://user:pass@host:5432/llmspell_prod"
+llmspell -p postgres-prod run script.lua
+
+# Local LLM production (Ollama)
+ollama serve
+llmspell -p full-local-ollama run script.lua
+
+# Cloud LLM production
+llmspell -p openai-prod run script.lua  # or claude-prod, gemini-prod
+```
+
+### Profile Quick Reference
+
+| Environment | Profile | Prerequisites |
+|-------------|---------|---------------|
+| Development | `development` | API keys |
+| Memory Dev | `memory-development` | API keys |
+| RAG Dev | `rag-dev` | API keys |
+| Staging | `postgres-prod` | PostgreSQL + API keys |
+| Production (Cloud) | `openai-prod`, `claude-prod` | API keys |
+| Production (Local) | `full-local-ollama` | Ollama + models |
+| Production (PG) | `postgres-prod` | PostgreSQL + API keys |
 
 ## Deployment Modes
 

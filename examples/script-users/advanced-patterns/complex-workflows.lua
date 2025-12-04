@@ -1,8 +1,14 @@
+-- Profile: research (recommended)
+-- Run with: llmspell -p research run complex-workflows.lua
+-- Full stack with trace logging for complex patterns
+
 -- ============================================================
 -- LLMSPELL ADVANCED PATTERNS SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: advanced-patterns
 -- Pattern ID: 02 - Complex Workflow Patterns v0.7.0
--- Complexity Level: ADVANCED
+-- Complexity: ADVANCED
 -- Real-World Use Case: Enterprise automation and decision systems
 -- Pattern Category: Workflow Orchestration
 --

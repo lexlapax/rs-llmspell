@@ -1,3 +1,7 @@
+-- Recommended profile: minimal
+-- Run with: llmspell -p minimal run user-input.lua
+-- Input file (no execution profile needed)
+
 -- WebApp Creator User Input File
 -- Modify this file to specify your web application requirements
 -- The main.lua file will load these specifications and generate your app

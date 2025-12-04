@@ -1,8 +1,14 @@
+-- Profile: memory (recommended)
+-- Run with: llmspell -p memory run memory-stats.lua
+-- Adaptive memory system
+
 -- ============================================================
--- LLMSPELL FEATURES - MEMORY MONITORING
+-- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 -- Feature: Memory Statistics and Monitoring
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Production monitoring, capacity planning
 --
 -- Purpose: Learn how to monitor memory system health, track growth,
@@ -18,7 +24,7 @@
 --   • Capacity planning metrics
 --
 -- Prerequisites:
---   • Completed getting-started/06-episodic-memory-basic.lua
+--   • Completed getting-started/05-memory-rag-advanced.lua
 --   • Basic understanding of episodic and semantic memory
 --
 -- HOW TO RUN:

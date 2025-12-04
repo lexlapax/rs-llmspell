@@ -34,7 +34,7 @@ use super::semantic::Entity;
 ///
 /// ```rust,no_run
 /// use llmspell_memory::traits::ConsolidationDecision;
-/// use llmspell_graph::types::Entity;
+/// use llmspell_graph::Entity;
 /// use serde_json::json;
 /// use chrono::Utc;
 ///

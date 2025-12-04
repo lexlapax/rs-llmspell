@@ -4,7 +4,7 @@
 use anyhow::Result;
 use llmspell_agents::{agents::basic::BasicAgent, builder::AgentBuilder, state::StatePersistence};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_kernel::state::config::SledConfig;
+use llmspell_kernel::state::config::SqliteConfig;
 use llmspell_kernel::state::{PersistenceConfig, StateManager, StateScope, StorageBackendType};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -27,16 +27,17 @@ mod tests {
 
         let state_manager = Arc::new(
             StateManager::with_backend(
-                StorageBackendType::Sled(SledConfig {
-                    path: storage_path.join("state_db"),
-                    cache_capacity: 1024 * 1024,
-                    use_compression: true,
+                StorageBackendType::Sqlite(SqliteConfig {
+                    path: storage_path.join("state_db.db"),
                 }),
                 PersistenceConfig::default(),
                 None, // No memory manager for this test
             )
             .await?,
         );
+
+        // Run migrations before using the state manager
+        state_manager.run_migrations().await?;
 
         // Create multiple agents with same state manager
         let config1 = AgentBuilder::basic("agent-1")
@@ -136,16 +137,17 @@ mod tests {
 
         let state_manager = Arc::new(
             StateManager::with_backend(
-                StorageBackendType::Sled(SledConfig {
-                    path: storage_path.join("state_db"),
-                    cache_capacity: 1024 * 1024,
-                    use_compression: true,
+                StorageBackendType::Sqlite(SqliteConfig {
+                    path: storage_path.join("state_db.db"),
                 }),
                 PersistenceConfig::default(),
                 None, // No memory manager for this test
             )
             .await?,
         );
+
+        // Run migrations before using the state manager
+        state_manager.run_migrations().await?;
 
         // Create shared context in global scope
         state_manager
@@ -216,16 +218,17 @@ mod tests {
         {
             let state_manager = Arc::new(
                 StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: storage_path.join("state_db"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
+                    StorageBackendType::Sqlite(SqliteConfig {
+                        path: storage_path.join("state_db.db"),
                     }),
                     enabled_persistence_config(),
                     None, // No memory manager for this test
                 )
                 .await?,
             );
+
+            // Run migrations before using the state manager
+            state_manager.run_migrations().await?;
 
             let config = AgentBuilder::basic(agent_id)
                 .description("Agent with persistent state")
@@ -264,16 +267,17 @@ mod tests {
         {
             let state_manager = Arc::new(
                 StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: storage_path.join("state_db"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
+                    StorageBackendType::Sqlite(SqliteConfig {
+                        path: storage_path.join("state_db.db"),
                     }),
                     enabled_persistence_config(),
                     None, // No memory manager for this test
                 )
                 .await?,
             );
+
+            // Run migrations (idempotent - safe to run again)
+            state_manager.run_migrations().await?;
 
             let config = AgentBuilder::basic(agent_id)
                 .description("Agent with persistent state")
@@ -313,16 +317,17 @@ mod tests {
 
         let state_manager = Arc::new(
             StateManager::with_backend(
-                StorageBackendType::Sled(SledConfig {
-                    path: storage_path.join("state_db"),
-                    cache_capacity: 1024 * 1024,
-                    use_compression: true,
+                StorageBackendType::Sqlite(SqliteConfig {
+                    path: storage_path.join("state_db.db"),
                 }),
                 PersistenceConfig::default(),
                 None, // No memory manager for this test
             )
             .await?,
         );
+
+        // Run migrations before using the state manager
+        state_manager.run_migrations().await?;
 
         // Shared task queue
         let task_queue = Arc::new(RwLock::new(vec![
@@ -421,16 +426,17 @@ mod tests {
         {
             let state_manager = Arc::new(
                 StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: storage_path.join("state_db"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
+                    StorageBackendType::Sqlite(SqliteConfig {
+                        path: storage_path.join("state_db.db"),
                     }),
                     enabled_persistence_config(),
                     None, // No memory manager for this test
                 )
                 .await?,
             );
+
+            // Run migrations before using the state manager
+            state_manager.run_migrations().await?;
 
             // Save state in old format
             state_manager
@@ -452,16 +458,17 @@ mod tests {
         {
             let state_manager = Arc::new(
                 StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: storage_path.join("state_db"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
+                    StorageBackendType::Sqlite(SqliteConfig {
+                        path: storage_path.join("state_db.db"),
                     }),
                     enabled_persistence_config(),
                     None, // No memory manager for this test
                 )
                 .await?,
             );
+
+            // Run migrations (idempotent - safe to run again)
+            state_manager.run_migrations().await?;
 
             // Read old state
             let old_state = state_manager

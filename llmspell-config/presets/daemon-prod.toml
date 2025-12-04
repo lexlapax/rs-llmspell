@@ -1,0 +1,5 @@
+# Daemon Production Preset - Production background service
+[profile]
+name = "Daemon Production"
+description = "Production daemon with full features and PostgreSQL"
+extends = ["bases/daemon", "features/full", "envs/prod", "backends/postgres"]

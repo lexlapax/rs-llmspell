@@ -6,25 +6,24 @@
 
 ## 📚 Examples
 
-Six comprehensive examples demonstrating LLMSpell Rust integration patterns.
+Three core examples demonstrating LLMSpell Rust integration patterns. For advanced patterns like async execution, builder patterns, and extension architecture, see API documentation and developer guides.
 
 **Complete Learning Path:**
 1. **[custom-tool-example](custom-tool-example/)** - Creating custom tools with BaseAgent + Tool traits
 2. **[custom-agent-example](custom-agent-example/)** - Building agents with personalities and specializations
-3. **[async-patterns-example](async-patterns-example/)** - Concurrent execution, streaming, timeouts, and pipelines
-4. **[extension-pattern-example](extension-pattern-example/)** - Plugin/extension architecture for extensible tools
-5. **[builder-pattern-example](builder-pattern-example/)** - Fluent APIs and complex tool configuration
-6. **[integration-test-example](integration-test-example/)** - Comprehensive testing strategies and patterns
+3. **[integration-test-example](integration-test-example/)** - Comprehensive testing strategies and patterns
 
 **Key Concepts Covered:**
 - BaseAgent trait implementation patterns
 - Tool trait with categories and security levels
 - AgentInput/AgentOutput structured communication
 - Parameter validation and error handling
-- Async patterns with tokio primitives
-- Extension/plugin architecture patterns
-- Builder pattern for complex configuration
 - Unit testing, integration testing, and mocking
+
+**Advanced Patterns (See API Docs):**
+- **Async Patterns**: See doc tests in [llmspell-core BaseAgent](https://docs.rs/llmspell-core) - concurrent execution, timeouts, select patterns
+- **Builder Pattern**: See doc tests in [llmspell-tools](https://docs.rs/llmspell-tools) - fluent APIs and tool configuration
+- **Extension Architecture**: See [Extension Architecture Guide](../../docs/developer-guide/extension-architecture.md) - plugin/extension systems
 
 ## 🚀 Running Examples
 
@@ -34,9 +33,6 @@ Each example is a standalone Rust project with its own Cargo.toml:
 # Run any example (from rust-developers/)
 cd custom-tool-example && cargo run
 cd custom-agent-example && cargo run
-cd async-patterns-example && cargo run
-cd extension-pattern-example && cargo run
-cd builder-pattern-example && cargo run
 cd integration-test-example && cargo run
 
 # Run tests for integration-test-example
@@ -44,12 +40,13 @@ cd integration-test-example && cargo test
 
 # Check compilation for all examples
 cd custom-tool-example && cargo check
-# ... repeat for other examples
+cd custom-agent-example && cargo check
+cd integration-test-example && cargo check
 ```
 
-**Compilation Time:** ~30 seconds first build, <1 second subsequent builds  
-**Execution Time:** <5 seconds per example  
-**Total Learning Time:** ~30 minutes for all 6 examples
+**Compilation Time:** ~20 seconds first build, <1 second subsequent builds
+**Execution Time:** <5 seconds per example
+**Total Learning Time:** ~15 minutes for all 3 core examples
 
 ## 📖 Prerequisites
 
@@ -73,21 +70,22 @@ cd custom-tool-example && cargo check
 1. **Start here:** [custom-tool-example](custom-tool-example/) - Learn BaseAgent + Tool fundamentals
 2. **Then:** [custom-agent-example](custom-agent-example/) - Understand agent personalities and specialization
 3. **Finally:** [integration-test-example](integration-test-example/) - Learn testing patterns
+4. **Advanced:** Read [Extension Architecture Guide](../../docs/developer-guide/extension-architecture.md) for extensible systems
 
 ### Experienced Rust Developer
 1. **Quick start:** [custom-tool-example](custom-tool-example/) - API overview in 5 minutes
-2. **Advanced patterns:** [async-patterns-example](async-patterns-example/) - Concurrent execution patterns
-3. **Architecture:** [extension-pattern-example](extension-pattern-example/) - Plugin system design
+2. **Advanced patterns:** See [llmspell-core doc tests](https://docs.rs/llmspell-core) for async execution patterns
+3. **Architecture:** [Extension Architecture Guide](../../docs/developer-guide/extension-architecture.md) for plugin system design
 
 ### Building Production Systems
 1. **Testing:** [integration-test-example](integration-test-example/) - Professional testing strategies
-2. **Configuration:** [builder-pattern-example](builder-pattern-example/) - Flexible tool configuration
-3. **Performance:** [async-patterns-example](async-patterns-example/) - Concurrent execution optimization
+2. **Configuration:** See [llmspell-tools doc tests](https://docs.rs/llmspell-tools) for builder patterns
+3. **Performance:** See [llmspell-core doc tests](https://docs.rs/llmspell-core) for concurrent execution optimization
 
 ### Specific Use Cases
-- **Need extensible tools?** → [extension-pattern-example](extension-pattern-example/)
-- **Complex configuration?** → [builder-pattern-example](builder-pattern-example/)
-- **High performance?** → [async-patterns-example](async-patterns-example/)
+- **Need extensible tools?** → [Extension Architecture Guide](../../docs/developer-guide/extension-architecture.md)
+- **Complex configuration?** → [llmspell-tools builder pattern doc tests](https://docs.rs/llmspell-tools)
+- **High performance?** → [llmspell-core async pattern doc tests](https://docs.rs/llmspell-core)
 - **Agent personalities?** → [custom-agent-example](custom-agent-example/)
 
 ## 📝 Example Standards
@@ -104,5 +102,6 @@ All examples follow Rust best practices:
 
 - [Script User Examples](../script-users/) - Lua scripting
 - [Developer Guide](../../docs/developer-guide/) - Architecture docs
-- [API Reference](https://docs.rs/llmspell/) - Rust API docs
+- [Extension Architecture](../../docs/developer-guide/extension-architecture.md) - Plugin system design
+- [API Reference](https://docs.rs/llmspell/) - Rust API docs (includes async/builder pattern doc tests)
 - [Contributing Guide](../../CONTRIBUTING.md) - Contribution guidelines

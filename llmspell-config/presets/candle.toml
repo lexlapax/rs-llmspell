@@ -1,0 +1,5 @@
+# Candle Preset - Local inference with Candle
+[profile]
+name = "Candle"
+description = "On-device inference using Candle ML framework"
+extends = ["bases/cli", "features/llm-local", "envs/dev", "backends/memory"]

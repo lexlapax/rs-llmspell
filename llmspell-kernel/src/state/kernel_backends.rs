@@ -3,7 +3,6 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use std::fmt;
-use std::path::PathBuf;
 
 use super::types::{DebugState, ExecutionState, SessionState};
 
@@ -12,8 +11,6 @@ use super::types::{DebugState, ExecutionState, SessionState};
 pub enum StorageBackend {
     /// In-memory storage (no persistence)
     Memory(Box<MemoryBackend>),
-    /// Sled embedded database storage
-    Sled(SledBackend),
     /// Vector storage backend
     Vector(VectorBackend),
 }
@@ -22,7 +19,6 @@ impl fmt::Debug for StorageBackend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Memory(_) => write!(f, "Memory"),
-            Self::Sled(_) => write!(f, "Sled"),
             Self::Vector(_) => write!(f, "Vector"),
         }
     }
@@ -40,7 +36,6 @@ impl StorageBackend {
                 backend.store_execution(state);
                 Ok(())
             }
-            Self::Sled(backend) => backend.store_execution(state),
             Self::Vector(backend) => backend.store_execution(state),
         }
     }
@@ -53,7 +48,6 @@ impl StorageBackend {
     pub fn load_execution(&self) -> Result<Option<ExecutionState>> {
         match self {
             Self::Memory(backend) => Ok(backend.load_execution()),
-            Self::Sled(backend) => backend.load_execution(),
             Self::Vector(backend) => backend.load_execution(),
         }
     }
@@ -69,7 +63,6 @@ impl StorageBackend {
                 backend.store_session(state);
                 Ok(())
             }
-            Self::Sled(backend) => backend.store_session(state),
             Self::Vector(backend) => backend.store_session(state),
         }
     }
@@ -82,7 +75,6 @@ impl StorageBackend {
     pub fn load_session(&self) -> Result<Option<SessionState>> {
         match self {
             Self::Memory(backend) => Ok(backend.load_session()),
-            Self::Sled(backend) => backend.load_session(),
             Self::Vector(backend) => backend.load_session(),
         }
     }
@@ -98,7 +90,6 @@ impl StorageBackend {
                 backend.store_debug(state);
                 Ok(())
             }
-            Self::Sled(backend) => backend.store_debug(state),
             Self::Vector(backend) => backend.store_debug(state),
         }
     }
@@ -111,7 +102,6 @@ impl StorageBackend {
     pub fn load_debug(&self) -> Result<Option<DebugState>> {
         match self {
             Self::Memory(backend) => Ok(backend.load_debug()),
-            Self::Sled(backend) => backend.load_debug(),
             Self::Vector(backend) => backend.load_debug(),
         }
     }
@@ -127,7 +117,6 @@ impl StorageBackend {
                 backend.clear();
                 Ok(())
             }
-            Self::Sled(backend) => backend.clear(),
             Self::Vector(backend) => {
                 backend.clear();
                 Ok(())
@@ -178,90 +167,6 @@ impl MemoryBackend {
         self.execution = None;
         self.session = None;
         self.debug = None;
-    }
-}
-
-/// Sled embedded database backend for persistent storage
-#[derive(Clone)]
-pub struct SledBackend {
-    db: sled::Db,
-}
-
-impl SledBackend {
-    /// Create a new Sled backend
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if database creation fails
-    pub fn new(path: PathBuf) -> Result<Self> {
-        let db = sled::open(path)?;
-        Ok(Self { db })
-    }
-
-    /// Create a temporary Sled backend (for testing)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if database creation fails
-    pub fn temporary() -> Result<Self> {
-        let db = sled::Config::new().temporary(true).open()?;
-        Ok(Self { db })
-    }
-
-    fn store_execution(&mut self, state: &ExecutionState) -> Result<()> {
-        let serialized = serde_json::to_vec(state)?;
-        self.db.insert(b"execution_state", serialized)?;
-        self.db.flush()?;
-        Ok(())
-    }
-
-    fn load_execution(&self) -> Result<Option<ExecutionState>> {
-        if let Some(data) = self.db.get(b"execution_state")? {
-            let state = serde_json::from_slice(&data)?;
-            Ok(Some(state))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn store_session(&mut self, state: &SessionState) -> Result<()> {
-        let serialized = serde_json::to_vec(state)?;
-        self.db.insert(b"session_state", serialized)?;
-        self.db.flush()?;
-        Ok(())
-    }
-
-    fn load_session(&self) -> Result<Option<SessionState>> {
-        if let Some(data) = self.db.get(b"session_state")? {
-            let state = serde_json::from_slice(&data)?;
-            Ok(Some(state))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn store_debug(&mut self, state: &DebugState) -> Result<()> {
-        let serialized = serde_json::to_vec(state)?;
-        self.db.insert(b"debug_state", serialized)?;
-        self.db.flush()?;
-        Ok(())
-    }
-
-    fn load_debug(&self) -> Result<Option<DebugState>> {
-        if let Some(data) = self.db.get(b"debug_state")? {
-            let state = serde_json::from_slice(&data)?;
-            Ok(Some(state))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn clear(&mut self) -> Result<()> {
-        self.db.remove(b"execution_state")?;
-        self.db.remove(b"session_state")?;
-        self.db.remove(b"debug_state")?;
-        self.db.flush()?;
-        Ok(())
     }
 }
 
@@ -409,17 +314,6 @@ mod tests {
         backend.store_execution(&exec_state);
         let loaded = backend.load_execution().unwrap();
         assert_eq!(loaded.execution_count, 1);
-    }
-
-    #[test]
-    fn test_sled_backend() {
-        let mut backend = SledBackend::temporary().unwrap();
-        let mut session_state = SessionState::default();
-        session_state.set_id("test-session");
-
-        backend.store_session(&session_state).unwrap();
-        let loaded = backend.load_session().unwrap().unwrap();
-        assert_eq!(loaded.session_id, Some("test-session".to_string()));
     }
 
     #[test]

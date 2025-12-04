@@ -4,6 +4,7 @@
 mod test_helpers;
 use test_helpers::create_test_infrastructure;
 
+use llmspell_bridge::engine::bridge::ApiDependencies;
 use llmspell_bridge::engine::factory::LuaConfig;
 use llmspell_bridge::engine::ScriptEngineBridge;
 use llmspell_bridge::lua::LuaEngine;
@@ -45,16 +46,15 @@ async fn test_lua_workflow_sequential_creation() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     let script = r#"
         local workflow = Workflow.sequential({
@@ -87,16 +87,15 @@ async fn test_lua_workflow_parallel() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     let script = r#"
         local workflow = Workflow.parallel({
@@ -126,16 +125,15 @@ async fn test_lua_workflow_conditional() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Use builder API pattern as per fixed implementation
     let script = r#"
@@ -186,16 +184,15 @@ async fn test_lua_workflow_loop() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     let script = r#"
         local workflow = Workflow.loop({
@@ -230,16 +227,15 @@ async fn test_lua_workflow_list() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     let script = r#"
         -- Create a workflow first
@@ -273,16 +269,15 @@ async fn test_lua_workflow_discover_types() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     let script = r#"
         local types = Workflow.types()
@@ -329,16 +324,15 @@ async fn test_lua_workflow_error_handling() {
     let mut engine = create_test_engine();
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Test with invalid workflow configuration
     let script = r"

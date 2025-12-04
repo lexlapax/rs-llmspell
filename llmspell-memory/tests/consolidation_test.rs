@@ -3,27 +3,25 @@
 //! Tests the end-to-end flow: Episodic → Consolidation → Semantic
 
 use llmspell_graph::extraction::RegexExtractor;
-use llmspell_graph::storage::surrealdb::SurrealDBBackend;
 use llmspell_memory::consolidation::ManualConsolidationEngine;
 use llmspell_memory::episodic::InMemoryEpisodicMemory;
 use llmspell_memory::manager::DefaultMemoryManager;
 use llmspell_memory::semantic::GraphSemanticMemory;
 use llmspell_memory::traits::MemoryManager;
 use llmspell_memory::types::{ConsolidationMode, EpisodicEntry};
+use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteGraphStorage};
 use std::sync::Arc;
-use tempfile::TempDir;
 
 /// Create test manager with manual consolidation engine
-async fn create_test_manager() -> (DefaultMemoryManager, TempDir) {
-    let temp_dir = TempDir::new().unwrap();
-
+async fn create_test_manager() -> DefaultMemoryManager {
     // Create backends
     let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    let graph = Arc::new(
-        SurrealDBBackend::new(temp_dir.path().to_path_buf())
-            .await
-            .unwrap(),
-    );
+
+    // Create in-memory SQLite backend for testing
+    let config = SqliteConfig::in_memory();
+    let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+    let graph = Arc::new(SqliteGraphStorage::new(backend));
+
     let semantic = Arc::new(GraphSemanticMemory::new(graph.clone()));
     let procedural = Arc::new(llmspell_memory::procedural::NoopProceduralMemory);
 
@@ -31,15 +29,12 @@ async fn create_test_manager() -> (DefaultMemoryManager, TempDir) {
     let extractor = Arc::new(RegexExtractor::new());
     let consolidation = Arc::new(ManualConsolidationEngine::new(extractor, graph));
 
-    let manager =
-        DefaultMemoryManager::with_consolidation(episodic, semantic, procedural, consolidation);
-
-    (manager, temp_dir)
+    DefaultMemoryManager::with_consolidation(episodic, semantic, procedural, consolidation)
 }
 
 #[tokio::test]
 async fn test_episodic_to_semantic_flow() {
-    let (manager, _temp) = create_test_manager().await;
+    let manager = create_test_manager().await;
 
     // Add episodic entries about Rust
     let entry1 = EpisodicEntry::new(
@@ -78,7 +73,7 @@ async fn test_episodic_to_semantic_flow() {
 
 #[tokio::test]
 async fn test_consolidation_marks_entries_processed() {
-    let (manager, _temp) = create_test_manager().await;
+    let manager = create_test_manager().await;
 
     // Add episodic entry
     let entry = EpisodicEntry::new(
@@ -108,7 +103,7 @@ async fn test_consolidation_marks_entries_processed() {
 
 #[tokio::test]
 async fn test_consolidation_skips_processed_entries() {
-    let (manager, _temp) = create_test_manager().await;
+    let manager = create_test_manager().await;
 
     // Add and process an entry
     let entry = EpisodicEntry::new(
@@ -137,7 +132,7 @@ async fn test_consolidation_skips_processed_entries() {
 
 #[tokio::test]
 async fn test_consolidation_session_isolation() {
-    let (manager, _temp) = create_test_manager().await;
+    let manager = create_test_manager().await;
 
     // Add entries to different sessions
     let entry1 = EpisodicEntry::new(
@@ -169,7 +164,7 @@ async fn test_consolidation_session_isolation() {
 
 #[tokio::test]
 async fn test_empty_session_consolidation() {
-    let (manager, _temp) = create_test_manager().await;
+    let manager = create_test_manager().await;
 
     // Consolidate non-existent session
     let result = manager
@@ -183,7 +178,7 @@ async fn test_empty_session_consolidation() {
 
 #[tokio::test]
 async fn test_multiple_relationship_extraction() {
-    let (manager, _temp) = create_test_manager().await;
+    let manager = create_test_manager().await;
 
     // Add entry with multiple relationships
     let entry = EpisodicEntry::new(
@@ -238,7 +233,7 @@ async fn test_consolidation_with_no_op_engine() {
 
 #[tokio::test]
 async fn test_consolidation_immediate_mode() {
-    let (manager, _temp) = create_test_manager().await;
+    let manager = create_test_manager().await;
 
     let entry = EpisodicEntry::new(
         "session-1".to_string(),
@@ -256,4 +251,76 @@ async fn test_consolidation_immediate_mode() {
 
     assert_eq!(result.entries_processed, 1);
     assert!(result.entities_added > 0);
+}
+
+#[tokio::test]
+async fn test_regex_extractor_standalone() {
+    let extractor = llmspell_graph::extraction::RegexExtractor::new();
+    let text = "Rust is a systems programming language. Rust has memory safety.";
+    let entities = extractor.extract_entities(text);
+
+    println!("Text: {text}");
+    println!("Entities extracted: {}", entities.len());
+    for ent in &entities {
+        println!("  - {}", ent.name);
+    }
+
+    assert!(
+        !entities.is_empty(),
+        "RegexExtractor should extract entities"
+    );
+    assert!(
+        entities.iter().any(|e| e.name == "Rust"),
+        "Should extract Rust"
+    );
+}
+
+#[tokio::test]
+async fn test_consolidation_debug() {
+    let manager = create_test_manager().await;
+
+    // Add episodic entries
+    let entry1 = EpisodicEntry::new(
+        "session-debug".to_string(),
+        "user".to_string(),
+        "Tell me about Rust programming language.".to_string(),
+    );
+
+    let entry2 = EpisodicEntry::new(
+        "session-debug".to_string(),
+        "assistant".to_string(),
+        "Rust is a systems programming language. Rust has memory safety.".to_string(),
+    );
+
+    manager.episodic().add(entry1.clone()).await.unwrap();
+    manager.episodic().add(entry2.clone()).await.unwrap();
+
+    println!(
+        "Entry 1: {} (processed: {})",
+        entry1.content, entry1.processed
+    );
+    println!(
+        "Entry 2: {} (processed: {})",
+        entry2.content, entry2.processed
+    );
+
+    // Trigger consolidation
+    let result = manager
+        .consolidate(
+            "session-debug",
+            llmspell_memory::types::ConsolidationMode::Manual,
+            None,
+        )
+        .await
+        .unwrap();
+
+    println!("Consolidation result:");
+    println!("  entries_processed: {}", result.entries_processed);
+    println!("  entities_added: {}", result.entities_added);
+
+    assert_eq!(result.entries_processed, 2, "Should process both entries");
+    assert!(
+        result.entities_added > 0,
+        "Should extract at least one entity"
+    );
 }

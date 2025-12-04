@@ -1,0 +1,5 @@
+# Full Local with Ollama Preset - Complete local stack
+[profile]
+name = "Full Local Ollama"
+description = "Full features with local Ollama models and SQLite"
+extends = ["bases/cli", "features/full", "features/llm-local", "envs/dev", "backends/sqlite"]

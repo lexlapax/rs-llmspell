@@ -12,7 +12,6 @@ use crate::engine::{
 use crate::lua::completion::LuaCompletionProvider;
 use crate::lua::globals::args::inject_args_global;
 use crate::lua::output_capture::{install_output_capture, ConsoleCapture};
-use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
 use llmspell_core::traits::debug_context::DebugContext;
@@ -399,22 +398,20 @@ impl ScriptEngineBridge for LuaEngine {
     #[allow(clippy::cognitive_complexity)]
     #[instrument(
         level = "info",
-        skip(self, registry, providers, tool_registry, agent_registry, workflow_factory, session_manager),
+        skip(self, deps),
         fields(
             engine_type = "lua",
             globals_injected = 0,
             infrastructure_initialized = 0,
-            session_manager_provided = session_manager.is_some()
+            session_manager_provided = deps.session_manager.is_some(),
+            state_manager_provided = deps.state_manager.is_some(),
+            rag_provided = deps.rag.is_some()
         )
     )]
+    #[allow(clippy::too_many_lines)]
     fn inject_apis(
         &mut self,
-        registry: &Arc<ComponentRegistry>,
-        providers: &Arc<ProviderManager>,
-        tool_registry: &Arc<llmspell_tools::ToolRegistry>,
-        agent_registry: &Arc<llmspell_agents::FactoryRegistry>,
-        workflow_factory: &Arc<dyn llmspell_workflows::WorkflowFactory>,
-        session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
+        deps: &crate::engine::bridge::ApiDependencies,
     ) -> Result<(), LLMSpellError> {
         info!("Injecting Lua global APIs");
         #[cfg(feature = "lua")]
@@ -429,25 +426,53 @@ impl ScriptEngineBridge for LuaEngine {
 
             // Create global context with or without state
             let global_context = state_access.map_or_else(
-                || Arc::new(GlobalContext::new(registry.clone(), providers.clone())),
+                || {
+                    Arc::new(GlobalContext::new(
+                        deps.registry.clone(),
+                        deps.providers.clone(),
+                    ))
+                },
                 |state| {
                     Arc::new(GlobalContext::with_state(
-                        registry.clone(),
-                        providers.clone(),
+                        deps.registry.clone(),
+                        deps.providers.clone(),
                         state,
                     ))
                 },
             );
 
             // Store infrastructure registries and SessionManager in GlobalContext (Phase 12.8.2.13)
-            global_context.set_bridge("tool_registry", tool_registry.clone());
-            global_context.set_bridge("agent_registry", agent_registry.clone());
-            global_context.set_bridge("workflow_factory", Arc::new(workflow_factory.clone()));
-            if let Some(session_manager_any) = session_manager {
-                if let Ok(session_manager) =
-                    Arc::downcast::<llmspell_kernel::sessions::SessionManager>(session_manager_any)
-                {
+            global_context.set_bridge("tool_registry", deps.tool_registry.clone());
+            global_context.set_bridge("agent_registry", deps.agent_registry.clone());
+            global_context.set_bridge("workflow_factory", Arc::new(deps.workflow_factory.clone()));
+            if let Some(session_manager_any) = &deps.session_manager {
+                if let Ok(session_manager) = Arc::clone(session_manager_any)
+                    .downcast::<llmspell_kernel::sessions::SessionManager>(
+                ) {
                     global_context.set_bridge("session_manager", session_manager);
+                }
+            }
+            // Store StateManager in GlobalContext (Phase 13c.2.8.15)
+            if let Some(state_manager_any) = &deps.state_manager {
+                if let Ok(state_manager) =
+                    Arc::clone(state_manager_any).downcast::<llmspell_kernel::state::StateManager>()
+                {
+                    global_context.set_bridge("state_manager", state_manager);
+                }
+            }
+            // Store RAG infrastructure in GlobalContext (Phase 13c.2.8.15)
+            if let Some(rag_any) = &deps.rag {
+                if let Ok(rag_infrastructure) =
+                    Arc::clone(rag_any)
+                        .downcast::<crate::globals::rag_infrastructure::RAGInfrastructure>()
+                {
+                    // Store the full RAGInfrastructure for register_rag_global
+                    global_context.set_bridge("rag_infrastructure", rag_infrastructure.clone());
+                    // Also store multi_tenant_rag separately for direct access
+                    global_context.set_bridge(
+                        "multi_tenant_rag",
+                        rag_infrastructure.multi_tenant_rag.clone(),
+                    );
                 }
             }
             debug!("Infrastructure registries stored in GlobalContext");
@@ -464,9 +489,20 @@ impl ScriptEngineBridge for LuaEngine {
                     );
                 }
 
-                // Initialize RAG infrastructure if enabled
+                // Initialize RAG infrastructure if enabled AND not already provided via inject_apis
+                // (Phase 13c.2.8.15: Infrastructure now creates RAG, so only init if not present)
                 if runtime_config.rag.enabled {
-                    Self::initialize_rag_infrastructure(&global_context, &runtime_config.rag);
+                    if global_context
+                        .get_bridge::<crate::globals::rag_infrastructure::RAGInfrastructure>(
+                            "rag_infrastructure",
+                        )
+                        .is_none()
+                    {
+                        debug!("RAG infrastructure not provided via Infrastructure, initializing from config");
+                        Self::initialize_rag_infrastructure(&global_context, &runtime_config.rag);
+                    } else {
+                        debug!("RAG infrastructure already provided via Infrastructure, skipping config-based initialization");
+                    }
                 }
             }
 

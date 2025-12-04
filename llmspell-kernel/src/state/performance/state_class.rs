@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Classification of state data to determine appropriate processing path
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum StateClass {
     /// In-memory only, no persistence, zero overhead
     Ephemeral,
@@ -14,7 +14,8 @@ pub enum StateClass {
     Trusted,
 
     /// Normal user data with basic validation
-    /// Target: <3% overhead  
+    /// Target: <3% overhead
+    #[default]
     Standard,
 
     /// Contains PII/secrets, needs full validation and redaction
@@ -24,12 +25,6 @@ pub enum StateClass {
     /// Untrusted external data, requires full validation
     /// Target: <10% overhead
     External,
-}
-
-impl Default for StateClass {
-    fn default() -> Self {
-        Self::Standard
-    }
 }
 
 impl StateClass {

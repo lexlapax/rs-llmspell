@@ -4,7 +4,7 @@
 #![cfg(feature = "postgres")]
 
 use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig};
-use llmspell_storage::traits::StorageBackend;
+use llmspell_storage::StorageBackend;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::OnceCell;
@@ -687,7 +687,7 @@ async fn test_backend_type() {
     let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
 
-    use llmspell_storage::traits::StorageBackendType;
+    use llmspell_storage::StorageBackendType;
     assert_eq!(
         backend.backend_type(),
         StorageBackendType::Postgres,

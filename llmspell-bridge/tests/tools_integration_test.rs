@@ -7,6 +7,7 @@ use test_helpers::create_test_infrastructure;
 #[cfg(feature = "lua")]
 async fn test_all_tools_integration() {
     use llmspell_bridge::{
+        engine::bridge::ApiDependencies,
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,
         ComponentRegistry,
@@ -33,16 +34,15 @@ async fn test_all_tools_integration() {
     // Inject APIs
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Simple integration test for all tools
     let test_script = r#"
@@ -115,6 +115,7 @@ async fn test_all_tools_integration() {
 #[cfg(feature = "lua")]
 async fn test_tool_performance_benchmarks() {
     use llmspell_bridge::{
+        engine::bridge::ApiDependencies,
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,
         ComponentRegistry,
@@ -138,16 +139,15 @@ async fn test_tool_performance_benchmarks() {
 
     let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-    engine
-        .inject_apis(
-            &registry,
-            &providers,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )
-        .unwrap();
+    let api_deps = ApiDependencies::new(
+        registry.clone(),
+        providers.clone(),
+        tool_registry.clone(),
+        agent_registry.clone(),
+        workflow_factory.clone(),
+    );
+
+    engine.inject_apis(&api_deps).unwrap();
 
     // Benchmark each tool category
     let tool_benchmarks = vec![

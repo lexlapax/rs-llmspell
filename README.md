@@ -2,9 +2,9 @@
 
 **Rapid AI Experimentation Platform** - Cast scripting spells to explore AI concepts, extract proven patterns to production-ready Rust
 
-**🚀 Version 0.13.1 - Production Storage Infrastructure & Documentation Consolidation**
+**🚀 Version 0.14.0 - Usability & Cohesion Refinement**
 
-**🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.13.1.md) | [🛠️ Examples](examples/)
+**🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.14.0.md) | [🛠️ Examples](examples/) | [🔧 Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -24,7 +24,7 @@ rs-llmspell is an **experimental platform for rapid AI concept exploration**.
 
 Built with **production-quality engineering** (architecture, performance, testing, observability) to make the transition from experiment to production as painless as possible. We use Rust not because we're production-ready, but because proven patterns deserve solid foundations for extraction.
 
-**Current Status**: v0.13.1 complete. Production-ready PostgreSQL storage backend (10 unified backends), Row-Level Security multi-tenancy, cross-platform support (Linux + macOS), self-contained kernel architecture, and 52% documentation consolidation (111 → 53 files). Previous experimental features include adaptive memory (episodic/semantic/procedural), context engineering, 10 workflow templates, local LLM support (Ollama + Candle), and RAG with HNSW vector search. See [Documentation Hub](docs/) for comprehensive guides.
+**Current Status**: v0.14.0 complete. Usability & Cohesion Refinement with 21 preset profiles, 56 standardized Lua examples, and 5540 tests passing. Built on v0.13.1's production-ready PostgreSQL storage backend (10 unified backends), Row-Level Security multi-tenancy, and cross-platform support (Linux + macOS). Previous experimental features include adaptive memory (episodic/semantic/procedural), context engineering, 10 workflow templates, local LLM support (Ollama + Candle), and RAG with HNSW vector search. See [Documentation Hub](docs/) for comprehensive guides.
 
 ---
 
@@ -47,7 +47,7 @@ Although experimental, rs-llmspell is built with production-grade engineering:
 - **Performance**: <2ms memory overhead, 8.47x HNSW speedup, <100ms context assembly
 - **Architecture**: Modular (21 crates), trait-based, SOLID principles, clear boundaries
 - **Scalability**: Designed for growth (async-first, resource limits, multi-tenancy ready)
-- **Testing**: >90% coverage (784 tests passing), zero warnings policy
+- **Testing**: >90% coverage (5540 tests passing), zero warnings policy
 - **Documentation**: >95% API docs (50+ guides across user/dev/technical)
 - **Observability**: Full tracing with <2% overhead, structured logging
 
@@ -200,7 +200,7 @@ export OPENAI_API_KEY="sk-..."  # Optional for cloud models
   --param model="ollama/llama3.2:3b"
 
 # Memory exploration
-./target/release/llmspell exec examples/script-users/getting-started/06-episodic-memory-basic.lua
+./target/release/llmspell exec examples/script-users/getting-started/05-memory-rag-advanced.lua
 ```
 
 ### Explore More
@@ -298,11 +298,15 @@ See [Scripts Overview](scripts/) for all automation tools.
 
 ## 🤝 Contributing
 
+**New Contributors**: Start with [README-DEVEL.md](README-DEVEL.md) for complete development environment setup.
+
 Building experimental AI components? See [Developer Guide](docs/developer-guide/) for:
 - Rapid iteration patterns
 - Production-quality code for future extraction
 - Testing with llmspell-testing helpers
 - 60+ examples to learn from
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and workflow.
 
 ---
 
@@ -322,21 +326,19 @@ Apache License, Version 2.0. See [LICENSE-APACHE](LICENSE-APACHE) for details.
 
 ## 🚀 Latest Release
 
-**v0.13.1 - Production Storage Infrastructure & Documentation Consolidation**
+**v0.14.0 - Usability & Cohesion Refinement**
 
-Production-ready PostgreSQL storage backend with 10 unified backends, Row-Level Security for database-enforced multi-tenancy, cross-platform compilation support, self-contained kernel architecture, and comprehensive documentation consolidation.
+Production-ready developer experience through consolidation and quality enhancement. Profile system standardization, example validation, and comprehensive quality infrastructure.
 
 **Key Achievements**:
-- 🗄️ 1 new crate (llmspell-storage) with 10 PostgreSQL backends
-- 🐘 PostgreSQL 18 + VectorChord (5x faster than pgvector, 26x cheaper)
-- 🔒 Row-Level Security with <5% overhead (4.9% measured)
-- 🐧 Cross-platform support (Linux + macOS validated in CI)
-- 🏗️ Self-contained kernel (630+ lines deleted, 82% fewer API methods)
-- 📖 52% documentation consolidation (111 → 53 files)
-- 📊 379 PostgreSQL tests passing (100% pass rate, zero warnings)
-- 🎯 Zero breaking changes (opt-in PostgreSQL, existing backends preserved)
+- 🎯 21 Preset Profiles: Complete 4-layer architecture for any deployment scenario
+- 📚 56 Lua Examples: All standardized with consistent headers and profile recommendations
+- 🧪 5540 Tests: 100% passing across all crates with zero clippy warnings
+- 📖 6 Getting-Started Examples: Progressive <30 minute onboarding path
+- 🔧 Validation Scripts: examples-validation.sh, quality-check-minimal.sh, quality-check-fast.sh
+- 📦 44MB Release Binary: Optimized build with LTO
 
-See [Release Notes](RELEASE_NOTES_v0.13.1.md) for complete details.
+See [Release Notes](RELEASE_NOTES_v0.14.0.md) for complete details.
 
 ---
 

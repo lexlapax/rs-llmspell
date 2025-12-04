@@ -1,0 +1,5 @@
+# Memory Development Preset - Memory + RAG for development
+[profile]
+name = "Memory Development"
+description = "Memory and RAG features for development with LLM providers"
+extends = ["bases/cli", "features/llm", "features/memory", "features/rag", "envs/dev", "backends/sqlite"]

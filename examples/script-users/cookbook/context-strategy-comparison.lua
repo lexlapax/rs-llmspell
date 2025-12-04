@@ -1,8 +1,14 @@
+-- Profile: memory
+-- Run with: llmspell -p memory run context-strategy-comparison.lua
+-- Context engineering (memory/context features only - no LLM API calls)
+
 -- ============================================================
--- LLMSPELL COOKBOOK - CONTEXT STRATEGY COMPARISON
+-- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Recipe: Comparing Episodic, Semantic, and Hybrid Retrieval
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Choosing optimal retrieval strategy for different query types
 --
 -- Purpose: Compare three context assembly strategies to understand their strengths:
@@ -18,8 +24,7 @@
 --   • When to use each approach
 --
 -- Prerequisites:
---   • Completed 06-episodic-memory-basic.lua
---   • Completed 07-context-assembly-basic.lua
+--   • Completed 05-memory-rag-advanced.lua
 --
 -- HOW TO RUN:
 -- ./target/debug/llmspell \

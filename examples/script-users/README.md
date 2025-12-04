@@ -1,6 +1,6 @@
 # Script Users Examples
 
-**Status**: 🚀 **Phase 8.10.6** - RAG integration complete with multi-tenancy, sessions, and cost optimization
+**Status**: 🚀 **Phase 13** (v0.13.x) - Adaptive memory, context engineering, and 21 preset profiles
 
 **Lua scripting examples for LLMSpell - from basics to production applications**
 
@@ -10,12 +10,12 @@
 
 - **6 Getting Started Examples** - Learn the basics step-by-step
 - **5 Feature Demonstrations** - Explore specific capabilities
-- **11 Cookbook Patterns** - Production-ready patterns (including 3 RAG patterns)
+- **16 Cookbook Patterns** - Production-ready patterns (including 3 RAG patterns)
 - **4 Advanced Patterns** - Complex orchestration and integration
-- **9 Complete Applications** - Full production examples (2 new RAG apps)
+- **11 Complete Applications** - Full production examples (2 RAG apps)
 - **3 RAG Test Suites** - Comprehensive RAG testing
 - **1 RAG Benchmark** - Performance measurement
-- **10 Builtin Profiles** - Zero-config quick start
+- **21 Builtin Profiles** - Zero-config quick start
 - **Custom Config Examples** - For unique patterns
 
 ## 🚀 Quick Start
@@ -32,25 +32,28 @@ llmspell -p providers run getting-started/02-first-agent.lua
 # State persistence examples
 llmspell -p state run features/state-persistence.lua
 
-# RAG examples (requires embedding model)
-llmspell -p rag-dev run getting-started/05-first-rag.lua
+# Memory & RAG examples (requires API key)
+llmspell -p memory run getting-started/05-memory-rag-advanced.lua
 
 # Local LLM examples (requires Ollama installed)
-llmspell -p ollama run examples/local_llm_status.lua
+llmspell -p ollama run features/local-llm-status.lua
 ```
 
-### Available Builtin Profiles
+### Available Builtin Profiles (21 total)
 
 - **minimal** - Tools only, no LLM providers
 - **development** - Dev settings with OpenAI/Anthropic + debug logging
 - **providers** - Simple OpenAI/Anthropic setup for agents
 - **state** - State persistence enabled
 - **sessions** - Sessions + state + hooks + events
+- **memory** - Adaptive memory system (Phase 13)
+- **memory-development** - Memory + RAG debugging
 - **ollama** - Local Ollama LLM backend
 - **candle** - Local Candle LLM backend (CPU/GPU)
 - **rag-dev** - RAG development with debug features
 - **rag-prod** - RAG production settings
-- **rag-perf** - RAG performance tuning
+
+See [Profile Guide](../../docs/user-guide/profile-layers-guide.md) for all 21 profiles.
 
 ### Custom Configuration (Optional)
 
@@ -65,9 +68,9 @@ llmspell -c path/to/custom-config.toml run script.lua
 script-users/
 ├── getting-started/     # 6 beginner examples (00-05)
 ├── features/           # 5 feature demonstrations
-├── cookbook/           # 11 production patterns (8 core + 3 RAG)
+├── cookbook/           # 16 production patterns (13 core + 3 RAG)
 ├── advanced-patterns/  # 4 complex orchestration examples
-├── applications/       # 9 complete applications (7 base + 2 RAG)
+├── applications/       # 11 complete applications (9 base + 2 RAG)
 ├── tests/             # 3 RAG test suites
 ├── benchmarks/        # 1 performance benchmark
 └── configs/           # Custom configuration examples (unique patterns)
@@ -84,7 +87,7 @@ Progressive examples from hello world to RAG systems. Start here if you're new t
 3. `02-first-agent.lua` - Creating your first agent
 4. `03-first-workflow.lua` - Building your first workflow
 5. `04-handle-errors.lua` - Proper error handling
-6. `05-first-rag.lua` - **NEW** - Your first RAG system (Phase 8)
+6. `05-memory-rag-advanced.lua` - Memory & RAG system (Phase 13)
 
 ### [Features](features/) - 5 Demonstrations
 Comprehensive demonstrations of LLMSpell capabilities.
@@ -109,7 +112,7 @@ Battle-tested patterns and best practices for production use.
 - `07-security-patterns.lua` - Input validation and secure handling
 - `08-state-management.lua` - Versioning and persistence
 
-**RAG Patterns (v0.8.0 - Phase 8):**
+**RAG Patterns:**
 - `RAG-01-rag-multi-tenant.lua` - Isolated vector stores per tenant
 - `RAG-02-rag-session.lua` - Conversational memory with context
 - `RAG-03-rag-cost-optimization.lua` - Reduce embedding costs by 70%
@@ -125,8 +128,8 @@ Complete, production-ready example applications.
 - `file-organizer` - Intelligent file organization system
 - `process-orchestrator` - Complex workflow automation
 - `research-collector` - v2.0 with RAG integration
-- `knowledge-base` - **NEW** - Personal knowledge management (Phase 8)
-- `personal-assistant` - **NEW** - AI productivity companion (Phase 8)
+- `knowledge-base` - Personal knowledge management
+- `personal-assistant` - AI productivity companion
 
 ### [Advanced Patterns](advanced-patterns/) - 4 Complex Examples
 Production-ready patterns bridging features and applications.
@@ -167,7 +170,7 @@ Custom configuration files for unique patterns and advanced scenarios.
 # Run with appropriate builtin profile
 llmspell -p minimal run examples/script-users/getting-started/00-hello-world.lua
 llmspell -p providers run examples/script-users/features/agent-basics.lua
-llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
+llmspell -p rag-dev run examples/script-users/getting-started/05-memory-rag-advanced.lua
 llmspell -p development run examples/script-users/applications/knowledge-base/main.lua
 ```
 
@@ -195,23 +198,23 @@ llmspell -c examples/script-users/applications/webapp-creator/config.toml \
 - API key for at least one provider:
   - OpenAI: Set `OPENAI_API_KEY` environment variable
   - Anthropic: Set `ANTHROPIC_API_KEY` environment variable
-  - Local models: Configure in `llmspell.toml`
+  - Local models: Use `-p ollama-production` (or see [configs/](configs/) for custom patterns)
 
 ### For Advanced Examples
 - Understanding of Lua basics
 - Familiarity with async patterns
 - Knowledge of error handling
 
-## 🆕 Phase 8 RAG Features
+## 🆕 Phase 13 Memory & RAG Features
 
-This release introduces comprehensive RAG (Retrieval-Augmented Generation) support:
+This release introduces comprehensive adaptive memory and context engineering:
 
+- **Adaptive Memory**: 3-tier memory system (episodic, semantic, procedural)
+- **Context Engineering**: Strategy-based context assembly
 - **Vector Storage**: HNSW algorithm for fast similarity search
 - **Multi-Tenancy**: Complete isolation between tenant knowledge bases
 - **Session Management**: Conversational memory with automatic cleanup
-- **Cost Optimization**: Smart caching reduces embedding costs by 70%
-- **Bi-temporal Metadata**: Track event time and ingestion time
-- **TTL Support**: Automatic document expiration
+- **21 Preset Profiles**: Zero-config deployment for any use case
 - **Production Ready**: Battle-tested patterns for enterprise deployment
 
 ## 🎯 Learning Recommendations

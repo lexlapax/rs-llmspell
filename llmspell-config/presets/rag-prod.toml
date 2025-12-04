@@ -1,0 +1,5 @@
+# RAG Production Preset
+[profile]
+name = "RAG Production"
+description = "RAG optimized for production use"
+extends = ["bases/cli", "features/rag", "envs/prod", "backends/sqlite"]

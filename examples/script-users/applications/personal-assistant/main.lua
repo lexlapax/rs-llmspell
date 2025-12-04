@@ -1,6 +1,14 @@
--- Application: Personal Assistant v1.0 (AI-Powered Productivity with RAG)
--- Purpose: Comprehensive personal assistant for daily tasks and knowledge management
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
+-- Profile: gemini-prod (recommended)
+-- Run with: llmspell -p gemini-prod run main.lua
+-- Full Phase 13 stack with Gemini
+
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
+-- Application ID: 09 - Personal Assistant v1.0.0
+-- Complexity: ADVANCED
 -- Expected Output: Task management, scheduling, reminders, and intelligent assistance
 -- Version: 1.0.0
 -- Tags: application, personal-assistant, rag, productivity, task-management, ai-assistant

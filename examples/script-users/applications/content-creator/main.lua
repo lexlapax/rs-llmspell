@@ -1,6 +1,14 @@
--- Application: Content Creator v2.0 (Power User Layer)
--- Purpose: Streamlined content creation with quality control and conditional workflows
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
+-- Profile: gemini-prod (recommended)
+-- Run with: llmspell -p gemini-prod run main.lua
+-- Full Phase 13 stack with Gemini
+
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: applications
+-- Application ID: 03 - Content Creator v2.0.0
+-- Complexity: ADVANCED
 -- Expected Output: High-quality content with conditional editing and formatting
 -- Version: 2.0.0
 -- Tags: application, content-creator, power-user, conditional, quality-control

@@ -1,8 +1,14 @@
+-- Profile: state (recommended)
+-- Run with: llmspell -p state run state-persistence.lua
+-- State persistence enabled
+
 -- ============================================================
--- LLMSPELL FEATURES SHOWCASE
+-- LLMSPELL FEATURES SHOWCASE  
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: features
 -- Feature ID: 04 - State Persistence v0.7.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Persisting data across script executions
 -- Feature Category: State Management
 --

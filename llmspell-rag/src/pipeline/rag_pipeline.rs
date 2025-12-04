@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use llmspell_core::state::StateScope;
-use llmspell_storage::vector_storage::VectorStorage;
+use llmspell_core::traits::storage::VectorStorage;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::time::{timeout, Duration};
@@ -319,7 +319,7 @@ impl RAGPipeline {
                 .await
                 .map_err(|e| RAGPipelineError::Storage { source: e })?;
             // Convert to scoped stats format
-            llmspell_storage::vector_storage::ScopedStats {
+            llmspell_storage::ScopedStats {
                 scope: llmspell_core::state::StateScope::Global,
                 vector_count: stats.total_vectors,
                 storage_bytes: stats.storage_bytes,
@@ -394,11 +394,12 @@ pub struct PipelineStats {
 mod tests {
     use super::*;
     use crate::embeddings::{EmbeddingProviderConfig, EmbeddingProviderType};
-    use llmspell_storage::backends::vector::HNSWVectorStorage;
-    use llmspell_storage::vector_storage::HNSWConfig;
+    use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 
-    fn create_test_pipeline() -> RAGPipeline {
-        let storage = Arc::new(HNSWVectorStorage::new(384, HNSWConfig::default()));
+    async fn create_test_pipeline() -> RAGPipeline {
+        let config = SqliteConfig::in_memory();
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let embedding_config = EmbeddingProviderConfig {
             provider_type: EmbeddingProviderType::HuggingFace,
             model: "test-model".to_string(),
@@ -421,13 +422,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_pipeline_creation() {
-        let _pipeline = create_test_pipeline();
+        let _pipeline = create_test_pipeline().await;
         // If we get here without panicking, creation succeeded
     }
 
     #[tokio::test]
     async fn test_invalid_config() {
-        let storage = Arc::new(HNSWVectorStorage::new(384, HNSWConfig::default()));
+        let config = SqliteConfig::in_memory();
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let embedding_factory = Arc::new(EmbeddingFactory::new(EmbeddingProviderConfig::default()));
         let embedding_cache = Arc::new(EmbeddingCache::new(
             crate::embeddings::CacheConfig::default(),

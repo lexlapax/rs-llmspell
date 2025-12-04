@@ -1,8 +1,14 @@
+-- Profile: rag-dev (recommended)
+-- Run with: llmspell -p rag-dev run rag-session.lua
+-- RAG features with debug logging
+
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: RAG-02 - Session-Based RAG v0.8.0
--- Complexity Level: INTERMEDIATE
+-- Complexity: INTERMEDIATE
 -- Real-World Use Case: Conversational AI with context-aware memory
 -- Pattern Category: RAG & Session Management
 --

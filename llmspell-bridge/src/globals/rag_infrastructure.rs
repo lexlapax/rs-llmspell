@@ -1,15 +1,18 @@
 //! ABOUTME: Shared RAG infrastructure initialization for multi-tenant vector storage
 //! ABOUTME: Provides `get_or_create` pattern for RAG management following session infrastructure pattern
+//!
 
 use crate::globals::GlobalContext;
 use llmspell_config::RAGConfig;
+use llmspell_core::traits::storage::{StorageBackend, VectorStorage};
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
 use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
 use llmspell_kernel::state::StateManager;
 use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
-use llmspell_storage::{MemoryBackend, SledBackend, StorageBackend, VectorStorage};
+use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
+use llmspell_storage::backends::MemoryBackend;
 use llmspell_tenancy::MultiTenantVectorManager;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -33,10 +36,7 @@ pub async fn get_or_create_rag_infrastructure(
         return Ok(RAGInfrastructure {
             multi_tenant_rag,
             vector_storage: None, // Storage is embedded in multi_tenant_rag
-            hnsw_storage: context
-                .get_bridge::<llmspell_storage::backends::vector::hnsw::HNSWVectorStorage>(
-                    "hnsw_storage",
-                ),
+            sqlite_storage: context.get_bridge::<SqliteVectorStorage>("sqlite_storage"),
         });
     }
 
@@ -48,7 +48,7 @@ pub async fn get_or_create_rag_infrastructure(
     let session_manager = get_or_create_session_manager(context, &state_manager)?;
 
     // Create vector storage based on configuration
-    let vector_storage = create_vector_storage(config, context).await;
+    let (vector_storage, sqlite_storage) = create_vector_storage(config, context).await?;
 
     // Create multi-tenant vector manager
     let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage.clone()));
@@ -64,10 +64,7 @@ pub async fn get_or_create_rag_infrastructure(
     Ok(RAGInfrastructure {
         multi_tenant_rag,
         vector_storage: Some(vector_storage),
-        hnsw_storage: context
-            .get_bridge::<llmspell_storage::backends::vector::hnsw::HNSWVectorStorage>(
-                "hnsw_storage",
-            ),
+        sqlite_storage: Some(sqlite_storage),
     })
 }
 
@@ -106,7 +103,7 @@ fn get_or_create_session_manager(
     let hook_registry = get_or_create_hook_registry(context);
     let hook_executor = get_or_create_hook_executor(context);
     let event_bus = get_or_create_event_bus(context);
-    let storage_backend = create_storage_backend("memory")?;
+    let storage_backend = create_storage_backend("memory");
 
     // Create SessionManagerConfig with defaults suitable for RAG
     let session_config = SessionManagerConfig::builder()
@@ -169,157 +166,72 @@ fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
     Arc::new(EventBus::new())
 }
 
-/// Convert config distance metric to storage distance metric
-const fn convert_distance_metric(
-    metric: &llmspell_config::DistanceMetric,
-) -> llmspell_storage::vector_storage::DistanceMetric {
-    match metric {
-        llmspell_config::DistanceMetric::Cosine => {
-            llmspell_storage::vector_storage::DistanceMetric::Cosine
-        }
-        llmspell_config::DistanceMetric::Euclidean => {
-            llmspell_storage::vector_storage::DistanceMetric::Euclidean
-        }
-        llmspell_config::DistanceMetric::InnerProduct => {
-            llmspell_storage::vector_storage::DistanceMetric::InnerProduct
-        }
-    }
-}
-
-/// Convert config HNSW configuration to storage HNSW configuration
-const fn convert_hnsw_config(
-    config: &llmspell_config::HNSWConfig,
-) -> llmspell_storage::vector_storage::HNSWConfig {
-    llmspell_storage::vector_storage::HNSWConfig {
-        m: config.m,
-        ef_construction: config.ef_construction,
-        ef_search: config.ef_search,
-        max_elements: config.max_elements,
-        seed: config.seed,
-        metric: convert_distance_metric(&config.metric),
-        allow_replace_deleted: config.allow_replace_deleted,
-        num_threads: config.num_threads,
-        nb_layers: config.nb_layers,
-        parallel_batch_size: config.parallel_batch_size,
-        enable_mmap: config.enable_mmap,
-        mmap_sync_interval: config.mmap_sync_interval,
-    }
-}
-
-/// Try to load existing HNSW storage from path
-async fn try_load_hnsw_from_path(
-    path: &std::path::Path,
-    dimensions: usize,
-    hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
-) -> Option<llmspell_storage::backends::vector::hnsw::HNSWVectorStorage> {
-    use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
-
-    if !path.exists() {
-        return None;
-    }
-
-    match HNSWVectorStorage::from_path(path, dimensions, hnsw_config).await {
-        Ok(storage) => {
-            info!("Successfully loaded existing HNSW index from {:?}", path);
-            Some(storage)
-        }
-        Err(e) => {
-            warn!("Failed to load existing HNSW index: {}, starting fresh", e);
-            None
-        }
-    }
-}
-
-/// Create new HNSW storage with optional persistence
-fn create_new_hnsw_storage(
-    dimensions: usize,
-    hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
-    persistence_path: Option<&std::path::Path>,
-) -> llmspell_storage::backends::vector::hnsw::HNSWVectorStorage {
-    use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
-
-    let storage = HNSWVectorStorage::new(dimensions, hnsw_config);
-
-    if let Some(path) = persistence_path {
-        storage.with_persistence(path.to_path_buf())
-    } else {
-        storage
-    }
-}
-
-/// Create HNSW storage with real implementation
-async fn create_hnsw_storage(
-    config: &RAGConfig,
-    hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
-) -> Arc<dyn VectorStorage> {
-    debug!("Creating HNSW vector storage for RAG");
-
-    if let Some(ref path) = config.vector_storage.persistence_path {
-        debug!(
-            "Loading or creating HNSW storage with persistence at: {:?}",
-            path
-        );
-
-        // Try to load existing data first
-        if let Some(storage) =
-            try_load_hnsw_from_path(path, config.vector_storage.dimensions, hnsw_config.clone())
-                .await
-        {
-            return Arc::new(storage);
-        }
-
-        // Create new storage with persistence
-        let storage =
-            create_new_hnsw_storage(config.vector_storage.dimensions, hnsw_config, Some(path));
-        Arc::new(storage)
-    } else {
-        warn!("HNSW storage created without persistence - data will not survive restarts");
-        let storage = create_new_hnsw_storage(config.vector_storage.dimensions, hnsw_config, None);
-        Arc::new(storage)
-    }
-}
-
 /// Create vector storage based on RAG configuration
+///
+/// Returns both the trait object and concrete `SqliteVectorStorage` for save operations
+///
+/// # Errors
+///
+/// Returns an error if `SQLite` backend or vector storage initialization fails
 async fn create_vector_storage(
     config: &RAGConfig,
     _context: &GlobalContext,
-) -> Arc<dyn VectorStorage> {
-    match config.vector_storage.backend {
-        llmspell_config::VectorBackend::HNSW => {
-            debug!("Creating HNSW vector storage for RAG");
-            let hnsw_config = convert_hnsw_config(&config.vector_storage.hnsw);
-            create_hnsw_storage(config, hnsw_config).await
-        }
-    }
+) -> Result<(Arc<dyn VectorStorage>, Arc<SqliteVectorStorage>)> {
+    debug!("Creating SQLite vector storage for RAG");
+
+    let dimensions = config.vector_storage.dimensions;
+
+    // Get database path from config or use default
+    let db_path = config
+        .vector_storage
+        .persistence_path
+        .clone()
+        .unwrap_or_else(|| std::path::PathBuf::from("./data/rag_vectors.db"));
+
+    debug!("Creating SQLite vector storage at: {:?}", db_path);
+
+    // Create SQLite backend
+    let config = SqliteConfig::new(db_path);
+    let backend = SqliteBackend::new(config)
+        .await
+        .map_err(|e| LLMSpellError::Storage {
+            message: format!("Failed to create SQLite backend for RAG: {e}"),
+            operation: Some("create_backend".to_string()),
+            source: None,
+        })?;
+
+    // Create vector storage with SQLite backend
+    let storage = SqliteVectorStorage::new(Arc::new(backend), dimensions)
+        .await
+        .map_err(|e| LLMSpellError::Storage {
+            message: format!("Failed to create SQLite vector storage for RAG: {e}"),
+            operation: Some("create_vector_storage".to_string()),
+            source: None,
+        })?;
+
+    let storage_arc = Arc::new(storage);
+
+    // Return both trait object and concrete type
+    Ok((storage_arc.clone(), storage_arc))
 }
 
 /// Create storage backend for sessions
 ///
-/// # Errors
-///
-/// Returns an error if:
-/// - Unknown backend type is specified
-/// - Backend creation fails
-fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
+/// Always returns `MemoryBackend` - only memory backend supported via Lua bridge.
+/// For persistent storage, use Rust API with `SQLite` or `PostgreSQL`.
+fn create_storage_backend(backend_type: &str) -> Arc<dyn StorageBackend> {
     match backend_type {
         "memory" => {
             debug!("Creating in-memory storage backend for RAG sessions");
-            Ok(Arc::new(MemoryBackend::new()))
-        }
-        "sled" => {
-            debug!("Creating sled storage backend for RAG sessions");
-            let backend = SledBackend::new().map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create sled backend for RAG: {e}"),
-                source: None,
-            })?;
-            Ok(Arc::new(backend))
+            Arc::new(MemoryBackend::new())
         }
         backend => {
             warn!(
-                "Unknown backend type '{}' for RAG, falling back to memory",
+                "Backend type '{}' not supported via Lua bridge for RAG (only 'memory'), falling back to memory. \
+                 For persistent storage, use Rust API with SQLite or PostgreSQL.",
                 backend
             );
-            Ok(Arc::new(MemoryBackend::new()))
+            Arc::new(MemoryBackend::new())
         }
     }
 }
@@ -328,25 +240,26 @@ fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>>
 pub struct RAGInfrastructure {
     pub multi_tenant_rag: Arc<MultiTenantRAG>,
     pub vector_storage: Option<Arc<dyn VectorStorage>>,
-    /// Keep a reference to the concrete HNSW storage for save/load operations
-    pub hnsw_storage: Option<Arc<llmspell_storage::backends::vector::hnsw::HNSWVectorStorage>>,
+    /// Keep a reference to the concrete `SQLite` storage for save/load operations
+    pub sqlite_storage: Option<Arc<SqliteVectorStorage>>,
 }
 
 impl RAGInfrastructure {
     /// Save vector storage to disk if persistence is configured
     ///
+    /// Note: `SQLite` storage auto-persists via transactions, so this is a no-op.
+    /// Kept for API compatibility with existing code.
+    ///
     /// # Errors
     ///
     /// Returns an error if the save operation fails
-    pub async fn save(&self) -> Result<()> {
-        if let Some(ref hnsw) = self.hnsw_storage {
-            info!("Saving HNSW vector storage to disk");
-            hnsw.save().await.map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to save HNSW storage: {e}"),
-                source: None,
-            })?;
+    pub fn save(&self) -> Result<()> {
+        if self.sqlite_storage.is_some() {
+            debug!(
+                "SQLite vector storage auto-persists via transactions - no explicit save needed"
+            );
         } else {
-            debug!("No HNSW storage to save (using different backend or no persistence)");
+            debug!("No vector storage to save");
         }
         Ok(())
     }
@@ -369,11 +282,14 @@ mod tests {
             ),
         );
 
-        let config = RAGConfig::builder()
+        let mut config = RAGConfig::builder()
             .enabled(true)
             .dimensions(384)
             .backend(llmspell_config::VectorBackend::HNSW)
             .build();
+
+        // Use in-memory database for testing
+        config.vector_storage.persistence_path = Some(std::path::PathBuf::from(":memory:"));
 
         let infrastructure = get_or_create_rag_infrastructure(&context, &config)
             .await
@@ -400,11 +316,14 @@ mod tests {
             ),
         );
 
-        let config = RAGConfig::builder()
+        let mut config = RAGConfig::builder()
             .enabled(true)
             .dimensions(768)
             .backend(llmspell_config::VectorBackend::HNSW)
             .build();
+
+        // Use in-memory database for testing
+        config.vector_storage.persistence_path = Some(std::path::PathBuf::from(":memory:"));
 
         let infrastructure = get_or_create_rag_infrastructure(&context, &config)
             .await

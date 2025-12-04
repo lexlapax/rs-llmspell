@@ -1,0 +1,5 @@
+# Providers Preset - All cloud LLM providers enabled
+[profile]
+name = "Providers"
+description = "All cloud providers (OpenAI, Anthropic, Gemini)"
+extends = ["bases/cli", "features/llm", "envs/dev", "backends/memory"]

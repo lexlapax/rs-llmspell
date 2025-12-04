@@ -1,0 +1,19 @@
+# Staging Environment Layer
+# Info logging, near-production configuration for testing
+
+[profile]
+name = "Staging Environment"
+description = "Production-like configuration for pre-release testing"
+
+[debug]
+enabled = true
+level = "info"
+
+[debug.output]
+stdout = false
+colored = false
+format = "json"
+
+[runtime]
+script_timeout_seconds = 300
+max_concurrent_scripts = 50

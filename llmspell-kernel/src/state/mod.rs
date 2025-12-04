@@ -66,7 +66,6 @@ pub mod sensitive_data;
 
 /// Testing utilities and helpers for session state validation
 pub mod session_test;
-pub mod vector_storage;
 
 // Re-export original kernel state types
 pub use circuit_breaker::CircuitBreaker;
@@ -79,25 +78,23 @@ pub use agent_state::{
 };
 pub use backend_adapter::StateStorageAdapter;
 pub use config::{
-    BackupConfig, EncryptionConfig, PerformanceConfig, PersistenceConfig, RocksDBConfig,
-    SledConfig, StorageBackendType,
+    BackupConfig, EncryptionConfig, PerformanceConfig, PersistenceConfig, SqliteConfig,
+    StorageBackendType,
 };
 pub use manager::{HookReplayManager, SerializedHookExecution, StateManager};
 pub use sensitive_data::{RedactSensitiveData, SensitiveDataConfig, SensitiveDataProtector};
 
 // Re-export original kernel storage types
-pub use kernel_backends::{
-    MemoryBackend as KernelMemoryBackend, SledBackend as KernelSledBackend, StorageBackend,
-    VectorBackend,
-};
+pub use kernel_backends::{MemoryBackend as KernelMemoryBackend, StorageBackend, VectorBackend};
 
 // Re-export comprehensive storage backends
-pub use backends::{MemoryBackend, SledBackend};
+pub use backends::MemoryBackend;
 
-// Re-export vector storage types
-pub use vector_storage::{
-    DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
-    VectorEntry, VectorQuery, VectorResult, VectorStorage,
+// Re-export vector storage types from llmspell-core (centralized storage traits)
+pub use llmspell_core::traits::storage::{HNSWStorage, VectorStorage};
+pub use llmspell_core::types::storage::{
+    DistanceMetric, HNSWConfig, NamespaceStats, ScopedStats, StorageStats, VectorEntry,
+    VectorQuery, VectorResult,
 };
 
 // Migration and schema types

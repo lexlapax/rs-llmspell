@@ -1,8 +1,14 @@
+-- Profile: rag-dev (recommended)
+-- Run with: llmspell -p rag-dev run rag-multi-tenant.lua
+-- RAG features with debug logging
+
 -- ============================================================
 -- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
+-- Phase: 13c.5.6 - Example Header Standardization
+-- Category: cookbook
 -- Pattern ID: RAG-01 - Multi-Tenant RAG System v0.8.0
--- Complexity Level: PRODUCTION
+-- Complexity: PRODUCTION
 -- Real-World Use Case: Enterprise SaaS with isolated customer knowledge bases
 -- Pattern Category: RAG & Vector Storage
 --

@@ -507,6 +507,7 @@ impl ScriptRuntime {
             state_manager,
             session_manager,
             rag,
+            vector_storage,
             memory_manager,
             tool_registry,
             agent_registry,
@@ -543,15 +544,45 @@ impl ScriptRuntime {
 
         debug!("Default agent factory registered successfully");
 
+        // Create RAGInfrastructure if RAG is enabled
+        let rag_infrastructure = if let (Some(rag_ref), Some(vs_ref)) = (&rag, &vector_storage) {
+            debug!("Creating RAGInfrastructure with vector_storage");
+            Some(Arc::new(
+                crate::globals::rag_infrastructure::RAGInfrastructure {
+                    multi_tenant_rag: rag_ref.clone(),
+                    vector_storage: Some(vs_ref.clone() as Arc<dyn llmspell_storage::VectorStorage>),
+                    sqlite_storage: Some(vs_ref.clone()),
+                },
+            ))
+        } else {
+            debug!(
+                "RAG infrastructure not created - rag: {}, vector_storage: {}",
+                rag.is_some(),
+                vector_storage.is_some()
+            );
+            None
+        };
+
+        // Create API dependencies struct for clean injection
+        let api_deps = crate::engine::bridge::ApiDependencies::new(
+            component_registry.clone(),
+            provider_manager.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        )
+        .with_session_manager(session_manager.clone())
+        .with_state_manager(state_manager.clone());
+
+        // Add RAG infrastructure if available
+        let api_deps = if let Some(rag_infra) = rag_infrastructure {
+            api_deps.with_rag(rag_infra as Arc<dyn std::any::Any + Send + Sync>)
+        } else {
+            api_deps
+        };
+
         // Inject APIs into the engine with full infrastructure
-        engine.inject_apis(
-            &component_registry,
-            &provider_manager,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            Some(session_manager.clone()),
-        )?;
+        engine.inject_apis(&api_deps)?;
 
         // Create execution context
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {

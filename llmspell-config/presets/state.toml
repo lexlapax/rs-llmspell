@@ -1,0 +1,5 @@
+# State Preset - State persistence with SQLite
+[profile]
+name = "State"
+description = "State persistence for stateful scripts"
+extends = ["bases/cli", "features/state", "envs/dev", "backends/sqlite"]

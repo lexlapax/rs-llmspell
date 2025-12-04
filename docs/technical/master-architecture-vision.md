@@ -102,7 +102,7 @@ Rs-LLMSpell is a **complete AI system with adaptive memory** that revolutionizes
 
 **📦 Comprehensive Built-in Library**: 40+ production-ready tools across 8 categories, multiple agent templates, and proven workflow patterns—no need to reinvent common functionality.
 
-**🔌 Bridge-First Philosophy**: Leverages the best existing Rust crates (rig for LLM providers, mlua for Lua, sled/rocksdb for storage) rather than reimplementing. Standing on the shoulders of giants.
+**🔌 Bridge-First Philosophy**: Leverages the best existing Rust crates (rig for LLM providers, mlua for Lua, sqlite/postgres for storage) rather than reimplementing. Standing on the shoulders of giants.
 
 **🚀 Zero-Compilation Development**: Test complex AI behaviors instantly without recompilation cycles. Perfect for rapid experimentation and production deployments alike.
 
@@ -309,7 +309,7 @@ Built-in production capabilities that scale from development to enterprise deplo
 #### 4. **Bridge-First Technology Strategy**
 - **LLM Providers**: `rig` crate for unified access to OpenAI, Anthropic, local models
 - **Script Engines**: `mlua` for Lua, `boa`/`v8` for JavaScript, `pyo3` for Python
-- **Storage**: `sled` for development, `rocksdb` for production, behind trait abstractions
+- **Storage**: `sqlite` for embedded, `postgres` for production, behind trait abstractions
 - **Async Runtime**: `tokio` with cooperative scheduling adapters for single-threaded engines
 
 #### 5. **Comprehensive Built-in Ecosystem**
@@ -470,7 +470,7 @@ Rs-LLMSpell is built on seven foundational principles that guide every architect
 **Implementation**:
 - **LLM Providers**: Use `rig` crate that already supports OpenAI, Anthropic, Ollama, and more
 - **Script Engines**: Use battle-tested `mlua`, `boa`/`v8`, `pyo3` rather than custom parsers
-- **Storage**: Use proven `sled` and `rocksdb` behind trait abstractions
+- **Storage**: Use proven `sqlite` and `postgres` behind trait abstractions
 - **Async Runtime**: Build on `tokio`'s mature ecosystem
 - **Platform Abstraction**: Use cross-platform crates (`std::path::PathBuf`, `directories-rs`, `which`) for OS-specific behavior
 
@@ -1239,7 +1239,7 @@ base_url = "http://localhost:11434"
 timeout = 120
 
 [storage]
-backend = "sled"
+backend = "sqlite"
 path = "./llmspell_data"
 max_size = "1GB"
 
@@ -1554,7 +1554,7 @@ In this mode, `rs-llmspell` is compiled as a native shared library (e.g., `.so`,
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
 │  │ LLM         │ │ Storage     │ │ Security            │   │
 │  │ Providers   │ │ Backend     │ │ Manager             │   │
-│  │ (rig)       │ │ (sled/rocks)│ │                     │   │
+│  │ (rig)       │ │ (sqlite/postgres)│ │                     │   │
 │  └─────────────┘ └─────────────┘ └─────────────────────┘   │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
 │  │ Vector DB   │ │ Graph DB    │ │ Resource            │   │
@@ -2188,7 +2188,7 @@ llmspell-state-traits: [NEW - Phase 5]
     ↓
 llmspell-storage:
   - Backend-agnostic persistence layer
-  - StorageBackend trait with Memory, Sled, RocksDB implementations
+  - StorageBackend trait with Memory, SQLite, PostgreSQL implementations
   - Type-safe serialization abstractions (StorageSerialize trait)
   - Used by agent registry and state persistence
     ↓
@@ -2429,7 +2429,7 @@ When running a Lua script from the command line, the following sequence occurs:
 
 3. Phased Initialization
    ├─> Phase 1: Infrastructure
-   │   ├─> Storage backend (sled/rocksdb)
+   │   ├─> Storage backend (sqlite/postgres)
    │   ├─> Network configuration
    │   ├─> Resource limits setup
    │   └─> Security manager
@@ -5048,7 +5048,7 @@ impl ExternalRuntimeBridge for ExternalLuaBridge {
 | **Lua Engine** | `mlua` | Safe bindings, async support, sandboxing |
 | **JavaScript** | `boa`/`v8` | Pure Rust option + high-performance option |
 | **Python** | `pyo3` | De facto standard, excellent API |
-| **Storage** | `sled`/`rocksdb` | Development simplicity + production scale |
+| **Storage** | `sqlite`/`postgres` | Development simplicity + production scale |
 | **Async Runtime** | `tokio` | Ecosystem standard, comprehensive features |
 | **Serialization** | `serde` | Universal Rust serialization |
 | **HTTP Client** | `reqwest` | Async support, feature-rich |
@@ -5288,8 +5288,8 @@ Phase 5 implemented comprehensive storage backends with production-ready feature
 #[derive(Debug, Clone)]
 pub enum StorageBackendType {
     Memory,                    // In-memory for development/testing
-    Sled(SledConfig),          // Embedded database for single-node
-    RocksDB(RocksDBConfig),    // High-performance production backend
+    Sqlite(SqliteConfig),          // Embedded database for single-node
+    Postgres(PostgresConfig),    // High-performance production backend
 }
 
 // Backend adapter with automatic failover
@@ -5678,7 +5678,7 @@ Phase 5 achieved exceptional performance metrics:
 ### Production Features Summary
 
 This state management architecture provides:
-- **Flexibility**: Multiple storage backends (Memory, Sled, RocksDB) and synchronization strategies
+- **Flexibility**: Multiple storage backends (Memory, SQLite, PostgreSQL) and synchronization strategies
 - **Reliability**: Automatic conflict resolution and migration support with rollback
 - **Performance**: 6-tier optimization architecture with StateClass system
 - **Security**: Circular reference detection, sensitive data protection, encryption
@@ -10076,7 +10076,7 @@ Specialized tools for managing artifacts - binary data, generated files, and per
 
 | Tool Name | Description | Storage Backends | Features |
 |-----------|-------------|------------------|----------|
-| `artifact_store` | Store and retrieve artifacts | S3, filesystem, RocksDB | Versioning, metadata |
+| `artifact_store` | Store and retrieve artifacts | S3, filesystem, PostgreSQL | Versioning, metadata |
 | `artifact_browser` | Browse and search artifacts | All backends | Full-text search, filtering |
 | `artifact_versioner` | Version control for artifacts | Git LFS, custom | Diff, merge, history |
 | `artifact_migrator` | Migrate artifacts between stores | All backends | Batch ops, validation |
@@ -10098,7 +10098,7 @@ local artifact_id = Tools.get("artifact-store"):execute({
             session_id = context.session_id
         }
     },
-    storage_backend = "s3",  -- s3, filesystem, rocksdb
+    storage_backend = "s3",  -- s3, filesystem, sqlite, postgres
     encryption = true
 })
 
@@ -12384,7 +12384,7 @@ Rs-LLMSpell follows a **bridge-first philosophy**: leverage the best existing Ru
 | **LLM Providers** | **Wrap** | `rig` + `candle` | Proven abstractions, multiple provider support | Bridge layer with rs-llmspell extensions |
 | **Lua Scripting** | **Wrap** | `mlua` | Battle-tested, async support, comprehensive API | Custom bridge with coroutine management |
 | **JavaScript Engine** | **Wrap** | `boa` | Pure Rust, improving rapidly, embeddable | Bridge with Promise abstraction layer |
-| **State Storage** | **Wrap** | `sled` + `rocksdb` | sled for development, rocksdb for production | Unified storage trait with backend switching |
+| **State Storage** | **Wrap** | `sqlite` + `postgres` | sqlite for embedded, postgres for production | Unified storage trait with backend switching |
 | **Event System** | **Build** | `tokio` + `crossbeam` | Need specialized hook execution patterns | Custom implementation using proven primitives |
 | **Hook Manager** | **Build** | Custom + `inventory` | Unique requirements for multi-language hooks | Custom with automatic registration |
 | **Tool Registry** | **Build** | Custom + `typemap` | Component discovery and lifecycle management | Custom registry with type-safe access |
@@ -12411,8 +12411,8 @@ mlua = { version = "0.9", features = ["async", "send", "luajit"] }
 boa_engine = "0.18"
 
 # Storage and Persistence
-sled = "0.34"
-rocksdb = "0.22"
+libsql = "0.5"
+deadpool-postgres = "0.22"
 
 # Async Runtime and Coordination
 tokio = { version = "1.0", features = ["full"] }
@@ -12456,7 +12456,7 @@ criterion = { version = "0.5", optional = true }
 
 ```toml
 [features]
-default = ["lua", "javascript", "sled-storage"]
+default = ["lua", "javascript", "sqlite-storage"]
 
 # Script Engine Support
 lua = ["mlua"]
@@ -12464,8 +12464,8 @@ javascript = ["boa_engine"]
 python = ["pyo3"] # Future
 
 # Storage Backends
-sled-storage = ["sled"]
-rocksdb-storage = ["rocksdb"]
+sqlite-storage = ["libsql"]
+postgres-storage = ["sqlite"]
 memory-storage = [] # In-memory for testing
 
 # LLM Provider Extensions
@@ -13150,13 +13150,13 @@ pub trait StorageBackend: Send + Sync {
 }
 
 // Backends implement same interface with different characteristics (no duplication)
-pub struct SledBackend {
-    db: sled::Db,
+pub struct SqliteBackend {
+    db: libsql::Database,
     // Characteristics: Simple, embedded, good for development
 }
 
-pub struct RocksDbBackend {
-    db: rocksdb::DB,
+pub struct PostgresBackend {
+    db: libsql::Database,
     // Characteristics: High-performance, production, tunable
 }
 
@@ -13169,9 +13169,9 @@ pub struct StorageCharacteristics {
 }
 
 // No duplication - same interface, different implementations
-impl StorageBackend for SledBackend {
+impl StorageBackend for SqliteBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
-        // Sled-specific implementation
+        // SQLite-specific implementation
         Ok(self.db.get(key)?.map(|v| v.to_vec()))
     }
     
@@ -13185,9 +13185,9 @@ impl StorageBackend for SledBackend {
     }
 }
 
-impl StorageBackend for RocksDbBackend {
+impl StorageBackend for PostgresBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
-        // RocksDB-specific implementation
+        // PostgreSQL-specific implementation
         Ok(self.db.get(key.as_bytes())?)
     }
     
@@ -13287,23 +13287,23 @@ pub enum SimilarityMetric {
 // - ExternalVectorBackend: Adapters for Qdrant, Weaviate, Pinecone
 ```
 
-#### Sled Backend Implementation
+#### SQLite Backend Implementation
 
 ```rust
-use sled::{Db, Tree, transaction::TransactionResult};
+use libsql::{Db, Tree, transaction::TransactionResult};
 
-pub struct SledBackend {
+pub struct SqliteBackend {
     db: Db,
-    config: SledConfig,
+    config: SqliteConfig,
     metrics: StorageMetrics,
 }
 
-impl SledBackend {
-    pub async fn new(config: SledConfig) -> Result<Self> {
-        let db = sled::open(&config.path)
-            .map_err(|e| LLMSpellError::Storage(format!("Failed to open sled database: {}", e)))?;
+impl SqliteBackend {
+    pub async fn new(config: SqliteConfig) -> Result<Self> {
+        let db = SqliteBackend::new(&config.path)
+            .map_err(|e| LLMSpellError::Storage(format!("Failed to open SQLite database: {}", e)))?;
             
-        // Configure sled for optimal performance
+        // Configure SQLite (libsql) for optimal performance
         db.set_merge_operator(Self::merge_operator);
         
         Ok(Self {
@@ -13339,7 +13339,7 @@ impl SledBackend {
 }
 
 #[async_trait]
-impl StorageBackend for SledBackend {
+impl StorageBackend for SqliteBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
         let start_time = Instant::now();
         
@@ -13362,7 +13362,7 @@ impl StorageBackend for SledBackend {
     }
     
     async fn transaction(&self) -> Result<Box<dyn StorageTransaction>> {
-        Ok(Box::new(SledTransaction::new(&self.db)))
+        Ok(Box::new(SqliteTransaction::new(&self.db)))
     }
     
     async fn scan_prefix(&self, prefix: &str) -> Result<Vec<(String, Vec<u8>)>> {
@@ -13381,19 +13381,19 @@ impl StorageBackend for SledBackend {
 }
 ```
 
-#### RocksDB Backend Implementation
+#### PostgreSQL Backend Implementation
 
 ```rust
-use rocksdb::{DB, Options, WriteBatch, ReadOptions, IteratorMode};
+use libsql::{DB, Options, WriteBatch, ReadOptions, IteratorMode};
 
-pub struct RocksDBBackend {
+pub struct PostgresBackend {
     db: Arc<DB>,
-    config: RocksDBConfig,
+    config: PostgresConfig,
     metrics: StorageMetrics,
 }
 
-impl RocksDBBackend {
-    pub async fn new(config: RocksDBConfig) -> Result<Self> {
+impl PostgresBackend {
+    pub async fn new(config: PostgresConfig) -> Result<Self> {
         let mut opts = Options::default();
         
         // Optimize for rs-llmspell workload
@@ -13406,20 +13406,20 @@ impl RocksDBBackend {
         opts.set_target_file_size_base(config.target_file_size);
         
         // Compression
-        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+        opts.set_compression_type(libsql::DatabaseCompressionType::Lz4);
         
         // Parallelism
         opts.set_max_background_jobs(config.background_jobs);
         opts.increase_parallelism(config.parallelism);
         
         // Block cache for better read performance
-        let block_cache = rocksdb::Cache::new_lru_cache(config.block_cache_size)?;
-        let mut block_opts = rocksdb::BlockBasedOptions::default();
+        let block_cache = libsql::Cache::new_lru_cache(config.block_cache_size)?;
+        let mut block_opts = libsql::BlockBasedOptions::default();
         block_opts.set_block_cache(&block_cache);
         opts.set_block_based_table_factory(&block_opts);
         
         let db = DB::open(&opts, &config.path)
-            .map_err(|e| LLMSpellError::Storage(format!("Failed to open RocksDB: {}", e)))?;
+            .map_err(|e| LLMSpellError::Storage(format!("Failed to connect to PostgreSQL: {}", e)))?;
             
         Ok(Self {
             db: Arc::new(db),
@@ -13430,7 +13430,7 @@ impl RocksDBBackend {
 }
 
 #[async_trait] 
-impl StorageBackend for RocksDBBackend {
+impl StorageBackend for PostgresBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
         let start_time = Instant::now();
         let db = self.db.clone();
@@ -13441,7 +13441,7 @@ impl StorageBackend for RocksDBBackend {
             db.get(key.as_bytes())
         }).await
         .map_err(|e| LLMSpellError::Runtime(format!("Task join error: {}", e)))?
-        .map_err(|e| LLMSpellError::Storage(format!("RocksDB get failed: {}", e)))?;
+        .map_err(|e| LLMSpellError::Storage(format!("PostgreSQL query failed: {}", e)))?;
         
         self.metrics.record_operation("get", start_time.elapsed());
         Ok(result)
@@ -13460,7 +13460,7 @@ impl StorageBackend for RocksDBBackend {
             db.write(batch)
         }).await
         .map_err(|e| LLMSpellError::Runtime(format!("Task join error: {}", e)))?
-        .map_err(|e| LLMSpellError::Storage(format!("RocksDB batch write failed: {}", e)))?;
+        .map_err(|e| LLMSpellError::Storage(format!("PostgreSQL transaction failed: {}", e)))?;
         
         self.metrics.record_operation("set_batch", start_time.elapsed());
         Ok(())
@@ -13470,12 +13470,12 @@ impl StorageBackend for RocksDBBackend {
         let db = self.db.clone();
         
         let stats = tokio::task::spawn_blocking(move || {
-            let size = db.property_value("rocksdb.total-sst-files-size")
+            let size = db.property_value("sqlite.page_count")
                 .unwrap_or_default()
                 .and_then(|s| s.parse::<u64>().ok())
                 .unwrap_or(0);
                 
-            let key_count = db.property_value("rocksdb.estimate-num-keys")
+            let key_count = db.property_value("sqlite.schema_version")
                 .unwrap_or_default()
                 .and_then(|s| s.parse::<u64>().ok())
                 .unwrap_or(0);
@@ -13483,7 +13483,7 @@ impl StorageBackend for RocksDBBackend {
             StorageStats {
                 size_bytes: size,
                 key_count,
-                backend: "rocksdb".to_string(),
+                backend: "sqlite".to_string(),
                 additional_info: HashMap::new(),
             }
         }).await
@@ -13506,11 +13506,11 @@ pub struct StorageManager {
 impl StorageManager {
     pub async fn new(config: StorageConfig) -> Result<Self> {
         let backend: Box<dyn StorageBackend> = match config.backend_type {
-            StorageBackendType::Sled => {
-                Box::new(SledBackend::new(config.sled_config).await?)
+            StorageBackendType::Sqlite => {
+                Box::new(SqliteBackend::new(config.sqlite_config).await?)
             }
-            StorageBackendType::RocksDB => {
-                Box::new(RocksDBBackend::new(config.rocksdb_config).await?)
+            StorageBackendType::Postgres => {
+                Box::new(PostgresBackend::new(config.postgres_config).await?)
             }
             StorageBackendType::Memory => {
                 Box::new(MemoryBackend::new())
@@ -23979,7 +23979,7 @@ rs-llmspell/
 │   ├── storage/                 # State and persistence
 │   │   ├── src/
 │   │   │   ├── lib.rs
-│   │   │   ├── sled_backend.rs  # Sled storage implementation
+│   │   │   ├── sqlite_backend.rs  # SQLite storage (libsql) implementation
 │   │   │   ├── memory_backend.rs# In-memory storage
 │   │   │   └── migrations.rs    # Schema migrations
 │   │   └── Cargo.toml
@@ -25604,8 +25604,8 @@ mlua = { version = "0.9", features = ["lua54", "async", "serialize"] }
 boa_engine = "0.17"
 
 # Storage and persistence
-sled = "0.34"
-rocksdb = "0.21"
+libsql = "0.5"
+deadpool-postgres = "0.21"
 
 # Async and concurrency
 crossbeam = "0.8"
@@ -25878,7 +25878,7 @@ fn check_cpu_feature(feature: &str) -> bool {
 ```toml
 # Example feature flag configuration in core crate
 [features]
-default = ["lua", "javascript", "builtin-tools", "sled-storage"]
+default = ["lua", "javascript", "builtin-tools", "sqlite-storage"]
 
 # Script engine features
 lua = ["dep:mlua"]
@@ -25886,8 +25886,8 @@ javascript = ["dep:boa_engine"]
 python = ["dep:pyo3"]  # Future
 
 # Storage backends
-sled-storage = ["dep:sled"]
-rocksdb-storage = ["dep:rocksdb"]
+sqlite-storage = ["dep:libsql"]
+postgres-storage = ["dep:deadpool-postgres"]
 memory-storage = []
 
 # Built-in component features
@@ -25992,9 +25992,7 @@ services:
       - metrics
 
   storage:
-    image: rocksdb/rocksdb:latest
     volumes:
-      - rocksdb_data:/data
     ports:
       - "6379:6379"
 
@@ -26017,7 +26015,6 @@ services:
       - ./monitoring/grafana:/etc/grafana/provisioning
 
 volumes:
-  rocksdb_data:
   prometheus_data:
   grafana_data:
 ```
@@ -26111,7 +26108,7 @@ data:
     port = 8080
     
     [storage]
-    backend = "rocksdb"
+    backend = "sqlite"
     path = "/var/lib/rs-llmspell/db"
     
     [scripting]
@@ -26746,7 +26743,7 @@ print("Result:", result.output)
 1. Complete built-in tools library (40+ tools)
 2. **JavaScriptEngine as second ScriptEngineBridge implementation**
 3. Drop-in engine switching via existing factory pattern
-4. Persistent state with sled
+4. Persistent state with SQLite
 5. Event system implementation
 
 **ARCHITECTURAL ADVANTAGE - Phase 2:**
@@ -26887,7 +26884,7 @@ tls_enabled = true
 max_connections = 1000
 
 [storage]
-backend = "rocksdb"
+backend = "sqlite"
 connection_pool_size = 20
 backup_enabled = true
 backup_interval = "1h"
@@ -28910,7 +28907,7 @@ cors_enabled = true                 # Enable CORS
 cors_origins = ["*"]                # Allowed CORS origins
 
 [storage]
-backend = "sled"                    # Storage backend: "sled", "rocksdb", "memory"
+backend = "sqlite"                    # Storage backend: "sqlite", "postgres", "memory"
 path = "/var/lib/rs-llmspell/db"   # Database path
 connection_pool_size = 10           # Connection pool size
 query_timeout = 5000                # Query timeout in milliseconds
@@ -29113,7 +29110,7 @@ pub const VALIDATION_RULES: &[ValidationRule] = &[
     },
     ValidationRule::OneOf { 
         field: "storage.backend".to_string(), 
-        values: vec!["sled".to_string(), "rocksdb".to_string(), "memory".to_string()] 
+        values: vec!["sqlite".to_string(), "sqlite".to_string(), "memory".to_string()] 
     },
     ValidationRule::Pattern { 
         field: "server.host".to_string(), 

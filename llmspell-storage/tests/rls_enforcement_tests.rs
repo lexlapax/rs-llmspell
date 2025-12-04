@@ -747,13 +747,16 @@ async fn test_multi_tenant_load_100x100() {
         .collect();
 
     // Phase 1: Insert 100 operations per tenant (10,000 total)
-    // Sequential insertions to avoid RLS race conditions with shared tenant context
+    // Use transactions to batch inserts per tenant (maintains RLS isolation)
     for tenant_id in &tenant_ids {
         backend.set_tenant_context(tenant_id).await.unwrap();
-        let client = backend.get_client().await.unwrap();
+        let mut client = backend.get_client().await.unwrap();
+
+        // Begin transaction for this tenant's batch
+        let transaction = client.transaction().await.unwrap();
 
         for j in 0..100 {
-            client
+            transaction
                 .execute(
                     "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
                     &[tenant_id, &format!("value-{}", j)],
@@ -761,6 +764,9 @@ async fn test_multi_tenant_load_100x100() {
                 .await
                 .unwrap();
         }
+
+        // Commit batch
+        transaction.commit().await.unwrap();
     }
 
     // Phase 2: Verify zero-leakage (each tenant sees exactly 100 rows)

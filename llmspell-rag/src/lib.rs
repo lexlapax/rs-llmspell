@@ -95,10 +95,11 @@ pub mod prelude {
         RetrievalStrategy, RetrievalWeights,
     };
 
-    // Re-export commonly used types from llmspell-storage
-    pub use llmspell_storage::{
-        DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
-        VectorEntry, VectorQuery, VectorResult, VectorStorage,
+    // Re-export commonly used types from llmspell-core
+    pub use llmspell_core::traits::storage::{HNSWStorage, VectorStorage};
+    pub use llmspell_core::types::storage::{
+        DistanceMetric, HNSWConfig, NamespaceStats, ScopedStats, StorageStats, VectorEntry,
+        VectorQuery, VectorResult,
     };
 
     // Pipeline exports will be added when implemented

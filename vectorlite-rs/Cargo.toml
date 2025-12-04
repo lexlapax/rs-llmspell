@@ -1,0 +1,49 @@
+[package]
+name = "vectorlite-rs"
+description = "Pure Rust HNSW vector search extension for SQLite"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lib]
+# Build both:
+# - cdylib: Loadable SQLite extension (.so/.dylib/.dll)
+# - rlib: Rust library for integration tests
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# HNSW vector indexing
+hnsw_rs = "0.3.2"
+
+# SQLite virtual table API (using libsql's fork to avoid symbol conflicts)
+# vtab feature: Virtual table trait implementations
+# Note: libsql-rusqlite provides same API as rusqlite but uses libsql's SQLite
+libsql-rusqlite = { version = "0.9", default-features = false, features = ["vtab"] }
+# Re-export as rusqlite for compatibility
+rusqlite = { package = "libsql-rusqlite", version = "0.9", default-features = false, features = ["vtab"] }
+
+# Serialization for metadata and configuration
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+# MessagePack for HNSW index persistence
+rmp-serde = "1.1"
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Zero-copy Vec<f32> marshaling for SQLite BLOBs
+zerocopy = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+[features]
+default = []
+# bundled feature removed - libsql-rusqlite uses libsql's SQLite implementation
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = { workspace = true }

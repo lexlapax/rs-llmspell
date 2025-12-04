@@ -296,9 +296,11 @@ fn test_chroot_jail_bypass_attacks() {
 
     let config = PathSecurityConfig {
         jail_directory: Some(jail_path.clone()),
-        allow_hidden: true,          // Allow hidden files for temp paths
-        allow_symlinks: true,        // Allow symlinks for temp paths
-        disallowed_prefixes: vec![], // Clear for this test
+        allow_hidden: true,                  // Allow hidden files for temp paths
+        allow_symlinks: true,                // Allow symlinks for temp paths
+        disallowed_prefixes: vec![],         // Clear for this test
+        check_permission_inheritance: false, // Linux temp dirs may have world-writable parents
+        cross_platform_validation: false,    // Skip for temp dir testing
         ..Default::default()
     };
     let validator = PathSecurityValidator::with_config(config);

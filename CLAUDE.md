@@ -14,14 +14,20 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - **Release Notes**: `/RELEASE_NOTES_v0.13.0.md` (comprehensive v0.13.0 changelog)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
-## Recent Completion Status (Experimental Infrastructure Evolution)
-- ✅ **Phase 7**: Infrastructure Consolidation (536+ files refactored, centralized testing, config revolution)
-- ✅ **Phase 10**: Service Integration & IDE Connectivity (kernel, Jupyter, VS Code, LSP)
-- ✅ **Phase 11**: Local LLM Integration (Ollama + Candle dual-path) - COMPLETE
-- ✅ **Phase 11a**: Bridge Consolidation (87% compile speedup, API standardization, docs completeness) - COMPLETE
-- ✅ **Phase 11b**: Local LLM Cleanup (unified profiles, dual-architecture models, platform-aware GPU) - COMPLETE
-- ✅ **Phase 12**: Experimental Template System (10 workflows, CLI + Lua API, multi-agent patterns) - COMPLETE
-- ✅ **Phase 13**: Experimental Memory & Context Engineering (3-tier memory, hot-swap backends, context assembly) - COMPLETE
+## Current Status (Phase 13c - Storage Consolidation)
+- ✅ **Phases 7-13**: Complete
+- 🚧 **Phase 13c**: Storage Consolidation → v0.14.0
+  - ✅ 13c.1: Dependencies (-60MB)
+  - ✅ 13c.2.0: Trait Architecture (3 traits, llmspell-core)
+  - ✅ 13c.2.1: libsql Foundation (SqliteBackend, migrations)
+  - ✅ 13c.2.2a: vectorlite-rs (1,098 lines, HNSW)
+  - ✅ 13c.2.3/3a: Vector Storage (1,174 lines, MessagePack persistence, <2ms)
+  - ✅ 13c.2.4: Graph Storage (1,230 lines, bi-temporal)
+  - ✅ 13c.2.5: Procedural Storage (885 lines, V5)
+  - ✅ 13c.2.6: State Storage (1,619 lines, V6/V7/V8, agent/KV/workflow)
+  - ✅ 13c.2.7: Auxiliary Tables (3,598 lines, V9/V10/V11/V13, 31 tests, zero warnings)
+  - ⏳ 13c.2.8: Legacy Removal + Graph Traversal Enhancement (NEXT)
+  - Pending: 13c.2.9-13c.2.12 (Testing, Integration, Compatibility, Docs)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
@@ -81,43 +87,30 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - `llmspell-graph`: Temporal knowledge graph (Phase 13)
 - `llmspell-context`: Context engineering pipeline (Phase 13)
 - `llmspell-bridge`: Script language integration
+- `llmspell-storage`: State management and persistence (Phase 13c)
 - `llmspell-utils`: Shared utilities (use for ALL shared code)
 - `llmspell-state-persistence`: State with persistence
 - `llmspell-hooks`: Hook system with replay
 - `llmspell-events`: Event system with correlation
 - `llmspell-sessions`: Session management with artifacts
+- `vectorlite-rs`: Pure Rust HNSW vector search SQLite extension (Phase 13c.2.2a)
 
 ## Development Workflow
 1. Read relevant phase doc + TODO.md
 2. Write failing test using llmspell-testing helpers
-3. Implement minimal solution
-4. Run ./scripts/quality-check-fast.sh
-5. Update TODO.md sub-tasks as completed
+3. Run ./scripts/quality-check-fast.sh
+4. Update TODO.md sub-tasks as completed
 
-## v0.13.0 Key Achievements (Phase 13 - Experimental Infrastructure)
-- **3-Tier Memory System**: Episodic (HNSW), Semantic (SurrealDB graph), Procedural (patterns)
-- **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SurrealDB (bi-temporal graph)
-- **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
-- **<2ms Memory Overhead**: 50x faster than target, production-quality validation at scale
-- **149 Tests Passing**: 100% pass rate, zero warnings, comprehensive validation
-- **Zero Breaking Changes**: Fully backward compatible, opt-in features
-- **1,300+ Lines API Docs**: llmspell-memory, llmspell-graph, llmspell-context
-- **Memory + Context Globals**: 17th and 18th Lua globals for script access
+## Recent Releases
+- **v0.13.0**: 3-tier memory, hot-swap backends, context engineering, 149 tests
+- **v0.12.0**: 10 templates, multi-agent workflows, CLI+Lua
 
-## v0.12.0 Key Achievements (Phase 12 - Experimental Workflows)
-- **10 Experimental Templates**: Rapid AI concept exploration workflows
-- **Template System Core**: 2,847 lines (trait-based, DashMap registry, ExecutionContext builder)
-- **CLI + Lua Integration**: `template list|info|exec|search|schema` commands + Template global (16th)
-- **Multi-Agent Workflows**: Real LLM integration (code-generator: 3 agents, data-analysis: 2 agents)
-- **<2ms Overhead**: 50x faster than target, production-quality engineering
-- **3,655 Lines Docs**: Architecture + 10 user guides + examples
-
-## Banned Project Behaviors
-- Creating new files (edit existing)
-- Adding dependencies (use existing or llmspell-utils)
-- Implementing features from future phases
-- Leaving TODO comments in code
-- Using unwrap() in production code
-- Skipping tests to meet deadlines
-- When writing Lua scripts, use `docs/user-guide/api/lua/README.md` for API reference - DO NOT GUESS method names
-- Never include attribution footers in git commits
+## Strict Project Behaviors
+- Do not Create new files (edit existing if possible)
+- Do Not add dependencies (use existing or llmspell-utils if possible)
+- Do not Implement features from future phases
+- Never Leave TODO comments in code, implement in place
+- No Using unwrap() in production code
+- No Skipping tests to meet deadlines
+- Never guess method names when writing Lua scripts, use `docs/user-guide/appendix/lua-api-reference.md` for API reference 
+- Never include claude attribution footers in git commits or in code

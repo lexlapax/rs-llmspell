@@ -8,7 +8,7 @@ use std::fs;
 #[test]
 #[serial]
 fn test_trace_level_off() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("off")
@@ -27,7 +27,7 @@ fn test_trace_level_off() {
 #[test]
 #[serial]
 fn test_trace_level_error() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("error")
@@ -46,7 +46,7 @@ fn test_trace_level_error() {
 #[test]
 #[serial]
 fn test_trace_level_warn() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("warn")
@@ -68,7 +68,7 @@ fn test_trace_level_warn() {
 #[test]
 #[serial]
 fn test_trace_level_info() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("info")
@@ -89,7 +89,7 @@ fn test_trace_level_info() {
 #[test]
 #[serial]
 fn test_trace_level_debug() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("debug")
@@ -110,7 +110,7 @@ fn test_trace_level_debug() {
 #[test]
 #[serial]
 fn test_trace_level_trace() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("trace")
@@ -136,7 +136,7 @@ fn test_trace_on_all_commands() {
     fs::write(test_file, "print('test')").unwrap();
 
     // Test run command - may output to stdout instead of stderr
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("info")
@@ -155,7 +155,7 @@ fn test_trace_on_all_commands() {
     );
 
     // Test exec command
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("--trace")
         .arg("info")
         .arg("exec")
@@ -177,7 +177,7 @@ fn test_debug_command_timeout() {
     fs::write(test_file, "print('debug test')").unwrap();
 
     // Test debug command with timeout - it should hang waiting for input
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("--trace")
         .arg("info")
         .arg("debug")
@@ -206,7 +206,7 @@ fn test_repl_command_timeout() {
     use std::time::Duration;
 
     // Test repl command with timeout - it should hang waiting for input
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("--trace")
         .arg("info")
         .arg("repl")
@@ -226,7 +226,7 @@ fn test_repl_command_timeout() {
 #[test]
 #[serial]
 fn test_span_propagation() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("trace")
@@ -247,7 +247,7 @@ fn test_span_propagation() {
 #[serial]
 fn test_stderr_stdout_separation() {
     // Test that trace output goes to stderr and program output goes to stdout
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     let output = cmd
         .arg("--trace")
         .arg("info")

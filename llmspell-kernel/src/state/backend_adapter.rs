@@ -4,7 +4,8 @@
 use super::config::StorageBackendType;
 use super::performance::UnifiedSerializer;
 use crate::state::{StateError, StateResult};
-use llmspell_storage::{StorageBackend, StorageSerialize};
+use llmspell_core::traits::storage::StorageBackend;
+use llmspell_storage::StorageSerialize;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -13,8 +14,8 @@ use std::sync::Arc;
 /// # Errors
 ///
 /// Returns `StateError::StorageError` if:
-/// - Sled backend cannot be created at the specified path
-/// - `RocksDB` backend is requested (not yet implemented)
+/// - `SQLite` backend cannot be created at the specified path
+/// - `PostgreSQL` backend is not yet fully implemented
 pub async fn create_storage_backend(
     backend_type: &StorageBackendType,
 ) -> StateResult<Arc<dyn StorageBackend>> {
@@ -23,16 +24,20 @@ pub async fn create_storage_backend(
             let backend = llmspell_storage::MemoryBackend::new();
             Ok(Arc::new(backend) as Arc<dyn StorageBackend>)
         }
-        StorageBackendType::Sled(config) => {
-            let backend = llmspell_storage::SledBackend::new_with_path(&config.path)
-                .map_err(|e| StateError::storage(e.to_string()))?;
-            Ok(Arc::new(backend) as Arc<dyn StorageBackend>)
-        }
-        StorageBackendType::RocksDB(_config) => {
-            // RocksDB backend to be implemented in future phase
-            Err(StateError::storage(
-                "RocksDB backend not yet implemented".to_string(),
-            ))
+        StorageBackendType::Sqlite(config) => {
+            let sqlite_config = llmspell_storage::backends::sqlite::SqliteConfig::new(&config.path);
+            let sqlite_backend =
+                llmspell_storage::backends::sqlite::SqliteBackend::new(sqlite_config)
+                    .await
+                    .map_err(|e| {
+                        StateError::storage(format!("Failed to create SQLite backend: {e}"))
+                    })?;
+            // Wrap in SqliteKVStorage with "system" tenant for kernel state
+            let kv_storage = llmspell_storage::backends::sqlite::SqliteKVStorage::new(
+                Arc::new(sqlite_backend),
+                "system".to_string(),
+            );
+            Ok(Arc::new(kv_storage) as Arc<dyn StorageBackend>)
         }
         #[cfg(feature = "postgres")]
         StorageBackendType::Postgres(_config) => {

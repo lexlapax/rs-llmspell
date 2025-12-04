@@ -1,6 +1,6 @@
 # LLMSpell Examples
 
-**Status**: 🚀 **Phase 8.10.6** - Complete example set with RAG integration, multi-tenancy, and cost optimization
+**Status**: 🚀 **Phase 13** (v0.13.x) - Complete example set with adaptive memory, context engineering, and 21 preset profiles
 
 **Learn by example - comprehensive demonstrations of LLMSpell capabilities**
 
@@ -25,12 +25,9 @@ examples/
 │   ├── tests/                      # 3 RAG test suites
 │   ├── benchmarks/                 # 1 RAG performance benchmark
 │   └── configs/                    # 15 configuration templates
-└── rust-developers/                # Rust integration examples (6 examples)
+└── rust-developers/                # Rust integration examples (3 examples)
     ├── custom-tool-example/        # Tool creation fundamentals
     ├── custom-agent-example/       # Agent implementation patterns
-    ├── async-patterns-example/     # Concurrent programming patterns
-    ├── extension-pattern-example/  # Plugin architecture
-    ├── builder-pattern-example/    # Configuration patterns
     └── integration-test-example/   # Testing strategies
 ```
 
@@ -54,8 +51,8 @@ All examples work with **builtin profiles** - no configuration files needed:
 # Learn error handling with state
 ./target/debug/llmspell -p state run examples/script-users/getting-started/04-handle-errors.lua
 
-# Try RAG (Phase 8 - requires embedding API)
-./target/debug/llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
+# Try Memory & RAG (Phase 13 - requires API key)
+./target/debug/llmspell -p memory run examples/script-users/getting-started/05-memory-rag-advanced.lua
 
 # Explore features
 ./target/debug/llmspell -p minimal run examples/script-users/features/tool-basics.lua
@@ -67,12 +64,12 @@ All examples work with **builtin profiles** - no configuration files needed:
 ```bash
 cd examples/rust-developers/custom-tool-example && cargo run
 cd examples/rust-developers/custom-agent-example && cargo run
-cd examples/rust-developers/async-patterns-example && cargo run
+cd examples/rust-developers/integration-test-example && cargo run
 ```
 
 ### Builtin Profiles (Recommended)
 
-LLMSpell includes 10 builtin profiles for common workflows:
+LLMSpell includes 21 builtin profiles for common workflows:
 
 ```bash
 # Tools and workflows only (no LLM providers)
@@ -84,20 +81,57 @@ LLMSpell includes 10 builtin profiles for common workflows:
 # State persistence enabled
 ./target/debug/llmspell -p state run examples/script-users/features/state-persistence.lua
 
-# RAG development (Phase 8)
-./target/debug/llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
+# Memory & RAG development
+./target/debug/llmspell -p memory-development run examples/script-users/getting-started/05-memory-rag-advanced.lua
 
 # RAG production
 ./target/debug/llmspell -p rag-prod run examples/script-users/cookbook/rag-multi-tenant.lua
 
 # Local LLM with Ollama
-./target/debug/llmspell -p ollama run examples/local_llm_status.lua
+./target/debug/llmspell -p ollama run examples/script-users/features/local-llm-status.lua
 
 # Sessions (state + hooks + events)
 ./target/debug/llmspell -p sessions run examples/script-users/cookbook/rag-session.lua
 ```
 
-**Available Profiles**: minimal, development, providers, state, sessions, ollama, candle, rag-dev, rag-prod, rag-perf
+**Available Profiles**: See [Profile Guide](../docs/user-guide/profile-layers-guide.md) for all 21 profiles
+
+---
+
+## 🤔 Decision Matrix: Rust Embedding vs Lua Scripting
+
+**Choose your path based on your use case:**
+
+| Factor | **Lua Scripting** ([script-users/](script-users/)) | **Rust Embedding** ([rust-developers/](rust-developers/)) |
+|--------|-------------------------------------------|------------------------------------------------|
+| **Best For** | Rapid prototyping, workflows, automation | Production integration, custom extensions |
+| **Setup Time** | Instant (no compilation) | Moderate (add dependency, rebuild) |
+| **Type Safety** | Runtime checking | Compile-time checking |
+| **Performance** | Excellent (mlua bridge) | Native Rust speed |
+| **Iteration Speed** | Instant (edit and run) | Slower (rebuild required) |
+| **Extensibility** | Limited to exposed APIs | Full access to Rust ecosystem |
+| **Use Cases** | Scripts, automation, workflows, experiments | Libraries, services, production systems |
+| **Learning Curve** | Low (Lua basics + LLMSpell API) | Higher (Rust + LLMSpell traits) |
+
+**Decision Guide**:
+
+✅ **Choose Lua Scripting If:**
+- Rapid prototyping or experimentation
+- Building workflows or automation scripts
+- Quick iteration is important
+- Don't need custom components
+- Using LLMSpell as a standalone tool
+
+✅ **Choose Rust Embedding If:**
+- Building production services or libraries
+- Need custom tools, agents, or workflows
+- Integrating LLMSpell into existing Rust applications
+- Performance critical paths
+- Need compile-time safety guarantees
+
+**Hybrid Approach**: Many projects start with Lua for prototyping, then extract performance-critical components to Rust.
+
+---
 
 ### Custom Configuration (Advanced)
 
@@ -122,7 +156,7 @@ For unique patterns not covered by builtin profiles:
 # Multi-agent coordination (requires API keys)
 ./target/debug/llmspell -p providers run examples/script-users/cookbook/multi-agent-coordination.lua
 
-# RAG patterns (Phase 8 - requires embedding API)
+# RAG patterns (requires embedding API)
 ./target/debug/llmspell -p rag-prod run examples/script-users/cookbook/rag-multi-tenant.lua
 
 ./target/debug/llmspell -p sessions run examples/script-users/cookbook/rag-session.lua
@@ -142,10 +176,10 @@ Applications include app-specific config files for demonstration, but can run wi
 ./target/debug/llmspell -c examples/script-users/applications/webapp-creator/config.toml \
   run examples/script-users/applications/webapp-creator/main.lua
 
-# Knowledge base (Phase 8) - with builtin RAG profile
+# Knowledge base (Phase 13) - with builtin RAG profile
 ./target/debug/llmspell -p rag-prod run examples/script-users/applications/knowledge-base/main.lua
 
-# Personal assistant (Phase 8) - with sessions profile
+# Personal assistant (Phase 13) - with sessions profile
 ./target/debug/llmspell -p sessions run examples/script-users/applications/personal-assistant/main.lua
 ```
 
@@ -162,7 +196,7 @@ Progressive learning path from basics to RAG:
 - **`02-first-agent.lua`** - Creating LLM agents
 - **`03-first-workflow.lua`** - Workflow orchestration
 - **`04-handle-errors.lua`** - Error handling patterns
-- **`05-first-rag.lua`** - RAG system basics (Phase 8)
+- **`05-memory-rag-advanced.lua`** - RAG system basics (Phase 13)
 
 #### Features (5 demonstrations)
 Core capability demonstrations:
@@ -185,7 +219,7 @@ Battle-tested patterns for production:
 - **`security-patterns.lua`** - Input validation
 - **`state-management.lua`** - Persistence patterns
 
-**RAG Patterns (3 - Phase 8):**
+**RAG Patterns (3):**
 - **`rag-multi-tenant.lua`** - Tenant isolation
 - **`rag-session.lua`** - Conversational memory
 - **`rag-cost-optimization.lua`** - 70% cost reduction
@@ -209,7 +243,7 @@ Production-ready applications:
 - **`process-orchestrator/`** - Workflow automation
 - **`research-collector/`** - v2.0 with RAG integration
 
-**RAG Applications (2 - Phase 8):**
+**RAG Applications (2):**
 - **`knowledge-base/`** - Personal knowledge management
 - **`personal-assistant/`** - AI productivity companion
 
@@ -303,9 +337,9 @@ export ANTHROPIC_API_KEY="your-key-here"
 3. Explore `async-patterns-example/` for concurrency
 4. Study `builder-pattern-example/` for configuration
 
-### For RAG Users (Phase 8)
+### For RAG Users (Phase 13)
 
-1. Start with `script-users/getting-started/05-first-rag.lua`
+1. Start with `script-users/getting-started/05-memory-rag-advanced.lua`
 2. Try RAG cookbook patterns:
    - `rag-multi-tenant.lua` for SaaS applications
    - `rag-session.lua` for conversational AI
@@ -467,24 +501,24 @@ To add new examples:
 6. **Error Handling**: Include proper error handling patterns
 7. **Update README**: Add to this file and relevant subdirectory READMEs
 
-## 🆕 Phase 8 RAG Features
+## 🆕 Phase 13 Memory & RAG Features
 
-Phase 8.10.6 introduces comprehensive RAG (Retrieval-Augmented Generation) support:
+Phase 13 (v0.13.x) introduces comprehensive adaptive memory and context engineering:
 
-### RAG Capabilities
+### Memory & RAG Capabilities
 
+- **Adaptive Memory**: 3-tier memory system (episodic, semantic, procedural)
+- **Context Engineering**: Strategy-based context assembly
 - **Vector Storage**: HNSW algorithm for fast similarity search
 - **Multi-Tenancy**: Complete isolation between tenant knowledge bases
 - **Session Management**: Conversational memory with automatic cleanup
 - **Cost Optimization**: Smart caching reduces embedding costs by 70%
-- **Bi-temporal Metadata**: Track both event time and ingestion time
-- **TTL Support**: Automatic document expiration for compliance
-- **Production Ready**: Battle-tested patterns for enterprise deployment
+- **21 Preset Profiles**: Zero-config deployment for any use case
 
-### RAG Examples
+### Memory & RAG Examples
 
 **Getting Started:**
-- `script-users/getting-started/05-first-rag.lua` - Learn RAG basics
+- `script-users/getting-started/05-memory-rag-advanced.lua` - Learn Memory & RAG
 
 **Production Patterns:**
 - `script-users/cookbook/rag-multi-tenant.lua` - Tenant isolation
@@ -506,30 +540,29 @@ Phase 8.10.6 introduces comprehensive RAG (Retrieval-Augmented Generation) suppo
 
 ## 📊 Summary
 
-### Total Examples: 60+
+### Total Examples: 50+
 
 **Script Users (Lua)**: 50+ examples
 - Getting Started: 6 progressive examples
 - Features: 5 capability demonstrations
-- Cookbook: 11 production patterns (including 3 RAG)
+- Cookbook: 16 production patterns (including 3 RAG)
 - Advanced Patterns: 4 complex scenarios
-- Applications: 9 complete applications (including 2 RAG)
+- Applications: 11 complete applications (including 2 RAG)
 - Tests: 3 RAG test suites
 - Benchmarks: 1 performance benchmark
 - Configs: 15 configuration templates
 
-**Rust Developers**: 6 integration examples
-- Tool creation, agent implementation, async patterns
-- Extension architecture, builder patterns, testing
+**Rust Developers**: 3 integration examples
+- Tool creation, agent implementation, testing
 
-### What's New in Phase 8
+### What's New in Phase 13
 
-- RAG integration with multi-tenancy and sessions
-- Cost optimization patterns (70% reduction)
-- 2 new RAG applications (knowledge-base, personal-assistant)
-- 3 RAG cookbook patterns
-- Comprehensive RAG test suites
-- 5 specialized RAG configurations
+- Adaptive memory system (episodic, semantic, procedural)
+- Context engineering with strategy-based assembly
+- 21 preset profiles for zero-config deployment
+- Memory-development profile for debugging
+- Validated getting-started examples (100% pass rate)
+- Quality-check integration for examples
 
 ---
 

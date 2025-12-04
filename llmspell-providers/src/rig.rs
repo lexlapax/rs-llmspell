@@ -7,7 +7,7 @@ use llmspell_core::{
     error::LLMSpellError,
     types::{AgentInput, AgentOutput, AgentStream},
 };
-use rig::{client::CompletionClient, completion::CompletionModel, providers};
+use rig::{client::CompletionClient, client::Nothing, completion::CompletionModel, providers};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -19,7 +19,8 @@ enum RigModel {
     OpenAI(providers::openai::responses_api::ResponsesCompletionModel),
     Anthropic(providers::anthropic::completion::CompletionModel),
     Cohere(providers::cohere::CompletionModel),
-    Ollama(providers::ollama::CompletionModel),
+    Ollama(providers::ollama::CompletionModel<reqwest::Client>),
+    Gemini(providers::gemini::completion::CompletionModel),
 }
 
 /// Rig provider implementation with cost tracking and tracing
@@ -65,7 +66,14 @@ impl RigProvider {
                             source: None,
                         })?;
 
-                let client = providers::openai::Client::new(api_key);
+                // rig-core 0.25+ uses builder pattern
+                let client = providers::openai::Client::builder()
+                    .api_key(api_key)
+                    .build()
+                    .map_err(|e| LLMSpellError::Configuration {
+                        message: format!("Failed to create OpenAI client: {}", e),
+                        source: None,
+                    })?;
                 let model = client.completion_model(&config.model);
                 info!(
                     "OpenAI client created successfully for model: {}",
@@ -84,8 +92,8 @@ impl RigProvider {
                             source: None,
                         })?;
 
-                // New rig 0.21 API uses builder pattern
-                let mut client_builder = providers::anthropic::Client::builder(api_key);
+                // rig-core 0.25+ uses builder pattern
+                let mut client_builder = providers::anthropic::Client::builder().api_key(api_key);
 
                 if let Some(base_url) = config.endpoint.as_deref() {
                     debug!("Using custom Anthropic endpoint: {}", base_url);
@@ -96,7 +104,7 @@ impl RigProvider {
                     warn!("Failed to create Anthropic client: {}", e);
                     LLMSpellError::Configuration {
                         message: format!("Failed to create Anthropic client: {}", e),
-                        source: Some(Box::new(e)),
+                        source: None,
                     }
                 })?;
 
@@ -118,7 +126,14 @@ impl RigProvider {
                             source: None,
                         })?;
 
-                let client = providers::cohere::Client::new(api_key);
+                // rig-core 0.25+ uses builder pattern
+                let client = providers::cohere::Client::builder()
+                    .api_key(api_key)
+                    .build()
+                    .map_err(|e| LLMSpellError::Configuration {
+                        message: format!("Failed to create Cohere client: {}", e),
+                        source: None,
+                    })?;
                 let model = client.completion_model(&config.model);
                 info!(
                     "Cohere client created successfully for model: {}",
@@ -134,18 +149,46 @@ impl RigProvider {
                     .unwrap_or("http://localhost:11434");
                 debug!("Ollama base URL: {}", base_url);
 
+                // rig-core 0.25+ - Ollama doesn't need API key, use .api_key(Nothing)
                 let client = providers::ollama::Client::builder()
+                    .api_key(Nothing)
                     .base_url(base_url)
                     .build()
                     .map_err(|e| LLMSpellError::Configuration {
                         message: format!("Failed to create Ollama client: {}", e),
-                        source: Some(Box::new(e)),
+                        source: None,
                     })?;
 
                 let model = client.completion_model(&config.model);
 
                 info!("Ollama client created successfully");
                 RigModel::Ollama(model)
+            }
+            "gemini" => {
+                trace!("Initializing Gemini client via rig");
+                let api_key =
+                    config
+                        .api_key
+                        .as_ref()
+                        .ok_or_else(|| LLMSpellError::Configuration {
+                            message: "Gemini API key required".to_string(),
+                            source: None,
+                        })?;
+
+                // rig-core 0.25+ uses builder pattern
+                let client = providers::gemini::Client::builder()
+                    .api_key(api_key)
+                    .build()
+                    .map_err(|e| LLMSpellError::Configuration {
+                        message: format!("Failed to create Gemini client: {}", e),
+                        source: None,
+                    })?;
+                let model = client.completion_model(&config.model);
+                info!(
+                    "Gemini client created successfully for model: {}",
+                    config.model
+                );
+                RigModel::Gemini(model)
             }
             _ => {
                 warn!(
@@ -163,7 +206,10 @@ impl RigProvider {
         // Set capabilities based on provider type and model
         let capabilities = ProviderCapabilities {
             supports_streaming: false, // Rig doesn't expose streaming yet
-            supports_multimodal: matches!(config.provider_type.as_str(), "openai" | "anthropic"),
+            supports_multimodal: matches!(
+                config.provider_type.as_str(),
+                "openai" | "anthropic" | "gemini"
+            ),
             max_context_tokens: Some(match config.provider_type.as_str() {
                 "openai" => match config.model.as_str() {
                     "gpt-4" | "gpt-4-turbo" => 128000,
@@ -174,6 +220,12 @@ impl RigProvider {
                     "claude-3-opus" | "claude-3-sonnet" => 200000,
                     "claude-2.1" => 100000,
                     _ => 100000,
+                },
+                "gemini" => match config.model.as_str() {
+                    "gemini-2.5-flash" | "gemini-2.5-flash-latest" => 1000000, // 1M context
+                    "gemini-2.5-pro" | "gemini-2.5-pro-latest" => 1000000,
+                    "gemini-3.0-pro" | "gemini-pro" => 32768,
+                    _ => 32768,
                 },
                 "cohere" => 4096,
                 "ollama" => 8192, // Default, model-dependent
@@ -247,13 +299,13 @@ impl RigProvider {
             }
             "anthropic" => {
                 match self.config.model.as_str() {
-                    "claude-3-opus-20240229" => {
+                    "claude-opus-4-5" => {
                         // Claude 3 Opus: $0.015/1K input, $0.075/1K output
                         let input_cost = (input_tokens as f64 / 1000.0) * 1.5;
                         let output_cost = (output_tokens as f64 / 1000.0) * 7.5;
                         ((input_cost + output_cost) * 100.0).round() as u64
                     }
-                    "claude-3-sonnet-20240229" => {
+                    "claude-sonnet-4-5" => {
                         // Claude 3 Sonnet: $0.003/1K input, $0.015/1K output
                         let input_cost = (input_tokens as f64 / 1000.0) * 0.3;
                         let output_cost = (output_tokens as f64 / 1000.0) * 1.5;
@@ -276,6 +328,28 @@ impl RigProvider {
             "ollama" => {
                 // Ollama is local/self-hosted, zero API cost
                 0
+            }
+            "gemini" => {
+                match self.config.model.as_str() {
+                    "gemini-2.5-flash" | "gemini-2.5-flash-latest" => {
+                        // Gemini 2.5 flash: $0.00125/1K input, $0.005/1K output (under 128K)
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.125;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 0.5;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                    "gemini-2.5-pro" | "gemini-2.5-pro-latest" => {
+                        // Gemini 2.5 pro: $0.000075/1K input, $0.0003/1K output
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.0075;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 0.03;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                    _ => {
+                        // Default to Gemini Pro pricing
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.125;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 0.5;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                }
             }
             _ => {
                 // Unknown provider, use conservative estimate
@@ -367,6 +441,12 @@ impl RigProvider {
                             trace!("Reasoning steps: {:?}", reasoning.reasoning);
                             Ok(reasoning.reasoning.join("\n\n"))
                         }
+                        AssistantContent::Image(_) => Err(LLMSpellError::Provider {
+                            message: "Unexpected image response in text completion context"
+                                .to_string(),
+                            provider: Some(self.config.name.clone()),
+                            source: None,
+                        }),
                     }
                 }),
             RigModel::Anthropic(model) => model
@@ -424,6 +504,12 @@ impl RigProvider {
                             trace!("Reasoning steps: {:?}", reasoning.reasoning);
                             Ok(reasoning.reasoning.join("\n\n"))
                         }
+                        AssistantContent::Image(_) => Err(LLMSpellError::Provider {
+                            message: "Unexpected image response in text completion context"
+                                .to_string(),
+                            provider: Some(self.config.name.clone()),
+                            source: None,
+                        }),
                     }
                 }),
             RigModel::Cohere(model) => model
@@ -481,6 +567,12 @@ impl RigProvider {
                             trace!("Reasoning steps: {:?}", reasoning.reasoning);
                             Ok(reasoning.reasoning.join("\n\n"))
                         }
+                        AssistantContent::Image(_) => Err(LLMSpellError::Provider {
+                            message: "Unexpected image response in text completion context"
+                                .to_string(),
+                            provider: Some(self.config.name.clone()),
+                            source: None,
+                        }),
                     }
                 }),
             RigModel::Ollama(model) => {
@@ -518,6 +610,75 @@ impl RigProvider {
                                 );
                                 Ok(reasoning.reasoning.join("\n\n"))
                             }
+                            AssistantContent::Image(_) => Err(LLMSpellError::Provider {
+                                message: "Unexpected image response in text completion context"
+                                    .to_string(),
+                                provider: Some(self.config.name.clone()),
+                                source: None,
+                            }),
+                        }
+                    })
+            }
+            RigModel::Gemini(model) => {
+                info!("Gemini completion via rig");
+                model
+                    .completion_request(&prompt)
+                    .max_tokens(self.max_tokens)
+                    .send()
+                    .await
+                    .map_err(|e| LLMSpellError::Provider {
+                        message: format!("Gemini completion failed: {}", e),
+                        provider: Some(self.config.name.clone()),
+                        source: None,
+                    })
+                    .and_then(|response| {
+                        use rig::completion::AssistantContent;
+                        trace!(
+                            "{} response received, processing variant",
+                            self.config.provider_type
+                        );
+                        match response.choice.first() {
+                            AssistantContent::Text(text) => {
+                                debug!(
+                                    "{} returned Text response: {} chars",
+                                    self.config.provider_type,
+                                    text.text.len()
+                                );
+                                Ok(text.text.clone())
+                            }
+                            AssistantContent::ToolCall(call) => {
+                                debug!(
+                                    "{} returned ToolCall response: function={}, id={}",
+                                    self.config.provider_type, call.function.name, call.id
+                                );
+                                warn!(
+                                    "Unexpected tool call in non-tool context: {}",
+                                    call.function.name
+                                );
+                                Err(LLMSpellError::Provider {
+                                    message: format!(
+                                        "Unexpected tool call response: {}",
+                                        call.function.name
+                                    ),
+                                    provider: Some(self.config.name.clone()),
+                                    source: None,
+                                })
+                            }
+                            AssistantContent::Reasoning(reasoning) => {
+                                debug!(
+                                    "Received reasoning response from {} with {} steps",
+                                    self.config.provider_type,
+                                    reasoning.reasoning.len()
+                                );
+                                trace!("Reasoning steps: {:?}", reasoning.reasoning);
+                                Ok(reasoning.reasoning.join("\n\n"))
+                            }
+                            AssistantContent::Image(_) => Err(LLMSpellError::Provider {
+                                message: "Unexpected image response in text completion context"
+                                    .to_string(),
+                                provider: Some(self.config.name.clone()),
+                                source: None,
+                            }),
                         }
                     })
             }

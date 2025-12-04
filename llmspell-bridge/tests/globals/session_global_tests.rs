@@ -10,6 +10,7 @@ use llmspell_kernel::sessions::config::SessionManagerConfig;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio;
+use llmspell_bridge::engine::bridge::ApiDependencies;
 
 /// Test session creation and basic operations
 #[tokio::test]
