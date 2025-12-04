@@ -1,8 +1,10 @@
 # Rs-LLMSpell Implementation Phases
 
-**Version**: 1.0  
-**Date**: June 2025  
-**Status**: Implementation Roadmap  
+**Version**: 1.1
+**Date**: December 2025
+**Status**: Implementation Roadmap
+**Current Phase**: Phase 14 (Web Interface) - NEXT
+**Latest Completion**: Phase 13c (Storage Consolidation & Usability) - v0.14.0
 
 > **📋 Complete Implementation Guide**: This document defines all implementation phases for rs-llmspell, from MVP foundation through advanced production features. Currently includes 19 core phases with additional future enhancements.
 
@@ -10,7 +12,7 @@
 
 ## Overview
 
-Rs-LLMSpell follows a carefully structured 25+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, Phase 11 for Local LLM Integration, Phase 11a for Bridge Consolidation, Phase 11b for Local LLM Cleanup & Configuration Consolidation, Phase 12 for Experimental Infrastructure with Production-Quality Engineering AI Agent Templates, Phase 13 for Adaptive Memory System, and Phase 13b for Cross-Platform Support with Complete PostgreSQL Storage Consolidation, essential for production deployment and multi-tenant scaling.
+Rs-LLMSpell follows a carefully structured 25+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, Phase 11 for Local LLM Integration, Phase 11a for Bridge Consolidation, Phase 11b for Local LLM Cleanup & Configuration Consolidation, Phase 12 for Experimental Infrastructure with Production-Quality Engineering AI Agent Templates, Phase 13 for Adaptive Memory System, Phase 13b for Cross-Platform Support with Complete PostgreSQL Storage Consolidation, and Phase 13c for Storage Consolidation & Usability Refinement (unified SQLite storage, layer-based profiles, documentation overhaul).
 
 ### Phase Categories
 
@@ -25,7 +27,9 @@ Rs-LLMSpell follows a carefully structured 25+ phase implementation approach tha
 - **User Experience** (Phase 12): Production-ready AI agent templates for immediate usability
 - **Advanced AI** (Phase 13): Adaptive memory system with temporal knowledge graphs
 - **Storage Infrastructure** (Phase 13b): Cross-platform support and unified PostgreSQL storage backend
-- **Protocol Support** (Phases 14-15): MCP client and server integration
+- **Storage Consolidation** (Phase 13c): ✅ COMPLETE - Unified SQLite storage, vectorlite-rs HNSW, layer-based profiles, legacy backend removal
+- **Web Interface** (Phase 14): HTTP API + Web UI + WebSocket streaming - NEXT
+- **Protocol Support** (Phases 15a-15b): MCP client and server integration
 - **Language Extensions** (Phase 16): JavaScript engine support
 - **Platform Support** (Phases 17-18): Library mode and cross-platform support
 - **Production Optimization** (Phase 19): Performance and security hardening
@@ -1905,188 +1909,303 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-## Phase 13c: Usability & Cohesion Refinement (2 Weeks)
+## Phase 13c: Storage Consolidation & Usability Refinement (6 Weeks) ✅ COMPLETE
 
-**Status**: NEXT
-**Priority**: HIGH (Quality & User Experience)
+**Status**: ✅ COMPLETE (December 2025)
+**Priority**: CRITICAL (Storage Unification + Quality & User Experience)
 **Dependencies**: Phase 13b completion
-**Timeline**: Weeks 53-54 (2 weeks)
+**Timeline**: November-December 2025 (~6 weeks actual)
+**Version**: v0.14.0
 
 ### Overview
 
-**Goal**: Transform rs-llmspell from feature-complete experimental platform to cohesive, production-ready developer experience. Focus on usability, consistency, and real-world deployment patterns.
+**Goal**: Consolidate fragmented storage backends into unified SQLite-based solution AND transform rs-llmspell into cohesive, production-ready developer experience.
 
-**Philosophy**: "Less is more" - reduce cognitive load, eliminate redundancy, ensure every example works flawlessly, provide clear paths from beginner to production.
+**Philosophy**: "Less is more" - reduce cognitive load, eliminate redundancy, unify storage, ensure every example works flawlessly, provide clear paths from beginner to production.
 
-**Why Now**: Phase 13 delivered massive experimental infrastructure (Templates, Memory, Context, Graph). Before PostgreSQL persistence (Phase 13b) and advanced integrations (Phase 14+), consolidate learnings into streamlined, cohesive platform.
-
----
-
-### Core Problems Addressed
-
-1. **Examples Sprawl** (75 files across 4 locations)
-   - Top-level `examples/` has 4 redundant local_llm_*.lua files
-   - `examples/rust-developers/` has 6 Rust examples (unclear if needed vs docs)
-   - `examples/script-users/` has 65+ Lua files with nested directories, broken examples
-   - `examples/templates/` Phase 12 integration unclear
-
-2. **Profile Chaos**
-   - Missing real-world profiles: postgres, production-ollama, memory-dev
-   - Redundant example-specific configs vs builtin profiles
-   - No validation that examples work with specified profiles
-
-3. **Documentation Drift**
-   - READMEs reference Phase 8, not Phase 13
-   - Examples have broken nested structures (communication-manager/examples/...)
-   - Generated artifacts in examples/ (webapp-creator/generated/)
-   - Unclear beginner path (7 getting-started examples, too many)
-
-4. **Real-World Gaps**
-   - No postgres profile for Phase 13b readiness
-   - No production ollama profile (local LLM deployment pattern)
-   - No validation that examples actually run
-   - Unclear distinction: when to use builtin profiles vs custom configs
+**Key Achievement**: Phase 13c evolved from a 2-week usability cleanup into a comprehensive 6-week storage consolidation + platform refinement effort, successfully:
+- Removing 4 legacy storage backends (HNSW files, SurrealDB, Sled, filesystem artifacts)
+- Unifying on SQLite + PostgreSQL dual-backend architecture
+- Creating vectorlite-rs pure Rust HNSW extension
+- Implementing layered profile composition system
+- Modernizing all documentation to Phase 13
 
 ---
 
-## Phase 13c Implementation Summary
+### Phase 13c.1: Cargo Dependencies Cleanup ✅ COMPLETE
 
-**Design Document**: `/docs/in-progress/phase-13c-design-doc.md` (3,422 lines)
+**Goal**: Remove redundant dependencies, improve compilation time
+**Duration**: 3 days
+**Result**: 10+ dependencies removed
 
-### Timeline Overview
+**Completed Tasks**:
+- ✅ **13c.1.1**: lazy_static + once_cell → std::sync::LazyLock/OnceLock (Rust 1.80+)
+- ✅ **13c.1.2**: Concurrency consolidation (crossbeam kept for lock-free structures)
+- ✅ **13c.1.3**: Tokio utilities audit (tokio-stream/util minimized)
+- ✅ **13c.1.4**: Serialization audit (serde_yaml removed, bincode kept)
+- ✅ **13c.1.5**: File operations audit (walkdir, path-clean kept)
+- ✅ **13c.1.6**: Compression audit (blake3 → sha2, lz4_flex kept)
+- ✅ **13c.1.7**: Unused dependency removal (quickjs_runtime removed)
+- ✅ **13c.1.8**: Dependency cleanup validation (2,982 tests passing)
 
-**2 Weeks** (10 working days) - detailed breakdown in design doc:
-- **Week 1**: Examples consolidation (Days 1-2), Profile enhancement (Days 3-4), Validation (Day 5)
-- **Week 2**: Documentation (Days 6-7), Integration testing (Days 8-9), Release preparation (Day 10)
-
-### Key Deliverables
-
-**Examples Consolidation** (75 → <50 files):
-- Top-level: Move 4 `local_llm_*.lua` to `script-users/features/`
-- Rust examples: 6 → 3 core (custom-tool, custom-agent, integration-test)
-- Getting-started: 8 → 5 examples (<30 min path)
-  - Merge 06-episodic-memory + 07-context-assembly → 05-memory-rag-advanced.lua
-- Cleanup: Remove broken nested examples/, generated artifacts
-
-**Profile Enhancement** (14 → 17 profiles):
-1. **postgres.toml**: PostgreSQL backend (Phase 13b readiness, VectorChord, RLS)
-2. **ollama-production.toml**: Production local LLM (llama3.2:3b, nomic-embed-text)
-3. **memory-development.toml**: Phase 13 memory debugging (HNSW, SurrealDB, debug logging)
-
-**Validation Infrastructure**:
-- `examples-validation.sh`: Automated validation (100% getting-started, 90%+ cookbook)
-- Integrated with `quality-check.sh` (non-blocking for API keys)
-- Profile + example compatibility matrix
-- Cross-platform testing (macOS + Linux)
-
-**Documentation**:
-- All READMEs updated to Phase 13 (from Phase 8)
-- `profiles-guide.md`: Profile decision matrix (builtin vs custom)
-- `migration-to-v0.14.md`: v0.13 → v0.14 comprehensive guide
-- `platform-notes.md`: macOS vs Linux gotchas
-- Updated user guide chapters (getting-started, deployment, profiles)
-
-**Quality & Release**:
-- v0.14.0 release candidate
-- CHANGELOG.md + RELEASE_NOTES_v0.14.0.md
-- All quality checks passing (zero warnings, 149+ tests)
-
-### Success Criteria
-
-**Examples**:
-- [ ] Top-level examples/ <5 items (clear entry points)
-- [ ] getting-started/ 5 examples (beginner completes in <30 min)
-- [ ] 100% examples validated with specified profiles
-- [ ] Zero broken nested directories
-- [ ] Zero generated artifacts in examples/
-
-**Profiles**:
-- [ ] postgres.toml ready for Phase 13b
-- [ ] ollama-production.toml works with real deployments
-- [ ] memory-development.toml enables Phase 13 debugging
-- [ ] 80%+ examples use builtin profiles (not custom configs)
-
-**Documentation**:
-- [ ] All READMEs reference Phase 13 (not Phase 8)
-- [ ] Profile decision matrix clear (builtin vs custom)
-- [ ] Migration guide complete (v0.13 → v0.14)
-- [ ] Zero broken links
-
-**Quality**:
-- [ ] examples-validation.sh in scripts/testing/
-- [ ] quality-check.sh includes example validation
-- [ ] 100% pass rate getting-started, 90%+ cookbook
-- [ ] Zero clippy warnings
-- [ ] All 149+ tests passing
-
-**Release**:
-- [ ] v0.14.0 ready (Cargo.toml, CHANGELOG, release notes)
-- [ ] All quality checks passing
-- [ ] Breaking changes documented
-- [ ] Phase 13c marked COMPLETE in implementation-phases.md
-
-### Key Metrics
-
-**Examples Consolidation**:
-- Before: 75 files → After: <50 files (33% reduction)
-- Getting-started: 8 → 5 examples (37.5% streamlined)
-- Completion time: 45+ min → <30 min (40% faster)
-
-**Profile Coverage**:
-- Before: 14 profiles → After: 17 profiles (+3 production)
-- Examples using builtins: 60% → 80%+
-- Production coverage: Partial → Complete
-
-**Quality Validation**:
-- Automated validation: 0% → 100%
-- Broken examples: Multiple → Zero
-- Documentation currency: Phase 8 → Phase 13
-
-### Design Principles
-
-- **Less is More**: Reduce cognitive load, eliminate redundancy, focus quality over quantity
-- **Real-World First**: Production profiles (postgres, ollama-production), deployment patterns
-- **Zero Friction**: Builtin profiles for 80%+ use cases, validated examples
-- **Production Ready**: Every example tested, every profile validated, every breaking change documented
-
-### Risk Assessment
-
-**Low Risks** (organizational changes, not architectural):
-- **Breaking Changes**: Top-level examples moved
-  - Mitigation: Migration guide, symlinks (transition period)
-- **Example Validation Failures**: Some examples may not work
-  - Mitigation: Fix or remove, document API key requirements
-- **Profile Complexity**: 17 profiles may confuse users
-  - Mitigation: Clear decision matrix, recommended profiles
-
-**Overall**: Low risk, high value (usability & production readiness)
+**Metrics**:
+- Dependencies removed: 10+ (lazy_static, once_cell, serde_yaml, blake3, quickjs_runtime, MySQL support)
+- Zero behavioral changes
+- Zero clippy warnings
 
 ---
 
-**END OF PHASE 13c SPECIFICATION**
+### Phase 13c.2: SQLite Unified Local Storage ✅ COMPLETE
+
+**Goal**: Consolidate 4 storage systems into unified libsql-based solution
+**Duration**: ~4 weeks
+**Result**: 10 storage components implemented, legacy backends removed
+
+**Strategic Rationale**:
+- **Problem**: 4 storage systems (HNSW files, SurrealDB, Sled KV, filesystem) created operational complexity
+- **Solution**: Unified libsql backend with vectorlite-rs HNSW extension
+- **Benefits**: Single-file backup, zero infrastructure, production-ready path to Turso
+
+**Completed Tasks**:
+- ✅ **13c.2.0**: Storage Trait Architecture (3 new traits in llmspell-core)
+- ✅ **13c.2.1**: libsql Backend Foundation (SqliteBackend, migrations, connection pooling)
+- ✅ **13c.2.2a**: vectorlite-rs Pure Rust HNSW (1,098 lines, SQLite virtual table)
+- ✅ **13c.2.3**: SqliteVectorStorage (1,174 lines, MessagePack persistence)
+- ✅ **13c.2.3a**: SqliteEpisodicMemory (640 lines, memory manager integration)
+- ✅ **13c.2.4**: SqliteGraphStorage (1,230 lines, bi-temporal, recursive CTEs)
+- ✅ **13c.2.5**: SqliteProceduralStorage (885 lines, pattern learning V5)
+- ✅ **13c.2.6**: SqliteStateStorage (1,619 lines, V6/V7/V8 - agent/KV/workflow)
+- ✅ **13c.2.7**: Auxiliary Tables (3,598 lines, V9/V10/V11/V13 - sessions/artifacts/events/hooks)
+- ✅ **13c.2.8**: Legacy Backend Removal + Graph Traversal Enhancement
+- ✅ **13c.2.9**: Testing & Benchmarking (635+ tests passing)
+- ✅ **13c.2.10**: Integration Testing (MemoryManager, KnowledgeGraph, State)
+
+**Legacy Backends Removed**:
+- HNSW file storage (hnsw_rs)
+- SurrealDB embedded graph
+- Sled KV store
+- rocksdb dependency (transitive via surrealdb)
+
+**Storage Components Implemented** (10 total):
+| Component | Migration | Description |
+|-----------|-----------|-------------|
+| V3 Vector | sqlite/V3 | HNSW-indexed vectors via vectorlite-rs |
+| V4 Graph | sqlite/V4 | Bi-temporal entities + relationships |
+| V5 Procedural | sqlite/V5 | Frequency-tracked patterns |
+| V6 Agent | sqlite/V6 | Agent state with versioning |
+| V7 KV Store | sqlite/V7 | Generic key-value fallback |
+| V8 Workflow | sqlite/V8 | Workflow lifecycle tracking |
+| V9 Sessions | sqlite/V9 | Session management |
+| V10 Artifacts | sqlite/V10 | Content-addressed storage |
+| V11 Events | sqlite/V11 | Time-series event log |
+| V13 Hooks | sqlite/V13 | Hook execution replay |
+
+---
+
+### Phase 13c.3: Trait Centralization Migration ✅ COMPLETE
+
+**Goal**: Migrate storage traits from domain crates to llmspell-core
+**Duration**: ~1 week
+**Result**: 3,714 lines migrated, zero circular dependencies
+
+**Completed Tasks**:
+- ✅ **13c.3.1**: Trait migration to llmspell-core (StorageBackend, VectorStorage, GraphBackend, etc.)
+- ✅ **13c.3.2**: Performance optimization (eliminated trait vtable overhead)
+- ✅ **13c.3.3**: Documentation updates
+
+**Metrics**:
+- Lines migrated: 3,714 (traits: 1,650 + types: 2,064)
+- Files created: 14 new files in llmspell-core
+- Zero circular dependencies
+- Performance maintained or improved
+
+---
+
+### Phase 13c.4: Profile System Overhaul ✅ COMPLETE
+
+**Goal**: Replace monolithic profiles with composable layer system
+**Duration**: ~1 week
+**Result**: 18 layers + 20 presets, multi-layer CLI support
+
+**Architecture**:
+```
+layers/
+├── base/           (4 layers: minimal, development, production, daemon)
+├── features/       (7 layers: memory, rag, sessions, state, templates, logging, llm)
+├── env/            (4 layers: local, docker, cloud, testing)
+└── backends/       (3 layers: sqlite, postgres, ollama)
+
+presets/            (20 combinations: minimal, development, postgres-prod, etc.)
+```
+
+**Completed Tasks**:
+- ✅ **13c.4.1-4.3**: Layer system infrastructure
+- ✅ **13c.4.4-4.6**: Profile merger with precedence
+- ✅ **13c.4.7**: 20 preset profile combinations
+- ✅ **13c.4.8**: Multi-layer CLI support (`-p base+features/memory+backends/postgres`)
+- ✅ **13c.4.9**: Comprehensive test suite (55+ tests)
+
+---
+
+### Phase 13c.5-13c.8: Usability & Release ✅ COMPLETE
+
+**Goal**: Examples consolidation, validation, documentation, release prep
+**Duration**: ~1 week
+
+**Completed**:
+- ✅ **13c.5**: Examples validation infrastructure
+- ✅ **13c.6**: Integration testing
+- ✅ **13c.7**: Documentation overhaul (all docs updated to Phase 13)
+- ✅ **13c.8**: Release preparation (v0.14.0)
+
+---
+
+### Final Metrics
+
+**Storage Consolidation**:
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Storage backends | 4 (fragmented) | 2 (SQLite + PostgreSQL) | Unified |
+| Binary bloat | ~60MB | ~12MB | -80% |
+| Backup procedure | 4 procedures | 1 file copy | Simplified |
+| Dependencies | 52 | 39-43 | -17-25% |
+
+**Code Quality**:
+| Metric | Result |
+|--------|--------|
+| Total tests | 635+ passing |
+| Clippy warnings | Zero |
+| Documentation | Phase 13 current |
+| Binary size (release) | 44MB |
+
+**Profile System**:
+| Metric | Before | After |
+|--------|--------|-------|
+| Profile files | 14 monolithic | 18 layers + 20 presets |
+| Composability | None | Full multi-layer |
+| Backward compatibility | N/A | 12 old names work |
+
+---
+
+### Key Deliverables Summary
+
+1. **vectorlite-rs**: Pure Rust HNSW SQLite extension (1,098 lines)
+2. **10 SQLite Storage Components**: Complete local storage solution
+3. **Layer-based Profiles**: 18 layers + 20 presets with CLI composition
+4. **Trait Centralization**: Storage traits in llmspell-core (zero circular deps)
+5. **Legacy Removal**: HNSW files, SurrealDB, Sled completely removed
+6. **Documentation**: All docs updated to Phase 13
+
+---
+
+**END OF PHASE 13c - ✅ COMPLETE**
 
 ---
 
 ## Advanced Integration Phases
 
 
-### **Phase 14: MCP Tool Integration (Weeks 55-56)**
+### **Phase 14: Web Interface (Weeks 55-58)**
 
-**Goal**: Support Model Control Protocol for external tools
-**Priority**: LOW (Advanced Integration)
+**Goal**: Create HTTP API and browser-based web interface for llmspell
+**Priority**: HIGH (User Experience & Accessibility)
+**Dependencies**: Phase 13c (Storage Consolidation) ✅, Phase 10 (Service Integration)
+
+**Strategic Rationale**: Currently llmspell is CLI-only with Jupyter protocol over ZeroMQ. Adding HTTP/WebSocket API and web UI enables:
+- Browser-based script development and execution
+- Real-time streaming of LLM responses
+- Visual management of agents, tools, sessions, and memory
+- Integration with web applications and services
+- Accessibility for non-CLI users
 
 **Components**:
-- MCP client implementation
-- External tool discovery and registration
-- MCP protocol compliance
-- Connection management and retries
+
+**Backend (llmspell-web crate)**:
+- HTTP server using axum (async, tower middleware ecosystem)
+- REST API endpoints:
+  - `POST /api/scripts/execute` - Execute Lua/JS scripts
+  - `POST /api/agents/{name}/invoke` - Invoke agent
+  - `POST /api/tools/{name}/call` - Call tool
+  - `GET /api/sessions` - List sessions
+  - `GET /api/memory/search` - Memory queries
+  - `GET /api/templates` - List templates
+- WebSocket endpoint for streaming (`/ws/stream`)
+- Server-Sent Events fallback (`/api/sse/stream`)
+- Authentication middleware (API keys, JWT)
+- CORS configuration for browser access
+- Integration with existing kernel infrastructure
+
+**Frontend (web-ui)**:
+- React/Next.js single-page application
+- Monaco editor for script editing
+- Real-time output streaming display
+- Agent/Tool management dashboard
+- Session browser with replay capability
+- Memory and context visualization
+- Template gallery and executor
+- Responsive design for desktop/tablet
+
+**Infrastructure**:
+- Static file serving for frontend
+- Health check and metrics endpoints
+- Rate limiting and request validation
+- Graceful shutdown with in-flight request handling
 
 **Success Criteria**:
-- [ ] Can connect to MCP servers
+- [ ] HTTP server starts and accepts connections
+- [ ] REST API endpoints functional for all major operations
+- [ ] WebSocket streaming delivers real-time LLM output
+- [ ] Web UI loads and connects to backend
+- [ ] Script execution works end-to-end via browser
+- [ ] Agent invocation with streaming response works
+- [ ] Session management accessible via UI
+- [ ] Authentication prevents unauthorized access
+- [ ] Performance: <100ms API response time (non-LLM operations)
+- [ ] Zero regressions in CLI functionality
+
+**Testing Requirements**:
+- HTTP endpoint integration tests
+- WebSocket streaming tests
+- Frontend component tests
+- End-to-end browser automation tests
+- Load testing for concurrent connections
+- Authentication/authorization tests
+- CORS policy validation
+- Graceful shutdown tests
+
+**Performance Targets**:
+- API response time: <100ms (excluding LLM inference)
+- WebSocket message latency: <50ms
+- Concurrent connections: 100+ simultaneous users
+- Frontend initial load: <3 seconds
+- Memory overhead: <100MB for web server
+
+---
+
+### **Phase 15a: MCP Client Integration (Weeks 59-60)**
+
+**Goal**: Support Model Context Protocol for consuming external tools
+**Priority**: MEDIUM (Advanced Integration)
+**Dependencies**: Phase 14 (Web Interface)
+
+**Strategic Rationale**: MCP (Model Context Protocol) enables llmspell to discover and use tools from external MCP servers, expanding the tool ecosystem without requiring native implementations.
+
+**Components**:
+- MCP client implementation (stdio, HTTP, WebSocket transports)
+- External tool discovery and registration
+- MCP protocol compliance (Anthropic specification)
+- Connection management with retry logic
+- Tool schema validation and adaptation
+- Integration with existing ToolRegistry
+
+**Success Criteria**:
+- [ ] Can connect to MCP servers via stdio transport
+- [ ] Can connect to MCP servers via HTTP/WebSocket
 - [ ] External tools are discoverable and callable
 - [ ] MCP protocol messages handled correctly
-- [ ] Connection failures handled gracefully
+- [ ] Connection failures handled gracefully with retries
 - [ ] Tool schemas from MCP servers validated
+- [ ] External tools appear in Lua `Tool.list()`
 
 **Testing Requirements**:
 - MCP protocol compliance tests
@@ -2094,26 +2213,33 @@ compression_ratio = 0.6  # Keep 60% of chunks
 - Connection failure recovery tests
 - Tool schema validation tests
 - Multi-server connection tests
+- Transport layer tests (stdio, HTTP, WebSocket)
 
 ---
 
-### **Phase 15: MCP Server Mode (Weeks 57-58)**
+### **Phase 15b: MCP Server Mode (Weeks 61-62)**
 
-**Goal**: Expose rs-llmspell tools and agents via MCP protocol
-**Priority**: LOW (Advanced Integration)
+**Goal**: Expose llmspell tools and agents via MCP protocol
+**Priority**: MEDIUM (Advanced Integration)
+**Dependencies**: Phase 15a (MCP Client)
+
+**Strategic Rationale**: Exposing llmspell as an MCP server allows external applications (Claude Desktop, other MCP clients) to use llmspell's tools and agents.
 
 **Components**:
 - MCP server implementation
 - Tool and agent exposure via MCP
 - Multi-client support
 - Protocol compliance and testing
+- Resource and prompt exposure
+- Sampling support for agent delegation
 
 **Success Criteria**:
 - [ ] MCP server accepts client connections
-- [ ] Built-in tools are accessible via MCP
-- [ ] Agents can be called as MCP tools
-- [ ] Multiple clients can connect simultaneously
+- [ ] Built-in tools accessible via MCP
+- [ ] Agents callable as MCP tools
+- [ ] Multiple clients connect simultaneously
 - [ ] Protocol compliance verified with test suite
+- [ ] Works with Claude Desktop as client
 
 **Testing Requirements**:
 - MCP server compliance tests
@@ -2121,10 +2247,11 @@ compression_ratio = 0.6  # Keep 60% of chunks
 - Tool/agent exposure validation
 - Protocol message handling tests
 - Load testing with multiple clients
+- Claude Desktop integration test
 
 ---
 
-### **Phase 16: JavaScript Engine Support (Weeks 59-60)**
+### **Phase 16: JavaScript Engine Support (Weeks 63-64)**
 
 **Goal**: Add JavaScript support via bridge pattern established in Phase 1
 **Priority**: MEDIUM (Multi-Language Support)
@@ -2153,7 +2280,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 17: Library Mode Support (Weeks 61-62)**
+### **Phase 17: Library Mode Support (Weeks 65-66)**
 
 **Goal**: Support usage as native module in external runtimes
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -2180,7 +2307,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 18: Cross-Platform Support (Weeks 63-64)**
+### **Phase 18: Cross-Platform Support (Weeks 67-68)**
 
 **Goal**: Complete cross-platform support (Windows, macOS, Linux)
 **Priority**: MEDIUM (Platform Coverage)
@@ -2227,7 +2354,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ## Production Optimization Phase
 
-### **Phase 19: Production Optimization (Weeks 65-66)**
+### **Phase 19: Production Optimization (Weeks 69-70)**
 
 **Goal**: Support usage as native module in external runtimes
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -2254,7 +2381,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 20: A2A Client Support (Weeks 67-68)**
+### **Phase 20: A2A Client Support (Weeks 71-72)**
 
 **Goal**: Agent-to-Agent communication as client
 **Priority**: LOW (Advanced Networking)
@@ -2281,7 +2408,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 21: A2A Server Support (Weeks 69-70)**
+### **Phase 21: A2A Server Support (Weeks 73-74)**
 
 **Goal**: Expose local agents via A2A protocol
 **Priority**: LOW (Advanced Networking)
@@ -2308,7 +2435,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 22: Multimodal Tools Implementation (Weeks 71-72)**
+### **Phase 22: Multimodal Tools Implementation (Weeks 75-76)**
 
 **Goal**: Implement comprehensive multimodal processing tools
 **Priority**: MEDIUM (Feature Enhancement)
@@ -2368,7 +2495,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 23: AI/ML Complex Tools (Weeks 73-74)**
+### **Phase 23: AI/ML Complex Tools (Weeks 77-78)**
 
 **Goal**: Implement AI and ML dependent complex tools
 **Priority**: MEDIUM (Advanced AI Features)
@@ -2402,7 +2529,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 24: Advanced Workflow Features (Weeks 75-78)**
+### **Phase 24: Advanced Workflow Features (Weeks 79-82)**
 **Goal**: Implement sophisticated workflow orchestration capabilities and advanced patterns
 **Priority**: LOW (Advanced Enhancement)
 **Dependencies**: Builds on Phase 3 (Workflows), Phase 8 (Vector Storage), Phase 13 (Memory System), and Phase 10 (Service Integration)

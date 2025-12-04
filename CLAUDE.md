@@ -8,26 +8,22 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 ## Critical References
 - **Architecture**: `/docs/technical/master-architecture-vision.md`
 - **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (23+ phase roadmap)
-- **Current Status**: v0.13.0 - Phase 13 Complete (Experimental Memory & Context Engineering)
-- **Phase 12 Design**: `/docs/in-progress/phase-12-design-doc.md` (Experimental Template System)
-- **Phase 13 Design**: `/docs/in-progress/phase-13-design-doc.md` (Experimental Memory System)
-- **Release Notes**: `/RELEASE_NOTES_v0.13.0.md` (comprehensive v0.13.0 changelog)
+- **Current Status**: v0.14.0 - Phase 13c Complete (Storage Consolidation & Usability)
+- **Phase 13c Design**: `/docs/in-progress/phase-13c-design-doc.md` (Storage Consolidation)
+- **Phase 13c Completion**: `/docs/in-progress/PHASE13c-DONE.md` (Detailed implementation notes)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
-## Current Status (Phase 13c - Storage Consolidation)
-- ✅ **Phases 7-13**: Complete
-- 🚧 **Phase 13c**: Storage Consolidation → v0.14.0
-  - ✅ 13c.1: Dependencies (-60MB)
-  - ✅ 13c.2.0: Trait Architecture (3 traits, llmspell-core)
-  - ✅ 13c.2.1: libsql Foundation (SqliteBackend, migrations)
-  - ✅ 13c.2.2a: vectorlite-rs (1,098 lines, HNSW)
-  - ✅ 13c.2.3/3a: Vector Storage (1,174 lines, MessagePack persistence, <2ms)
-  - ✅ 13c.2.4: Graph Storage (1,230 lines, bi-temporal)
-  - ✅ 13c.2.5: Procedural Storage (885 lines, V5)
-  - ✅ 13c.2.6: State Storage (1,619 lines, V6/V7/V8, agent/KV/workflow)
-  - ✅ 13c.2.7: Auxiliary Tables (3,598 lines, V9/V10/V11/V13, 31 tests, zero warnings)
-  - ⏳ 13c.2.8: Legacy Removal + Graph Traversal Enhancement (NEXT)
-  - Pending: 13c.2.9-13c.2.12 (Testing, Integration, Compatibility, Docs)
+## Current Status (Phase 14 - NEXT)
+- ✅ **Phases 7-13c**: Complete
+- ✅ **Phase 13c**: Storage Consolidation & Usability → v0.14.0 COMPLETE
+  - ✅ 13c.1: Dependencies cleanup (10+ deps removed)
+  - ✅ 13c.2: SQLite Unified Local Storage (10 storage components)
+    - vectorlite-rs (1,098 lines, pure Rust HNSW)
+    - 10 SQLite backends (V3-V13): Vector, Graph, Procedural, Agent, KV, Workflow, Sessions, Artifacts, Events, Hooks
+  - ✅ 13c.3: Trait Centralization (3,714 lines to llmspell-core)
+  - ✅ 13c.4: Profile System Overhaul (18 layers + 20 presets)
+  - ✅ 13c.5-13c.8: Examples, Validation, Documentation, Release
+- ⏳ **Phase 14**: Web Interface (HTTP API + Web UI + WebSocket) (NEXT)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
@@ -102,6 +98,7 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 4. Update TODO.md sub-tasks as completed
 
 ## Recent Releases
+- **v0.14.0**: Storage consolidation (SQLite unified), vectorlite-rs HNSW, layer-based profiles, 635+ tests
 - **v0.13.0**: 3-tier memory, hot-swap backends, context engineering, 149 tests
 - **v0.12.0**: 10 templates, multi-agent workflows, CLI+Lua
 
