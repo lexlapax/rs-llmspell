@@ -17,3 +17,5 @@ llmspell-core = { path = "../llmspell-core" }
 llmspell-events = { path = "../llmspell-events" }
 futures = "0.3"
 tracing = "0.1"
+llmspell-memory = { path = "../llmspell-memory" }
+chrono = { version = "0.4", features = ["serde"] }

@@ -596,6 +596,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         &self.session_manager
     }
 
+    /// Get the memory manager
+    pub fn get_memory_manager(&self) -> Option<&Arc<dyn llmspell_memory::MemoryManager>> {
+        self.memory_manager.as_ref()
+    }
+
     /// Check if hooks are enabled in session manager configuration
     pub fn are_hooks_enabled(&self) -> bool {
         // Session manager always has hooks registry and built-in hooks registered

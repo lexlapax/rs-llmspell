@@ -20,6 +20,9 @@ impl WebServer {
             .route("/health", get(health_check))
             .route("/api/scripts/execute", post(handlers::scripts::execute_script))
             .route("/ws/stream", get(handlers::ws::ws_handler))
+            .route("/api/sessions", get(handlers::sessions::list_sessions))
+            .route("/api/sessions/:id", get(handlers::sessions::get_session))
+            .route("/api/memory/search", get(handlers::memory::search_memory))
             .with_state(state);
 
         let listener = tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await?;

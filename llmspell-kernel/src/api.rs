@@ -574,6 +574,11 @@ impl KernelHandle {
     pub fn session_manager(&self) -> &Arc<crate::sessions::SessionManager> {
         self.kernel.get_session_manager()
     }
+
+    /// Get the memory manager
+    pub fn memory_manager(&self) -> Option<&Arc<dyn llmspell_memory::MemoryManager>> {
+        self.kernel.get_memory_manager()
+    }
 }
 
 /// Handle for a client connection to a kernel
