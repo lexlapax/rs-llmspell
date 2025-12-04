@@ -579,6 +579,11 @@ impl KernelHandle {
     pub fn memory_manager(&self) -> Option<&Arc<dyn llmspell_memory::MemoryManager>> {
         self.kernel.get_memory_manager()
     }
+
+    /// Get the component registry
+    pub fn component_registry(&self) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
+        self.kernel.get_component_registry()
+    }
 }
 
 /// Handle for a client connection to a kernel

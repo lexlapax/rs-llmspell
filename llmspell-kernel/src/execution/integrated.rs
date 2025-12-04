@@ -601,6 +601,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         self.memory_manager.as_ref()
     }
 
+    /// Get the component registry
+    pub fn get_component_registry(&self) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
+        self.script_executor.component_registry()
+    }
+
     /// Check if hooks are enabled in session manager configuration
     pub fn are_hooks_enabled(&self) -> bool {
         // Session manager always has hooks registry and built-in hooks registered

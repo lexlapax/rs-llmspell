@@ -23,6 +23,10 @@ impl WebServer {
             .route("/api/sessions", get(handlers::sessions::list_sessions))
             .route("/api/sessions/:id", get(handlers::sessions::get_session))
             .route("/api/memory/search", get(handlers::memory::search_memory))
+            .route("/api/agents", get(handlers::agents::list_agents))
+            .route("/api/agents/:id/execute", post(handlers::agents::execute_agent))
+            .route("/api/tools", get(handlers::tools::list_tools))
+            .route("/api/tools/:id/execute", post(handlers::tools::execute_tool))
             .with_state(state);
 
         let listener = tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await?;

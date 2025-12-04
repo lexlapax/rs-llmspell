@@ -3,4 +3,6 @@ pub mod scripts;
 pub mod ws;
 pub mod sessions;
 pub mod memory;
+pub mod agents;
+pub mod tools;
 
