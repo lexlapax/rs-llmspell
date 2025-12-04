@@ -175,12 +175,12 @@
 **Description**: Create default configuration profiles for the web interface.
 
 **Acceptance Criteria**:
-- [ ] `web.toml` created with default settings
-- [ ] `web-development.toml` created with dev settings (CORS, verbose logging)
+- [x] `web.toml` created with default settings
+- [x] `web-development.toml` created with dev settings (CORS, verbose logging)
 
 **Files to Create/Modify**:
-- `llmspell-config/builtins/web.toml` (NEW)
-- `llmspell-config/builtins/web-development.toml` (NEW)
+- `llmspell-config/presets/web.toml` (NEW)
+- `llmspell-config/presets/web-development.toml` (NEW)
 
 **Implementation Steps**:
 1.  Create `web.toml`:
@@ -193,8 +193,12 @@
 2.  Create `web-development.toml` with wider permissions.
 
 **Definition of Done**:
-- [ ] Config files exist
-- [ ] Can be loaded by `llmspell-config`
+- [x] Config files exist
+- [x] Can be loaded by `llmspell-config`
+
+**Implementation Insights**:
+- ✅ Created `web.toml` and `web-development.toml` in `llmspell-config/presets/`.
+- ✅ Configured default ports and CORS settings.
 
 ---
 
