@@ -1,24 +1,28 @@
 use crate::config::WebConfig;
-use crate::handlers::health::health_check;
+use crate::handlers::{self, health::health_check};
+use crate::state::AppState;
 use anyhow::Result;
-use axum::{routing::get, Router};
-use tokio::net::TcpListener;
+use axum::{routing::{get, post}, Router};
+use llmspell_kernel::api::KernelHandle;
+use std::sync::Arc;
 use tokio::signal;
+use tokio::sync::Mutex;
 
 pub struct WebServer;
 
 impl WebServer {
-    pub async fn run(config: WebConfig) -> Result<()> {
-        let app = Router::new().route("/health", get(health_check));
+    pub async fn run(config: WebConfig, kernel: KernelHandle) -> Result<()> {
+        let state = AppState {
+            kernel: Arc::new(Mutex::new(kernel)),
+        };
 
-        let addr = format!("{}:{}", config.host, config.port);
-        println!("Listening on {}", addr);
+        let app = Router::new()
+            .route("/health", get(health_check))
+            .route("/api/scripts/execute", post(handlers::scripts::execute_script))
+            .with_state(state);
 
-        let listener = TcpListener::bind(&addr).await?;
-        axum::serve(listener, app)
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
-
+        let listener = tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await?;
+        axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
         Ok(())
     }
 }
