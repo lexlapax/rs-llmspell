@@ -59,7 +59,7 @@ export default function Tools() {
                 </div>
 
                 <div className="flex-1 flex flex-col min-h-0">
-                    <div className="flex-1 min-h-0 border-b border-gray-200">
+                    <div className="flex-1 min-h-0 border-b border-gray-200 relative">
                         <CodeEditor
                             value={code}
                             onChange={(val) => setCode(val || '')}
@@ -67,7 +67,7 @@ export default function Tools() {
                             height="100%"
                         />
                     </div>
-                    <div className="h-1/3 min-h-[200px] bg-[#1e1e1e]">
+                    <div className="h-64 shrink-0 bg-[#1e1e1e]">
                         <Console
                             logs={logs}
                             onClear={() => setLogs([])}

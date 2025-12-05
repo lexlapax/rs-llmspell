@@ -37,7 +37,8 @@ impl WebServer {
             .route("/api/tools", get(handlers::tools::list_tools))
             .route("/api/tools/:id/execute", post(handlers::tools::execute_tool))
             .layer(axum::middleware::from_fn(track_metrics))
-            .with_state(state);
+            .with_state(state)
+            .fallback(handlers::assets::static_handler);
 
         let listener = tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await?;
         axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
