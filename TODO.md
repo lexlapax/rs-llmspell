@@ -598,6 +598,18 @@
 **Definition of Done**:
 - [x] Hook reliably receives messages
 - [x] Functional tests pass
+
+### Task 14.2.7: Template & Config APIs (Backend)
+**Priority**: CRITICAL (P0)
+**Estimated Time**: 6 hours
+**Description**: Backend endpoints for Templates and Configuration.
+
+**Acceptance Criteria**:
+- [ ] GET /api/templates - list available templates
+- [ ] GET /api/templates/:id - get template schema
+- [ ] POST /api/templates/:id/launch - create session from template
+- [ ] GET /api/config - get current configuration
+- [ ] PUT /api/config - update configuration
 - [x] Zero lint errors
 
 **Implementation Insights**:
@@ -732,6 +744,92 @@
 - ✅ Integrated into `Sessions.tsx` with a master-detail layout.
 - ✅ Used **mock session data** pending backend event history API.
 - ✅ Verified playback and scrubbing in Chrome (see Walkthrough).
+
+### Task 14.3.7: Configuration Manager
+**Priority**: CRITICAL (P0)
+**Estimated Time**: 4 hours
+
+**Description**: UI for `llmspell-config` (Phase 13c) 18-layer profile system.
+
+**Acceptance Criteria**:
+- [ ] Form-based settings editor
+- [ ] Environment variable vs Profile overrides visualization
+- [ ] Provider configuration (API keys, models)
+
+### Task 14.3.8: Template Library (Spells)
+**Priority**: CRITICAL (Retention P0)
+**Estimated Time**: 6 hours
+**Assignee**: Frontend Developer
+
+**Description**: Main entry point for user orchestration (Phase 12). Gallery view of available templates.
+
+**Acceptance Criteria**:
+- [ ] List templates from `llmspell-templates` registry (mocked first if needed)
+- [ ] Group by Category (Research, Chat, Data, Code, Workflow)
+- [ ] Template Configuration Modal (inputs override defaults)
+- [ ] "Launch" button creates new Session
+- [ ] Verified in Chrome
+
+**Files to Create/Modify**:
+- `llmspell-web/frontend/src/pages/Templates.tsx` (NEW)
+- `llmspell-web/frontend/src/components/templates/TemplateCard.tsx` (NEW)
+- `llmspell-web/frontend/src/components/templates/ConfigModal.tsx` (NEW)
+
+### Task 14.3.9: Workflow Visualizer
+**Priority**: HIGH (P1)
+**Estimated Time**: 8 hours
+
+**Description**: Visualize sequential, parallel, conditional, and loop workflow patterns (Phase 3.3).
+
+**Acceptance Criteria**:
+- [ ] Graph/Tree visualization of workflow steps
+- [ ] Step status indication (Pending, Running, Completed, Failed)
+- [ ] Click step to view details
+- [ ] Verified in Chrome
+
+### Task 14.3.10: Provider Status Widget
+**Priority**: MEDIUM (P2)
+**Estimated Time**: 2 hours
+
+**Description**: Status indicator for LLM providers (Ollama, OpenAI, Candle).
+
+**Acceptance Criteria**:
+- [ ] Visual indicator of active provider
+- [ ] Latency/Status check
+- [ ] Verified in Chrome
+
+### Task 14.3.11: Knowledge Base Manager
+**Priority**: MEDIUM (P3)
+**Estimated Time**: 6 hours
+
+**Description**: Interface for managing RAG documents and sources (Phase 8).
+
+**Acceptance Criteria**:
+- [ ] Document list view (PDF, MD, TXT)
+- [ ] File upload/ingestion UI
+- [ ] Vector search explorer (test queries)
+- [ ] Verified in Chrome
+
+### Task 14.3.12: Navigation Enhancement
+**Priority**: HIGH (P1)
+**Estimated Time**: 2 hours
+**Configuration**: Update Layout.tsx for new pages.
+
+**Acceptance Criteria**:
+- [ ] Add "Library" nav item (position: above Agents)
+- [ ] Add routes for /library, /settings
+- [ ] Update Settings placeholder to Configuration component
+
+### Task 14.3.13: Agents Instance View
+**Priority**: HIGH (P1)
+**Estimated Time**: 4 hours
+**Description**: Enhance Agents page to show runtime instances vs catalog types.
+
+**Acceptance Criteria**:
+- [ ] Show Active/Sleeping/Terminated agent instances
+- [ ] Instance controls (Stop, Restart)
+- [ ] Clear visual distinction from "agent types" catalog
+- [ ] Link instances to their source Session
 - [ ] Functional tests pass
 - [ ] Zero lint errors
 
