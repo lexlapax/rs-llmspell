@@ -28,8 +28,18 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
     return response.json();
 }
 
+import type { ConfigItem, UpdateConfigResponse } from './types';
+
 export const api = {
     getHealth: () => fetchJson<HealthResponse>('/health'),
     getSessions: () => fetchJson<Session[]>(`${API_BASE}/sessions`),
     getSession: (id: string) => fetchJson<Session>(`${API_BASE}/sessions/${id}`),
+
+    // Config API
+    getConfig: () => fetchJson<ConfigItem[]>(`${API_BASE}/config`),
+    updateConfig: (overrides: Record<string, string>) => fetchJson<UpdateConfigResponse>(`${API_BASE}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overrides })
+    }),
 };

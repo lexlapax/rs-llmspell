@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 import {
     LayoutDashboard,
     MessageSquare,
@@ -12,11 +12,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
-interface LayoutProps {
-    children: React.ReactNode;
-}
-
-export default function Layout({ children }: LayoutProps) {
+export default function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const location = useLocation();
 
@@ -26,6 +22,7 @@ export default function Layout({ children }: LayoutProps) {
         { name: 'Memory', href: '/memory', icon: Brain },
         { name: 'Agents', href: '/agents', icon: Bot },
         { name: 'Tools', href: '/tools', icon: Wrench },
+        { name: 'Configuration', href: '/config', icon: Settings },
     ];
 
     return (
@@ -109,7 +106,7 @@ export default function Layout({ children }: LayoutProps) {
 
                 {/* Page Content */}
                 <main className="flex-1 overflow-auto">
-                    {children}
+                    <Outlet />
                 </main>
             </div>
         </div>

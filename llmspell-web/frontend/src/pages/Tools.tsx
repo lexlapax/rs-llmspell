@@ -1,10 +1,11 @@
+
 import { useState, useCallback } from 'react';
 import CodeEditor from '../components/editor/CodeEditor';
 import Console, { type LogEntry } from '../components/editor/Console';
 import { useWebSocket } from '../hooks/useWebSocket';
 import clsx from 'clsx';
 
-export default function Tools() {
+export const Tools = () => {
     const [code, setCode] = useState('-- Write your script here\nprint("Hello World")');
     const [language, setLanguage] = useState<'javascript' | 'lua'>('lua');
     const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -62,7 +63,7 @@ export default function Tools() {
                     <div className="flex-1 min-h-0 border-b border-gray-200 relative">
                         <CodeEditor
                             value={code}
-                            onChange={(val) => setCode(val || '')}
+                            onChange={(val: string | undefined) => setCode(val || '')}
                             language={language}
                             height="100%"
                         />
@@ -79,4 +80,4 @@ export default function Tools() {
             </div>
         </div>
     );
-}
+};

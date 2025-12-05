@@ -21,7 +21,7 @@ const MOCK_EVENTS: TimelineEvent[] = [
     { id: 'evt_9', type: 'system', title: 'Success', content: 'All tests passed.', timestamp: Date.now() - 3440000 },
 ];
 
-export default function Sessions() {
+export function Sessions() {
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
     return (

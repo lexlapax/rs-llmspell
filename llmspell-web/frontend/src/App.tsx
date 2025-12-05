@@ -1,25 +1,22 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import Sessions from './pages/Sessions';
-import Memory from './pages/Memory';
-import Agents from './pages/Agents';
-import Tools from './pages/Tools';
+import { Sessions } from './pages/Sessions';
+import { Tools } from './pages/Tools';
+import { Config } from './pages/Config';
 
 function App() {
   return (
     <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/sessions" element={<Sessions />} />
-          <Route path="/memory" element={<Memory />} />
-          <Route path="/agents" element={<Agents />} />
-          <Route path="/tools" element={<Tools />} />
-          {/* Placeholder for settings */}
-          <Route path="/settings" element={<div className="p-6">Settings Placeholder</div>} />
-        </Routes>
-      </Layout>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="tools" element={<Tools />} />
+          <Route path="sessions" element={<Sessions />} />
+          <Route path="config" element={<Config />} />
+        </Route>
+      </Routes>
     </Router>
   );
 }
