@@ -1,14 +1,25 @@
 import { useState } from 'react';
 import CodeEditor from '../components/editor/CodeEditor';
+import { useWebSocket } from '../hooks/useWebSocket';
+import clsx from 'clsx';
 
 export default function Tools() {
     const [code, setCode] = useState('-- Write your script here\nprint("Hello World")');
     const [language, setLanguage] = useState<'javascript' | 'lua'>('lua');
+    const { isConnected, connectionState } = useWebSocket('/ws/stream');
 
     return (
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-gray-900">Tools & Scripts</h1>
+                <div className="flex items-center space-x-4">
+                    <h1 className="text-2xl font-bold text-gray-900">Tools & Scripts</h1>
+                    <span className={clsx(
+                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                        isConnected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                    )}>
+                        WS: {connectionState}
+                    </span>
+                </div>
                 <div className="flex space-x-2">
                     <select
                         value={language}
