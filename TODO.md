@@ -469,11 +469,11 @@
 **Description**: Build the main UI layout and navigation structure.
 
 **Acceptance Criteria**:
-- [ ] Sidebar with links
-- [ ] Header with status
-- [ ] Responsive container
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Sidebar with links
+- [x] Header with status
+- [x] Responsive container
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/Layout.tsx` (NEW)
@@ -484,9 +484,9 @@
 2.  Setup React Router.
 
 **Definition of Done**:
-- [ ] Navigation works between routes
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Navigation works between routes
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 ### Task 14.3.2b: Dashboard Widgets
 **Priority**: HIGH
