@@ -363,28 +363,33 @@
 **Description**: Implement WebError types with HTTP status mapping.
 
 **Acceptance Criteria**:
-- [ ] `WebError` enum defined
-- [ ] `IntoResponse` implemented for `WebError`
-- [ ] Standardized JSON error format
+- [x] `WebError` enum defined
+- [x] `IntoResponse` implemented for `WebError`
+- [x] Standardized JSON error format
+- [x] Functional tests pass
+- [x] Zero clippy warnings
 
 **Files to Create/Modify**:
-- `llmspell-web/src/error/mod.rs` (MODIFY)
+- `llmspell-web/src/error.rs` (NEW)
+- `llmspell-web/src/handlers/*.rs` (MODIFY)
 
 **Implementation Steps**:
-1.  Create error types:
-    ```rust
-    pub enum WebError {
-        ScriptExecution { message: String, details: serde_json::Value },
-        Authentication { message: String },
-        NotFound { resource: String },
-        Internal(anyhow::Error),
-    }
-    ```
-2.  Implement `IntoResponse` to map errors to status codes and JSON bodies.
+1.  Define `WebError` enum.
+2.  Implement `IntoResponse`.
+3.  Refactor handlers.
 
 **Definition of Done**:
-- [ ] All handlers use `Result<Json<T>, WebError>`
-- [ ] Errors return correct HTTP codes
+- [x] All handlers use `Result<Json<T>, WebError>`
+- [x] Errors return correct HTTP codes
+- [x] Functional tests pass
+- [x] Zero clippy warnings
+
+**Implementation Insights**:
+- ✅ Created `llmspell-web/src/error.rs` with `WebError` and `ErrorResponse`.
+- ✅ Refactored `scripts.rs`, `sessions.rs`, `memory.rs`, `agents.rs`, `tools.rs` to use `WebError`.
+- ✅ Added `thiserror` dependency.
+- ✅ Added unit tests in `error.rs` verifying JSON output and status codes.
+- ✅ Verified zero clippy warnings.
 
 ### Task 14.2.6: Metrics Endpoint
 **Priority**: MEDIUM
@@ -397,6 +402,8 @@
 - [ ] `/metrics` endpoint returns text/plain
 - [ ] Request duration histogram
 - [ ] Active connection gauge
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/src/handlers/metrics.rs` (NEW)
@@ -409,6 +416,8 @@
 
 **Definition of Done**:
 - [ ] `/metrics` returns valid Prometheus data
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ---
 
@@ -426,6 +435,8 @@
 - [ ] TypeScript configured
 - [ ] Tailwind/CSS setup
 - [ ] Build script generates `dist/`
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/package.json` (NEW)
@@ -440,6 +451,8 @@
 **Definition of Done**:
 - [ ] Dev server runs
 - [ ] Build produces static assets
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.2a: Dashboard Layout & Navigation
 **Priority**: HIGH
@@ -452,6 +465,8 @@
 - [ ] Sidebar with links
 - [ ] Header with status
 - [ ] Responsive container
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/Layout.tsx` (NEW)
@@ -463,6 +478,8 @@
 
 **Definition of Done**:
 - [ ] Navigation works between routes
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.2b: Dashboard Widgets
 **Priority**: HIGH
@@ -475,6 +492,8 @@
 - [ ] System Status widget
 - [ ] Recent Activity widget
 - [ ] Quick Actions widget
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/pages/Dashboard.tsx` (NEW)
@@ -486,6 +505,8 @@
 
 **Definition of Done**:
 - [ ] Dashboard displays widgets correctly
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.2c: Dashboard API Integration
 **Priority**: HIGH
@@ -497,6 +518,8 @@
 **Acceptance Criteria**:
 - [ ] Fetch status from `/health`
 - [ ] Fetch activity from `/api/sessions`
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/api/client.ts` (NEW)
@@ -508,6 +531,8 @@
 
 **Definition of Done**:
 - [ ] Real data shown in dashboard
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.3a: Monaco Editor Integration
 **Priority**: CRITICAL
@@ -520,6 +545,8 @@
 - [ ] Editor component renders
 - [ ] Language selection works
 - [ ] Theme support
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/editor/CodeEditor.tsx` (NEW)
@@ -530,6 +557,8 @@
 
 **Definition of Done**:
 - [ ] Editor usable for typing code
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.3b: WebSocket Hook & State
 **Priority**: CRITICAL
@@ -542,6 +571,8 @@
 - [ ] Auto-reconnect logic
 - [ ] Message parsing
 - [ ] State updates on events
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/hooks/useWebSocket.ts` (NEW)
@@ -552,6 +583,8 @@
 
 **Definition of Done**:
 - [ ] Hook reliably receives messages
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.3c: Console Component
 **Priority**: CRITICAL
@@ -564,6 +597,8 @@
 - [ ] Log lines rendering
 - [ ] ANSI color support
 - [ ] Auto-scroll
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/editor/Console.tsx` (NEW)
@@ -574,6 +609,8 @@
 
 **Definition of Done**:
 - [ ] Logs display correctly with colors
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.4: Embed Frontend Assets
 **Priority**: CRITICAL
@@ -586,6 +623,8 @@
 - [ ] `Assets` struct with `#[derive(RustEmbed)]`
 - [ ] Fallback handler for SPA routing
 - [ ] Binary contains assets
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/src/handlers/static.rs` (NEW)
@@ -602,6 +641,8 @@
 **Definition of Done**:
 - [ ] `llmspell web start` serves UI
 - [ ] Refreshing on sub-routes works
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.5: Memory Graph Visualization
 **Priority**: HIGH
@@ -614,6 +655,8 @@
 - [ ] Force-directed graph rendering
 - [ ] Node inspection on click
 - [ ] Filtering by entity type
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/memory/MemoryGraph.tsx` (NEW)
@@ -624,6 +667,8 @@
 
 **Definition of Done**:
 - [ ] Graph visualizes memory connections
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.3.6: Session Timeline
 **Priority**: MEDIUM
@@ -636,6 +681,8 @@
 - [ ] Timeline visualization of events
 - [ ] Click to jump to event
 - [ ] Play/Pause replay
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/session/Timeline.tsx` (NEW)
@@ -646,6 +693,8 @@
 
 **Definition of Done**:
 - [ ] Can scrub through session history
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ---
 
@@ -662,6 +711,8 @@
 - [ ] `X-API-Key` validation
 - [ ] JWT generation/validation
 - [ ] Middleware applied to protected routes
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/src/middleware/auth.rs` (NEW)
@@ -674,6 +725,8 @@
 **Definition of Done**:
 - [ ] Unauthorized requests rejected (401)
 - [ ] Valid keys accepted
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.4.2: Daemon Lifecycle Integration
 **Priority**: HIGH
@@ -686,6 +739,8 @@
 - [ ] `llmspell web start --daemon` works
 - [ ] PID file management
 - [ ] `llmspell web stop` works
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-kernel/src/daemon/mod.rs` (MODIFY - expose helpers)
@@ -698,6 +753,8 @@
 **Definition of Done**:
 - [ ] Background process starts/stops reliably
 - [ ] PID file correct
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.4.3: CLI Web Subcommand
 **Priority**: CRITICAL
@@ -710,6 +767,8 @@
 - [ ] `web` subcommand registered
 - [ ] Arguments parsed correctly
 - [ ] Commands execute backend logic
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-cli/src/commands/web.rs` (NEW)
@@ -721,6 +780,8 @@
 
 **Definition of Done**:
 - [ ] CLI commands control the web server
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ---
 
@@ -738,6 +799,8 @@
 - [ ] Integration tests for full flow
 - [ ] E2E tests (Playwright) for UI
 - [ ] Load tests (k6)
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/tests/api_integration.rs` (NEW)
@@ -756,6 +819,8 @@
 **Definition of Done**:
 - [ ] All tests pass
 - [ ] Coverage >90%
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.5.2: Documentation & Polish
 **Priority**: HIGH
@@ -767,6 +832,8 @@
 **Acceptance Criteria**:
 - [ ] `docs/user-guide/web-interface.md`
 - [ ] CLI help text updated
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `docs/user-guide/web-interface.md` (NEW)
@@ -777,6 +844,8 @@
 
 **Definition of Done**:
 - [ ] Docs complete and reviewed
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 ### Task 14.5.3: OpenAPI Generation
 **Priority**: MEDIUM
@@ -788,6 +857,8 @@
 **Acceptance Criteria**:
 - [ ] OpenAPI JSON endpoint
 - [ ] Swagger UI (optional)
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/src/api_docs.rs` (NEW)
