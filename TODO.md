@@ -438,12 +438,12 @@
 **Description**: Set up React/Vite project within `llmspell-web/frontend`.
 
 **Acceptance Criteria**:
-- [ ] Vite project created
-- [ ] TypeScript configured
-- [ ] Tailwind/CSS setup
-- [ ] Build script generates `dist/`
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] Vite project created
+- [x] TypeScript configured
+- [x] Tailwind/CSS setup
+- [x] Build script generates `dist/`
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/package.json` (NEW)
@@ -456,10 +456,10 @@
 3.  Configure `vite.config.ts` for proxying API.
 
 **Definition of Done**:
-- [ ] Dev server runs
-- [ ] Build produces static assets
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] Dev server runs
+- [x] Build produces static assets
+- [x] Functional tests pass
+- [x] Zero clippy warnings
 
 ### Task 14.3.2a: Dashboard Layout & Navigation
 **Priority**: HIGH
@@ -473,7 +473,7 @@
 - [ ] Header with status
 - [ ] Responsive container
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/Layout.tsx` (NEW)
@@ -486,7 +486,7 @@
 **Definition of Done**:
 - [ ] Navigation works between routes
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ### Task 14.3.2b: Dashboard Widgets
 **Priority**: HIGH
@@ -500,7 +500,7 @@
 - [ ] Recent Activity widget
 - [ ] Quick Actions widget
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/pages/Dashboard.tsx` (NEW)
@@ -513,7 +513,7 @@
 **Definition of Done**:
 - [ ] Dashboard displays widgets correctly
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ### Task 14.3.2c: Dashboard API Integration
 **Priority**: HIGH
@@ -526,7 +526,7 @@
 - [ ] Fetch status from `/health`
 - [ ] Fetch activity from `/api/sessions`
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/api/client.ts` (NEW)
@@ -539,7 +539,7 @@
 **Definition of Done**:
 - [ ] Real data shown in dashboard
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ### Task 14.3.3a: Monaco Editor Integration
 **Priority**: CRITICAL
@@ -553,7 +553,7 @@
 - [ ] Language selection works
 - [ ] Theme support
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/editor/CodeEditor.tsx` (NEW)
@@ -565,7 +565,7 @@
 **Definition of Done**:
 - [ ] Editor usable for typing code
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ### Task 14.3.3b: WebSocket Hook & State
 **Priority**: CRITICAL
@@ -579,7 +579,7 @@
 - [ ] Message parsing
 - [ ] State updates on events
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/hooks/useWebSocket.ts` (NEW)
@@ -591,7 +591,7 @@
 **Definition of Done**:
 - [ ] Hook reliably receives messages
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ### Task 14.3.3c: Console Component
 **Priority**: CRITICAL
@@ -605,7 +605,7 @@
 - [ ] ANSI color support
 - [ ] Auto-scroll
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/editor/Console.tsx` (NEW)
@@ -617,7 +617,7 @@
 **Definition of Done**:
 - [ ] Logs display correctly with colors
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ### Task 14.3.4: Embed Frontend Assets
 **Priority**: CRITICAL
@@ -649,7 +649,7 @@
 - [ ] `llmspell web start` serves UI
 - [ ] Refreshing on sub-routes works
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ### Task 14.3.5: Memory Graph Visualization
 **Priority**: HIGH
@@ -663,7 +663,7 @@
 - [ ] Node inspection on click
 - [ ] Filtering by entity type
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/memory/MemoryGraph.tsx` (NEW)
@@ -675,7 +675,7 @@
 **Definition of Done**:
 - [ ] Graph visualizes memory connections
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ### Task 14.3.6: Session Timeline
 **Priority**: MEDIUM
@@ -689,7 +689,7 @@
 - [ ] Click to jump to event
 - [ ] Play/Pause replay
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/session/Timeline.tsx` (NEW)
@@ -701,7 +701,7 @@
 **Definition of Done**:
 - [ ] Can scrub through session history
 - [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [ ] Zero lint errors
 
 ---
 
