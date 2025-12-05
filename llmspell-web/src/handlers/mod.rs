@@ -5,4 +5,5 @@ pub mod sessions;
 pub mod memory;
 pub mod agents;
 pub mod tools;
+pub mod metrics;
 

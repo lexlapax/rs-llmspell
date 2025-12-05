@@ -20,6 +20,8 @@ tracing = "0.1"
 llmspell-memory = { path = "../llmspell-memory" }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
 
 [dev-dependencies]
 http-body-util = "0.1"
