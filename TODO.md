@@ -496,11 +496,11 @@
 **Description**: Implement widgets for the main dashboard view.
 
 **Acceptance Criteria**:
-- [ ] System Status widget
-- [ ] Recent Activity widget
-- [ ] Quick Actions widget
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] System Status widget
+- [x] Recent Activity widget
+- [x] Quick Actions widget
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/pages/Dashboard.tsx` (NEW)
@@ -511,9 +511,9 @@
 2.  Compose them in `Dashboard.tsx`.
 
 **Definition of Done**:
-- [ ] Dashboard displays widgets correctly
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Dashboard displays widgets correctly
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 ### Task 14.3.2c: Dashboard API Integration
 **Priority**: HIGH
@@ -523,10 +523,10 @@
 **Description**: Connect dashboard widgets to backend APIs.
 
 **Acceptance Criteria**:
-- [ ] Fetch status from `/health`
-- [ ] Fetch activity from `/api/sessions`
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Fetch status from `/health`
+- [x] Fetch activity from `/api/sessions`
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/api/client.ts` (NEW)
@@ -537,9 +537,9 @@
 2.  Create React hooks for data fetching.
 
 **Definition of Done**:
-- [ ] Real data shown in dashboard
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Real data shown in dashboard
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 ### Task 14.3.3a: Monaco Editor Integration
 **Priority**: CRITICAL
@@ -549,11 +549,12 @@
 **Description**: Integrate Monaco Editor for script editing.
 
 **Acceptance Criteria**:
-- [ ] Editor component renders
-- [ ] Language selection works
-- [ ] Theme support
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Editor component renders
+- [x] Language selection works
+- [x] Theme support
+- [x] Verified in Chrome
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/components/editor/CodeEditor.tsx` (NEW)
@@ -563,9 +564,15 @@
 2.  Configure editor options.
 
 **Definition of Done**:
-- [ ] Editor usable for typing code
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Editor usable for typing code
+- [x] Functional tests pass
+- [x] Zero lint errors
+
+**Implementation Insights**:
+- ✅ Integrated `@monaco-editor/react` with `CodeEditor.tsx` wrapper.
+- ✅ Verified in Chrome (fixed layout constraints).
+- ✅ Removed global `index.css` constraints (`display: flex`) to allow full-width editor.
+- ✅ Set default language to Lua (primary runtime) with proper starter code.
 
 ### Task 14.3.3b: WebSocket Hook & State
 **Priority**: CRITICAL
@@ -604,6 +611,7 @@
 - [ ] Log lines rendering
 - [ ] ANSI color support
 - [ ] Auto-scroll
+- [ ] Verified in Chrome
 - [ ] Functional tests pass
 - [ ] Zero lint errors
 
@@ -662,6 +670,7 @@
 - [ ] Force-directed graph rendering
 - [ ] Node inspection on click
 - [ ] Filtering by entity type
+- [ ] Verified in Chrome
 - [ ] Functional tests pass
 - [ ] Zero lint errors
 
@@ -688,6 +697,7 @@
 - [ ] Timeline visualization of events
 - [ ] Click to jump to event
 - [ ] Play/Pause replay
+- [ ] Verified in Chrome
 - [ ] Functional tests pass
 - [ ] Zero lint errors
 
