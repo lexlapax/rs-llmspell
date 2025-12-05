@@ -4,6 +4,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use crate::state::AppState;
+use crate::error::WebError;
 
 #[derive(Serialize)]
 pub struct AgentResponse {
@@ -23,12 +24,12 @@ pub struct ExecuteAgentResponse {
 
 pub async fn list_agents(
     State(state): State<AppState>,
-) -> Result<Json<Vec<AgentResponse>>, String> {
+) -> Result<Json<Vec<AgentResponse>>, WebError> {
     let kernel = state.kernel.lock().await;
     
     let registry = kernel
         .component_registry()
-        .ok_or_else(|| "Component registry not available".to_string())?;
+        .ok_or_else(|| WebError::Internal("Component registry not available".to_string()))?;
 
     let agents = registry.list_agents().await;
 
@@ -44,17 +45,17 @@ pub async fn execute_agent(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(payload): Json<ExecuteAgentRequest>,
-) -> Result<Json<ExecuteAgentResponse>, String> {
+) -> Result<Json<ExecuteAgentResponse>, WebError> {
     let kernel = state.kernel.lock().await;
     
     let registry = kernel
         .component_registry()
-        .ok_or_else(|| "Component registry not available".to_string())?;
+        .ok_or_else(|| WebError::Internal("Component registry not available".to_string()))?;
 
     let agent = registry
         .get_agent(&id)
         .await
-        .ok_or_else(|| format!("Agent '{}' not found", id))?;
+        .ok_or_else(|| WebError::NotFound(format!("Agent '{}' not found", id)))?;
 
     // Execute agent
     // Note: Agent trait execute method signature needs to be checked.

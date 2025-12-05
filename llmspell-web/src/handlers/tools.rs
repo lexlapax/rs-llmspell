@@ -5,7 +5,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use crate::state::AppState;
-use llmspell_core::traits::tool::Tool;
+use crate::error::WebError;
 
 #[derive(Serialize)]
 pub struct ToolResponse {
@@ -27,12 +27,12 @@ pub struct ExecuteToolResponse {
 
 pub async fn list_tools(
     State(state): State<AppState>,
-) -> Result<Json<Vec<ToolResponse>>, String> {
+) -> Result<Json<Vec<ToolResponse>>, WebError> {
     let kernel = state.kernel.lock().await;
     
     let registry = kernel
         .component_registry()
-        .ok_or_else(|| "Component registry not available".to_string())?;
+        .ok_or_else(|| WebError::Internal("Component registry not available".to_string()))?;
 
     let tool_names = registry.list_tools().await;
     let mut tools = Vec::new();
@@ -58,17 +58,17 @@ pub async fn execute_tool(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(payload): Json<ExecuteToolRequest>,
-) -> Result<Json<ExecuteToolResponse>, String> {
+) -> Result<Json<ExecuteToolResponse>, WebError> {
     let kernel = state.kernel.lock().await;
     
     let registry = kernel
         .component_registry()
-        .ok_or_else(|| "Component registry not available".to_string())?;
+        .ok_or_else(|| WebError::Internal("Component registry not available".to_string()))?;
 
     let tool = registry
         .get_tool(&id)
         .await
-        .ok_or_else(|| format!("Tool '{}' not found", id))?;
+        .ok_or_else(|| WebError::NotFound(format!("Tool '{}' not found", id)))?;
 
     // Create execution context
     let context = llmspell_core::ExecutionContext::new();
@@ -82,14 +82,14 @@ pub async fn execute_tool(
     if let Value::Object(params) = payload.parameters {
         input = input.with_parameter("parameters", Value::Object(params));
     } else {
-        return Err("Parameters must be a JSON object".to_string());
+        return Err(WebError::BadRequest("Parameters must be a JSON object".to_string()));
     }
 
     // Execute tool
     let output = tool
         .execute(input, context)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| WebError::Internal(e.to_string()))?;
 
     Ok(Json(ExecuteToolResponse {
         output: output.text,

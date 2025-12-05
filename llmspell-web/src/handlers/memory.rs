@@ -4,6 +4,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use crate::state::AppState;
+use crate::error::WebError;
 
 #[derive(Deserialize)]
 pub struct SearchMemoryParams {
@@ -23,19 +24,19 @@ pub struct MemoryEntryResponse {
 pub async fn search_memory(
     State(state): State<AppState>,
     Query(params): Query<SearchMemoryParams>,
-) -> Result<Json<Vec<MemoryEntryResponse>>, String> {
+) -> Result<Json<Vec<MemoryEntryResponse>>, WebError> {
     let kernel = state.kernel.lock().await;
     
     let memory_manager = kernel
         .memory_manager()
-        .ok_or_else(|| "Memory manager not available".to_string())?;
+        .ok_or_else(|| WebError::Internal("Memory manager not available".to_string()))?;
 
     let episodic = memory_manager.episodic();
 
     let results = episodic
         .search(&params.query, params.limit.unwrap_or(10))
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| WebError::Internal(e.to_string()))?;
 
     let response = results
         .into_iter()

@@ -8,15 +8,20 @@ pub struct ExecuteScriptRequest {
 }
 
 #[derive(Serialize)]
-pub struct ExecuteScriptResponse {
+pub struct ScriptExecutionResponse {
     pub result: String,
 }
+
+use crate::error::WebError;
 
 pub async fn execute_script(
     State(state): State<AppState>,
     Json(payload): Json<ExecuteScriptRequest>,
-) -> Result<Json<ExecuteScriptResponse>, String> {
+) -> Result<Json<ScriptExecutionResponse>, WebError> {
     let mut kernel = state.kernel.lock().await;
-    let result = kernel.execute(&payload.code).await.map_err(|e| e.to_string())?;
-    Ok(Json(ExecuteScriptResponse { result }))
+    let result = kernel
+        .execute(&payload.code)
+        .await
+        .map_err(|e| WebError::Internal(e.to_string()))?;
+    Ok(Json(ScriptExecutionResponse { result }))
 }

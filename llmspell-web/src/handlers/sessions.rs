@@ -5,6 +5,7 @@ use axum::{
 use llmspell_kernel::sessions::types::{SessionQuery, SessionSortBy, SessionStatus};
 use serde::{Deserialize, Serialize};
 use crate::state::AppState;
+use crate::error::WebError;
 
 #[derive(Deserialize)]
 pub struct ListSessionsParams {
@@ -29,7 +30,7 @@ pub struct SessionResponse {
 pub async fn list_sessions(
     State(state): State<AppState>,
     Query(params): Query<ListSessionsParams>,
-) -> Result<Json<Vec<SessionResponse>>, String> {
+) -> Result<Json<Vec<SessionResponse>>, WebError> {
     let kernel = state.kernel.lock().await;
     let session_manager = kernel.session_manager();
 
@@ -48,7 +49,7 @@ pub async fn list_sessions(
     let sessions = session_manager
         .list_sessions(query)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| WebError::Internal(e.to_string()))?;
 
     let response = sessions
         .into_iter()
@@ -68,7 +69,7 @@ pub async fn list_sessions(
 pub async fn get_session(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<Json<SessionResponse>, String> {
+) -> Result<Json<SessionResponse>, WebError> {
     let kernel = state.kernel.lock().await;
     let session_manager = kernel.session_manager();
 
@@ -83,7 +84,7 @@ pub async fn get_session(
     // I'll try to parse it.
     use std::str::FromStr;
     let session_id = llmspell_kernel::sessions::types::SessionId::from_str(&id)
-        .map_err(|_| "Invalid session ID".to_string())?;
+        .map_err(|_| WebError::BadRequest("Invalid session ID".to_string()))?;
 
     let session = session_manager
         .get_session(&session_id)
