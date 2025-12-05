@@ -36,6 +36,12 @@ impl WebServer {
             .route("/api/agents/:id/execute", post(handlers::agents::execute_agent))
             .route("/api/tools", get(handlers::tools::list_tools))
             .route("/api/tools/:id/execute", post(handlers::tools::execute_tool))
+            // Templates API
+            .route("/api/templates", get(handlers::templates::list_templates))
+            .route("/api/templates/:id", get(handlers::templates::get_template))
+            .route("/api/templates/:id/launch", post(handlers::templates::launch_template))
+            // Config API
+            .route("/api/config", get(handlers::config::get_config).put(handlers::config::update_config))
             .layer(axum::middleware::from_fn(track_metrics))
             .with_state(state)
             .fallback(handlers::assets::static_handler);

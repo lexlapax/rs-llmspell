@@ -7,4 +7,6 @@ pub mod agents;
 pub mod tools;
 pub mod metrics;
 pub mod assets;
+pub mod templates;
+pub mod config;
 
