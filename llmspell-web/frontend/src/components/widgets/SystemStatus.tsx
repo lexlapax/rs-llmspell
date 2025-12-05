@@ -1,12 +1,45 @@
 import { Activity, Server, Cpu, Database } from 'lucide-react';
+import { useSystemStatus } from '../../hooks/useSystemStatus';
 
 export default function SystemStatus() {
-    // Mock data for now
+    const { status, loading, error } = useSystemStatus();
+
+    const formatUptime = (seconds: number) => {
+        const d = Math.floor(seconds / (3600 * 24));
+        const h = Math.floor((seconds % (3600 * 24)) / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return `${d}d ${h}h ${m}m`;
+    };
+
     const stats = [
-        { name: 'Status', value: 'Online', icon: Activity, color: 'text-green-600', bg: 'bg-green-100' },
-        { name: 'Uptime', value: '2d 14h', icon: Server, color: 'text-blue-600', bg: 'bg-blue-100' },
-        { name: 'Active Sessions', value: '12', icon: Cpu, color: 'text-purple-600', bg: 'bg-purple-100' },
-        { name: 'Memory Usage', value: '1.2 GB', icon: Database, color: 'text-orange-600', bg: 'bg-orange-100' },
+        {
+            name: 'Status',
+            value: error ? 'Offline' : (loading ? 'Checking...' : 'Online'),
+            icon: Activity,
+            color: error ? 'text-red-600' : 'text-green-600',
+            bg: error ? 'bg-red-100' : 'bg-green-100'
+        },
+        {
+            name: 'Uptime',
+            value: status ? formatUptime(status.uptime_seconds) : '-',
+            icon: Server,
+            color: 'text-blue-600',
+            bg: 'bg-blue-100'
+        },
+        {
+            name: 'Active Sessions',
+            value: '-', // Placeholder until sessions API returns count or we calculate it
+            icon: Cpu,
+            color: 'text-purple-600',
+            bg: 'bg-purple-100'
+        },
+        {
+            name: 'Memory Usage',
+            value: '-', // Placeholder
+            icon: Database,
+            color: 'text-orange-600',
+            bg: 'bg-orange-100'
+        },
     ];
 
     return (
