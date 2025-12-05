@@ -27,7 +27,7 @@ export default function CodeEditor({
     };
 
     return (
-        <div className="w-full overflow-hidden">
+        <div className="w-full h-full overflow-hidden">
             <Editor
                 height={height}
                 defaultLanguage={language}
