@@ -965,11 +965,11 @@
 **Description**: Add API Key and JWT authentication middleware.
 
 **Acceptance Criteria**:
-- [ ] `X-API-Key` validation
-- [ ] JWT generation/validation
-- [ ] Middleware applied to protected routes
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] `X-API-Key` validation
+- [x] JWT generation/validation
+- [x] Middleware applied to protected routes
+- [x] Functional tests pass
+- [x] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-web/src/middleware/auth.rs` (NEW)
