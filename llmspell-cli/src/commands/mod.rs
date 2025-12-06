@@ -59,6 +59,11 @@ pub mod storage;
 pub mod template;
 pub mod tool;
 pub mod version;
+pub mod web;
+
+// ...
+
+
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
 use crate::execution_context::ExecutionContext;
@@ -234,6 +239,10 @@ pub async fn execute_command(
 
         Commands::Storage { command } => {
             storage::handle_storage_command(command, runtime_config, output_format).await
+        }
+
+        Commands::Web { command } => {
+            web::handle_web_command(command, runtime_config).await
         }
 
         Commands::Version(version_cmd) => version::execute(version_cmd, output_format).await,

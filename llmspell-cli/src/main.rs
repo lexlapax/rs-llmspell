@@ -18,12 +18,18 @@ fn main() -> Result<()> {
     // Initialize tracing based on --trace flag
     setup_tracing(cli.trace);
 
-    // Check if this is a kernel start command with daemon mode
-    // We need to handle daemon mode BEFORE creating any tokio runtime
-    if let llmspell_cli::cli::Commands::Kernel {
-        command: llmspell_cli::cli::KernelCommands::Start { daemon: true, .. },
-    } = cli.command
-    {
+    // Check for daemon mode in both Kernel and Web commands
+    // Check for daemon mode in both Kernel and Web commands
+    let is_daemon = matches!(
+        &cli.command,
+        llmspell_cli::cli::Commands::Kernel {
+            command: llmspell_cli::cli::KernelCommands::Start { daemon: true, .. },
+        } | llmspell_cli::cli::Commands::Web {
+            command: llmspell_cli::cli::WebCommands::Start { daemon: true, .. },
+        }
+    );
+
+    if is_daemon {
         // Handle daemon mode specially - fork BEFORE creating tokio runtime
         return handle_daemon_mode(cli);
     }
@@ -47,29 +53,30 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
     use std::path::PathBuf;
 
     // Extract daemon-specific parameters
-    let (port, id, _connection_file, log_file, pid_file) =
-        if let llmspell_cli::cli::Commands::Kernel {
+    let (port, id, log_file, pid_file) = match &cli.command {
+        llmspell_cli::cli::Commands::Kernel {
             command:
                 llmspell_cli::cli::KernelCommands::Start {
                     port,
                     id,
-                    connection_file,
                     log_file,
                     pid_file,
                     ..
                 },
-        } = &cli.command
-        {
-            (
-                *port,
-                id.clone(),
-                connection_file.clone(),
-                log_file.clone(),
-                pid_file.clone(),
-            )
-        } else {
-            unreachable!("Already checked this is a daemon kernel start command");
-        };
+        } => (*port, id.clone(), log_file.clone(), pid_file.clone()),
+
+        llmspell_cli::cli::Commands::Web {
+            command:
+                llmspell_cli::cli::WebCommands::Start {
+                    port,
+                    log_file,
+                    pid_file,
+                    ..
+                },
+        } => (*port, Some("web".to_string()), log_file.clone(), pid_file.clone()),
+
+        _ => unreachable!("Already checked this is a daemon start command"),
+    };
 
     // Set up daemon configuration
     let default_pid_path = || {
@@ -128,7 +135,7 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
     // Check if already running
     if daemon_manager.is_running()? {
         return Err(anyhow::anyhow!(
-            "Kernel daemon already running with PID file {:?}",
+            "Process already running with PID file {:?}",
             daemon_config.pid_file
         ));
     }

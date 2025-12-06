@@ -1001,11 +1001,11 @@
 **Description**: Integrate with `llmspell-kernel` daemon infrastructure.
 
 **Acceptance Criteria**:
-- [ ] `llmspell web start --daemon` works
-- [ ] PID file management
-- [ ] `llmspell web stop` works
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] `llmspell web start --daemon` works
+- [x] PID file management
+- [x] `llmspell web stop` works
+- [x] Functional tests pass
+- [x] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-kernel/src/daemon/mod.rs` (MODIFY - expose helpers)
@@ -1016,12 +1016,18 @@
 2.  Manage PID files.
 
 **Definition of Done**:
-- [ ] Background process starts/stops reliably
-- [ ] PID file correct
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] Background process starts/stops reliably
+- [x] PID file correct
+- [x] Functional tests pass
+- [x] Zero clippy warnings
 
-### Task 14.4.3: CLI Web Subcommand
+**Implementation Insights**:
+- Integrated `llmspell-web` directly into `llmspell-cli` to create a unified binary.
+- Added `web` subcommand (covering Task 14.4.3 requirements).
+- Reused `llmspell-kernel`'s `PidFile` for process tracking.
+- Implemented `stop` and `status` using `nix` signals for direct process control.
+
+### Task 14.4.3: CLI Web Subcommand (COMPLETED)
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Assignee**: CLI Developer
@@ -1029,11 +1035,11 @@
 **Description**: Implement `llmspell web start/stop/status/open` commands.
 
 **Acceptance Criteria**:
-- [ ] `web` subcommand registered
-- [ ] Arguments parsed correctly
-- [ ] Commands execute backend logic
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] `web` subcommand registered
+- [x] Arguments parsed correctly
+- [x] Commands execute backend logic
+- [x] Functional tests pass
+- [x] Zero clippy warnings
 
 **Files to Create/Modify**:
 - `llmspell-cli/src/commands/web.rs` (NEW)
@@ -1044,9 +1050,9 @@
 2.  Implement command handlers calling `llmspell-web`.
 
 **Definition of Done**:
-- [ ] CLI commands control the web server
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] CLI commands control the web server
+- [x] Functional tests pass
+- [x] Zero clippy warnings
 
 ---
 

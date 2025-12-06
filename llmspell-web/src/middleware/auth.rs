@@ -5,7 +5,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
@@ -34,27 +34,20 @@ pub async fn auth_middleware(
     // 2. Check JWT
     if let Some(auth_header) = headers.get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
-            if auth_str.starts_with("Bearer ") {
-                let token = &auth_str[7..];
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
                 let secret = state.config.auth_secret.as_bytes();
                 
                 // Validate token
-                let validation = Validation::new(Algorithm::HS256);
+                let validation = Validation::default();
                 let decoding_key = DecodingKey::from_secret(secret);
-
-                match decode::<Claims>(token, &decoding_key, &validation) {
-                    Ok(_) => {
-                         // Valid token
-                         return Ok(next.run(request).await);
-                    }
-                    Err(_) => {
-                        // Invalid token
-                        // fall through to 401
-                    }
+                // Decode
+                if decode::<Claims>(token, &decoding_key, &validation).is_ok() {
+                    return Ok(next.run(request).await);
                 }
             }
         }
     }
+
 
     // 3. Fallback: Unauthorized
     Err(StatusCode::UNAUTHORIZED)

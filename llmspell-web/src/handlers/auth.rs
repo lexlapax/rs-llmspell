@@ -30,7 +30,7 @@ pub async fn login(
     Json(payload): Json<LoginRequest>,
 ) -> impl IntoResponse {
     // Validate API Key
-    if state.config.api_keys.iter().any(|k| *k == payload.api_key) {
+    if state.config.api_keys.contains(&payload.api_key) {
         // Generate JWT
         let expiration = SystemTime::now()
             .duration_since(UNIX_EPOCH)

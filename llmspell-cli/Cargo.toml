@@ -27,6 +27,7 @@ llmspell-rag = { path = "../llmspell-rag" }
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-workflows = { path = "../llmspell-workflows" }
+llmspell-web = { path = "../llmspell-web" }
 tokio.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 serde.workspace = true
