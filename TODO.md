@@ -915,15 +915,21 @@
 **Configuration**: Update Layout.tsx for new pages.
 
 **Acceptance Criteria**:
-- [ ] Add "Library" nav item (position: above Agents)
-- [ ] Add routes for /library, /settings
-- [ ] Update Settings placeholder to Configuration component
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Add "Library" nav item (position: above Agents)
+- [x] Add routes for /library, /settings
+- [x] Update Settings placeholder to Configuration component
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 
 **Files Created/Modified**:
--
+- `llmspell-web/frontend/src/components/Layout.tsx` (MODIFY)
+- `llmspell-web/frontend/src/App.tsx` (MODIFY)
+
+**Implementation Insights**:
+- ✅ **Navigation Order**: Reordered sidebar to place "Library" closer to "Agents" as requested.
+- ✅ **Settings Route**: Added `/settings` route aliased to the Configuration page.
+- ✅ **Zero Lint Errors**: changes were strictly structural, no new logic introduced.
 
 **Implementation Insights**:
 -

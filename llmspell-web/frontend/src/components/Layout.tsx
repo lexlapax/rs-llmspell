@@ -20,10 +20,10 @@ export default function Layout() {
 
     const navigation = [
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-        { name: 'Library', href: '/library', icon: Book },
         { name: 'Knowledge', href: '/knowledge', icon: Database },
         { name: 'Sessions', href: '/sessions', icon: MessageSquare },
         { name: 'Memory', href: '/memory', icon: Brain },
+        { name: 'Library', href: '/library', icon: Book },
         { name: 'Agents', href: '/agents', icon: Bot },
         { name: 'Tools', href: '/tools', icon: Wrench },
         { name: 'Configuration', href: '/config', icon: Settings },

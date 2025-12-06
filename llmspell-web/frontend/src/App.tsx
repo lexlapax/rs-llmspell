@@ -20,6 +20,7 @@ function App() {
           <Route path="sessions/:id" element={<SessionDetails />} />
           <Route path="sessions" element={<Sessions />} />
           <Route path="config" element={<Config />} />
+          <Route path="settings" element={<Config />} />
           <Route path="library" element={<Templates />} />
           <Route path="knowledge" element={<KnowledgeBase />} />
         </Route>
