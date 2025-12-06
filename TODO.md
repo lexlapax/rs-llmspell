@@ -834,18 +834,25 @@
 **Description**: Visualize sequential, parallel, conditional, and loop workflow patterns (Phase 3.3).
 
 **Acceptance Criteria**:
-- [ ] Graph/Tree visualization of workflow steps
-- [ ] Step status indication (Pending, Running, Completed, Failed)
-- [ ] Click step to view details
-- [ ] Verified in Chrome
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Graph/Tree visualization of workflow steps
+- [x] Step status indication (Pending, Running, Completed, Failed)
+- [x] Click step to view details
+- [x] Verified in Chrome
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 **Files Created/Modified**:
--
+- `llmspell-web/frontend/src/components/workflow/WorkflowGraph.tsx` (NEW)
+- `llmspell-web/frontend/src/pages/SessionDetails.tsx` (NEW)
+- `llmspell-web/frontend/src/pages/Sessions.tsx` (MODIFY)
+- `llmspell-web/frontend/src/api/types.ts` (MODIFY)
 
 **Implementation Insights**:
--
+- ✅ **DAG Visualization**: Integrated `react-force-graph-2d` with `dagMode="lr"` to visualize workflow steps as a directed acyclic graph.
+- ✅ **Status Coding**: Implemented color-coded nodes (Green/Completed, Blue/Running, Red/Failed) for immediate status recognition.
+- ✅ **Interactive Inspection**: Added click handlers to nodes to display detailed step metadata in a side panel.
+- ✅ **Responsive Design**: Created custom `useResizeObserver` to ensure the graph adapts to container changes.
+- ✅ **Routing**: Added `/sessions/:id` route and linked it from the main Sessions list.
 
 
 

@@ -80,6 +80,36 @@ export interface TemplateMetadata {
     // author, requires, etc. omit for now if not used
 }
 
+export interface WorkflowNode {
+    id: string;
+    label: string;
+    type: 'agent' | 'tool' | 'process';
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    data?: any;
+    x?: number; // Force graph coordinates
+    y?: number;
+}
+
+export interface WorkflowLink {
+    source: string;
+    target: string;
+    label?: string;
+}
+
+export interface WorkflowExecution {
+    nodes: WorkflowNode[];
+    links: WorkflowLink[];
+}
+
+export interface SessionDetails {
+    id: string;
+    template_id: string;
+    created_at: string;
+    status: string;
+    workflow: WorkflowExecution;
+    logs: string[]; // Placeholder for logs
+}
+
 
 export interface LaunchTemplateResponse {
     session_id: string;
