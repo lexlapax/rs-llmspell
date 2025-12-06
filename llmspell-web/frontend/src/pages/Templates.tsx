@@ -20,6 +20,79 @@ export function Templates() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState<TemplateDetails | null>(null);
 
+    // Mock Data
+    const MOCK_TEMPLATES: Template[] = [
+        {
+            id: 'tmpl_research_v1',
+            name: 'Deep Research Assistant',
+            description: 'Automated research agent that searches the web, summarizes findings, and compiles a report with citations.',
+            category: 'Research',
+            tags: ['research', 'web-search', 'automation'],
+            version: '1.0.0',
+            config_schema: {}
+        },
+        {
+            id: 'tmpl_chat_v2',
+            name: 'Advanced Chatbot',
+            description: 'A highly capable conversational agent with long-term memory and context awareness.',
+            category: 'Chat',
+            tags: ['chat', 'memory', 'nlp'],
+            version: '2.1.0',
+            config_schema: {}
+        },
+        {
+            id: 'tmpl_rust_coder',
+            name: 'Rust Code Architect',
+            description: 'Specialized assistant for generating, refactoring, and documenting Rust codebases.',
+            category: 'Code',
+            tags: ['rust', 'coding', 'development'],
+            version: '1.2.0',
+            config_schema: {}
+        },
+        {
+            id: 'tmpl_data_etl',
+            name: 'Data ETL Pipeline',
+            description: 'Extract, Transform, and Load textual data into structured formats for analysis.',
+            category: 'Data',
+            tags: ['data', 'etl', 'processing'],
+            version: '0.9.5',
+            config_schema: {}
+        },
+        {
+            id: 'tmpl_workflow_gen',
+            name: 'Workflow Generator',
+            description: 'Create multi-step agent workflows from natural language descriptions.',
+            category: 'Workflow',
+            tags: ['workflow', 'orchestration'],
+            version: '1.0.0',
+            config_schema: {}
+        }
+    ];
+
+    const MOCK_DETAILS: TemplateDetails = {
+        metadata: MOCK_TEMPLATES[0] as any,
+        schema: {
+            version: "1.0",
+            parameters: [
+                {
+                    name: "agent_name",
+                    description: "Name of the agent to deploy",
+                    type: "string",
+                    required: true,
+                    default: "My Agent"
+                },
+                {
+                    name: "model",
+                    description: "LLM Model to use",
+                    type: "string",
+                    required: true,
+                    default: "gpt-4",
+                    constraints: { allowed_values: ["gpt-4", "gpt-3.5-turbo", "claude-2"] }
+                }
+            ]
+        }
+    };
+
     useEffect(() => {
         loadTemplates();
     }, []);
@@ -28,10 +101,15 @@ export function Templates() {
         setIsLoading(true);
         try {
             const data = await api.getTemplates();
-            setTemplates(data);
+            if (data && data.length > 0) {
+                setTemplates(data);
+            } else {
+                console.log('Using mock templates (empty API response)');
+                setTemplates(MOCK_TEMPLATES);
+            }
         } catch (error) {
-            console.error('Failed to load templates:', error);
-            // In a real app we'd show a toast or error message
+            console.warn('Backend unreachable, using mock templates:', error);
+            setTemplates(MOCK_TEMPLATES);
         } finally {
             setIsLoading(false);
         }
@@ -39,12 +117,20 @@ export function Templates() {
 
     const handleLaunchClick = async (template: Template) => {
         try {
-            const details = await api.getTemplate(template.id);
-            setSelectedTemplate(details);
+            try {
+                const details = await api.getTemplate(template.id);
+                setSelectedTemplate(details);
+            } catch (e) {
+                console.warn('Failed to fetch details, using mock:', e);
+                // Fallback details logic
+                setSelectedTemplate({
+                    metadata: template as any,
+                    schema: MOCK_DETAILS.schema
+                });
+            }
             setIsModalOpen(true);
         } catch (error) {
-            console.error('Failed to load template details:', error);
-            // Handle error, maybe show toast
+            console.error('Error opening modal:', error);
         }
     };
 
