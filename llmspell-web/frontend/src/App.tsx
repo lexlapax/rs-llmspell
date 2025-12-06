@@ -8,6 +8,7 @@ import { Config } from './pages/Config';
 import { Templates } from './pages/Templates';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import Agents from './pages/Agents';
+import Memory from './pages/Memory';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           {/* Specific route before list if needed, or order matters less here with v6+ */}
           <Route path="sessions/:id" element={<SessionDetails />} />
           <Route path="sessions" element={<Sessions />} />
+          <Route path="memory" element={<Memory />} />
           <Route path="agents" element={<Agents />} />
           <Route path="config" element={<Config />} />
           <Route path="settings" element={<Config />} />
