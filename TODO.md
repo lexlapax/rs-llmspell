@@ -817,7 +817,15 @@
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/pages/Templates.tsx` (NEW)
 - `llmspell-web/frontend/src/components/templates/TemplateCard.tsx` (NEW)
-- `llmspell-web/frontend/src/components/templates/ConfigModal.tsx` (NEW)
+- `llmspell-web/frontend/src/components/templates/LaunchModal.tsx` (NEW) – Replaced ConfigModal with dynamic form builder
+- `llmspell-web/frontend/src/api/types.ts` (MODIFY) – Added `TemplateDetails` and `Schema` types
+
+**Implementation Insights**:
+- ✅ **Dynamic Form Generation**: Implemented a metadata-driven `LaunchModal` that dynamically renders input fields based on the template's `ConfigSchema` (Constraint-based validation).
+- ✅ **Backend Serialization Fix**: Resolved `422 Unprocessable Entity` error by adding `#[serde(transparent)]` to `TemplateParams` in `llmspell-templates/src/core.rs`. This fixed the mismatch between the frontend's flat JSON payload and the backend's expected structure.
+- ✅ **Null Handling**: Implemented filtering logic in `LaunchModal` to exclude optional parameters with `null` values (like `session_id`), ensuring the backend's validation logic isn't triggered incorrectly.
+- ✅ **Type Safety**: Enhanced frontend types to support complex `TemplateCategory` enums and nested configuration schemas.
+- ✅ **Verification**: Confirmed end-to-end launch flow from UI to backend session creation (mocked) via browser automation.
 
 ### Task 14.3.9: Workflow Visualizer
 **Priority**: HIGH (P1)
