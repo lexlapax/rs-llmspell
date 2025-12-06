@@ -1,6 +1,7 @@
 import SystemStatus from '../components/widgets/SystemStatus';
 import QuickActions from '../components/widgets/QuickActions';
 import RecentActivity from '../components/widgets/RecentActivity';
+import ProviderStatus from '../components/widgets/ProviderStatus';
 
 export default function Dashboard() {
     return (
@@ -23,7 +24,8 @@ export default function Dashboard() {
                 </div>
 
                 {/* Sidebar Column (1/3 width on large screens) */}
-                <div className="lg:col-span-1">
+                <div className="lg:col-span-1 space-y-6">
+                    <ProviderStatus />
                     <RecentActivity />
                 </div>
             </div>
