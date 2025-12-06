@@ -806,13 +806,13 @@
 **Description**: Main entry point for user orchestration (Phase 12). Gallery view of available templates.
 
 **Acceptance Criteria**:
-- [ ] List templates from `llmspell-templates` registry (mocked first if needed)
-- [ ] Group by Category (Research, Chat, Data, Code, Workflow)
-- [ ] Template Configuration Modal (inputs override defaults)
-- [ ] "Launch" button creates new Session
-- [ ] Verified in Chrome
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] List templates from `llmspell-templates` registry (mocked first if needed)
+- [x] Group by Category (Research, Chat, Data, Code, Workflow)
+- [x] Template Configuration Modal (inputs override defaults)
+- [x] "Launch" button creates new Session
+- [x] Verified in Chrome
+- [x] Functional tests pass
+- [x] Zero lint errors
 
 **Files to Create/Modify**:
 - `llmspell-web/frontend/src/pages/Templates.tsx` (NEW)
@@ -833,6 +833,15 @@
 - [ ] Functional tests pass
 - [ ] Zero lint errors
 
+**Files Created/Modified**:
+-
+
+**Implementation Insights**:
+-
+
+
+
+
 ### Task 14.3.10: Provider Status Widget
 **Priority**: MEDIUM (P2)
 **Estimated Time**: 2 hours
@@ -845,6 +854,14 @@
 - [ ] Verified in Chrome
 - [ ] Functional tests pass
 - [ ] Zero lint errors
+
+
+**Files Created/Modified**:
+-
+
+**Implementation Insights**:
+-
+
 
 ### Task 14.3.11: Knowledge Base Manager
 **Priority**: MEDIUM (P3)
@@ -860,6 +877,14 @@
 - [ ] Functional tests pass
 - [ ] Zero lint errors
 
+
+**Files Created/Modified**:
+-
+
+**Implementation Insights**:
+-
+
+
 ### Task 14.3.12: Navigation Enhancement
 **Priority**: HIGH (P1)
 **Estimated Time**: 2 hours
@@ -871,6 +896,14 @@
 - [ ] Update Settings placeholder to Configuration component
 - [ ] Functional tests pass
 - [ ] Zero lint errors
+
+
+**Files Created/Modified**:
+-
+
+**Implementation Insights**:
+-
+
 
 ### Task 14.3.13: Agents Instance View
 **Priority**: HIGH (P1)
@@ -884,6 +917,14 @@
 - [ ] Link instances to their source Session
 - [ ] Functional tests pass
 - [ ] Zero lint errors
+
+
+**Files Created/Modified**:
+-
+
+**Implementation Insights**:
+-
+
 
 ---
 

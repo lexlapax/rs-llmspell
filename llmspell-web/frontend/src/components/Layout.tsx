@@ -8,7 +8,8 @@ import {
     Wrench,
     Settings,
     Menu,
-    X
+    X,
+    Book
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -18,6 +19,7 @@ export default function Layout() {
 
     const navigation = [
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+        { name: 'Library', href: '/library', icon: Book },
         { name: 'Sessions', href: '/sessions', icon: MessageSquare },
         { name: 'Memory', href: '/memory', icon: Brain },
         { name: 'Agents', href: '/agents', icon: Bot },

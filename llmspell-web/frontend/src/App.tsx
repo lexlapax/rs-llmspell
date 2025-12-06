@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import { Sessions } from './pages/Sessions';
 import { Tools } from './pages/Tools';
 import { Config } from './pages/Config';
+import { Templates } from './pages/Templates'; // Added import for Templates
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="tools" element={<Tools />} />
           <Route path="sessions" element={<Sessions />} />
           <Route path="config" element={<Config />} />
+          <Route path="library" element={<Templates />} /> {/* Added /library route */}
         </Route>
       </Routes>
     </Router>

@@ -115,6 +115,7 @@ impl std::fmt::Display for TemplateCategory {
 
 /// Template parameters (input values)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(transparent)]
 pub struct TemplateParams {
     /// Parameter values
     pub values: HashMap<String, serde_json::Value>,
