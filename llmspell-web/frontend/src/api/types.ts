@@ -136,3 +136,26 @@ export interface VectorSearchResult {
         chunk_index: number;
     };
 }
+
+export type AgentStatus = 'active' | 'sleeping' | 'terminated' | 'failed' | 'idle';
+
+export interface AgentInstance {
+    id: string;
+    type_id: string;
+    name: string;
+    status: AgentStatus;
+    session_id?: string;
+    uptime_seconds: number;
+    messages_processed: number;
+    last_active: string;
+}
+
+export interface AgentCatalogItem {
+    id: string;
+    name: string;
+    description: string;
+    version: string;
+    capabilities: string[];
+    category: 'assistant' | 'researcher' | 'coder' | 'data';
+    icon?: string;
+}

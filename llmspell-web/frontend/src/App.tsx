@@ -7,6 +7,7 @@ import { Tools } from './pages/Tools';
 import { Config } from './pages/Config';
 import { Templates } from './pages/Templates';
 import { KnowledgeBase } from './pages/KnowledgeBase';
+import Agents from './pages/Agents';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           {/* Specific route before list if needed, or order matters less here with v6+ */}
           <Route path="sessions/:id" element={<SessionDetails />} />
           <Route path="sessions" element={<Sessions />} />
+          <Route path="agents" element={<Agents />} />
           <Route path="config" element={<Config />} />
           <Route path="settings" element={<Config />} />
           <Route path="library" element={<Templates />} />

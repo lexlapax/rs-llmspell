@@ -941,12 +941,21 @@
 **Description**: Enhance Agents page to show runtime instances vs catalog types.
 
 **Acceptance Criteria**:
-- [ ] Show Active/Sleeping/Terminated agent instances
-- [ ] Instance controls (Stop, Restart)
-- [ ] Clear visual distinction from "agent types" catalog
-- [ ] Link instances to their source Session
-- [ ] Functional tests pass
-- [ ] Zero lint errors
+- [x] Show Active/Sleeping/Terminated agent instances
+- [x] Instance controls (Stop, Restart)
+- [x] Clear visual distinction from "agent types" catalog
+- [x] Link instances to their source Session
+- [x] Functional tests pass
+- [x] Zero lint errors
+
+**Files Created/Modified**:
+- `llmspell-web/frontend/src/api/types.ts` (MODIFY)
+- `llmspell-web/frontend/src/pages/Agents.tsx` (MODIFY)
+
+**Implementation Insights**:
+- ✅ **Dual View**: Implemented split view for "Active Instances" and "Agent Catalog".
+- ✅ **Visual Status**: Use colored badges and animations (ping for active) to show agent state.
+- ✅ **Mock Interactivity**: Verified mock Stop/Restart actions update local state correctly.
 
 
 **Files Created/Modified**:
