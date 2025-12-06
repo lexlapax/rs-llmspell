@@ -116,3 +116,23 @@ export interface LaunchTemplateResponse {
     status: string;
     message: string;
 }
+
+export interface RagDocument {
+    id: string;
+    filename: string;
+    type: 'pdf' | 'md' | 'txt' | 'docx';
+    size: number;
+    status: 'indexed' | 'processing' | 'failed' | 'pending';
+    uploaded_at: string;
+}
+
+export interface VectorSearchResult {
+    id: string;
+    content: string;
+    score: number; // Similarity score 0-1
+    metadata: {
+        document_id: string;
+        filename: string;
+        chunk_index: number;
+    };
+}

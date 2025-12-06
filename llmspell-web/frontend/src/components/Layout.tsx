@@ -9,7 +9,8 @@ import {
     Settings,
     Menu,
     X,
-    Book
+    Book,
+    Database
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -20,6 +21,7 @@ export default function Layout() {
     const navigation = [
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
         { name: 'Library', href: '/library', icon: Book },
+        { name: 'Knowledge', href: '/knowledge', icon: Database },
         { name: 'Sessions', href: '/sessions', icon: MessageSquare },
         { name: 'Memory', href: '/memory', icon: Brain },
         { name: 'Agents', href: '/agents', icon: Bot },

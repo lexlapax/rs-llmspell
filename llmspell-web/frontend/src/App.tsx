@@ -5,7 +5,8 @@ import { Sessions } from './pages/Sessions';
 import { SessionDetails } from './pages/SessionDetails';
 import { Tools } from './pages/Tools';
 import { Config } from './pages/Config';
-import { Templates } from './pages/Templates'; // Added import for Templates
+import { Templates } from './pages/Templates';
+import { KnowledgeBase } from './pages/KnowledgeBase';
 
 function App() {
   return (
@@ -19,7 +20,8 @@ function App() {
           <Route path="sessions/:id" element={<SessionDetails />} />
           <Route path="sessions" element={<Sessions />} />
           <Route path="config" element={<Config />} />
-          <Route path="library" element={<Templates />} /> {/* Added /library route */}
+          <Route path="library" element={<Templates />} />
+          <Route path="knowledge" element={<KnowledgeBase />} />
         </Route>
       </Routes>
     </Router>

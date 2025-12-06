@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
-import { Config } from '../../api/types';
+import type { ConfigItem } from '../../api/types';
 import { Server, Activity, Cpu } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function ProviderStatus() {
-    const [config, setConfig] = useState<Config | null>(null);
+    const [configItems, setConfigItems] = useState<ConfigItem[]>([]);
     const [status, setStatus] = useState<'online' | 'offline' | 'checking'>('checking');
     const [latency, setLatency] = useState<number | null>(null);
 
@@ -13,7 +13,7 @@ export default function ProviderStatus() {
         const fetchConfig = async () => {
             try {
                 const cfg = await api.getConfig();
-                setConfig(cfg);
+                setConfigItems(cfg);
             } catch (err) {
                 console.error("Failed to fetch config", err);
             }
@@ -48,8 +48,8 @@ export default function ProviderStatus() {
     };
 
     // Fallback if config isn't loaded yet
-    // const providerName = 'ollama'; // Default/Fallback
-    const providerName = config?.active_provider || 'Simulated'; // Simulated for now since active_provider might be missing in mock
+    const activeProviderItem = configItems.find(c => c.name === 'active_provider') || configItems.find(c => c.name === 'llm.provider');
+    const providerName = activeProviderItem?.value || 'Simulated';
 
     return (
         <div className="bg-white rounded-lg shadow p-4 flex items-center justify-between border border-gray-100">

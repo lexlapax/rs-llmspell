@@ -11,7 +11,7 @@ interface WorkflowGraphProps {
 export function WorkflowGraph({ data, onNodeClick }: WorkflowGraphProps) {
     const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
     const containerRef = useRef<HTMLDivElement>(null);
-    const { width, height } = useResizeObserver(containerRef);
+    const { width, height } = useResizeObserver(containerRef as React.RefObject<HTMLElement>);
     const [highlightNodes, setHighlightNodes] = useState(new Set<string>());
     const [hoverNode, setHoverNode] = useState<WorkflowNode | null>(null);
 
@@ -82,7 +82,7 @@ export function WorkflowGraph({ data, onNodeClick }: WorkflowGraphProps) {
                     linkDirectionalArrowRelPos={1}
                     linkCurvature={0.25}
                     onNodeClick={(node) => {
-                        setHighlightNodes(new Set([node.id]));
+                        setHighlightNodes(new Set([String(node.id)]));
                         if (onNodeClick) onNodeClick(node as WorkflowNode);
                     }}
                     onNodeHover={(node) => setHoverNode(node as WorkflowNode || null)}
