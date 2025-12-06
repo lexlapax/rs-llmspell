@@ -931,10 +931,6 @@
 - ✅ **Settings Route**: Added `/settings` route aliased to the Configuration page.
 - ✅ **Zero Lint Errors**: changes were strictly structural, no new logic introduced.
 
-**Implementation Insights**:
--
-
-
 ### Task 14.3.13: Agents Instance View
 **Priority**: HIGH (P1)
 **Estimated Time**: 4 hours
@@ -956,14 +952,6 @@
 - ✅ **Dual View**: Implemented split view for "Active Instances" and "Agent Catalog".
 - ✅ **Visual Status**: Use colored badges and animations (ping for active) to show agent state.
 - ✅ **Mock Interactivity**: Verified mock Stop/Restart actions update local state correctly.
-
-
-**Files Created/Modified**:
--
-
-**Implementation Insights**:
--
-
 
 ---
 
@@ -992,10 +980,18 @@
 2.  Add login endpoint.
 
 **Definition of Done**:
-- [ ] Unauthorized requests rejected (401)
-- [ ] Valid keys accepted
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] Unauthorized requests rejected (401)
+- [x] Valid keys accepted
+- [x] Functional tests pass
+- [x] Zero clippy warnings
+
+**Applies to**: `llmspell-web` server.
+
+**Implementation Insights**:
+- ✅ **Secure Config**: Added `auth_secret` and `api_keys` to WebConfig.
+- ✅ **Dual Auth**: Middleware supports both `X-API-Key` (for clients) and `Bearer JWT` (for session).
+- ✅ **Login Handler**: Created `/login` endpoint to exchange API Key for session JWT.
+- ✅ **Protected Routes**: Wired all `/api/*` routes to use `auth_middleware`.
 
 ### Task 14.4.2: Daemon Lifecycle Integration
 **Priority**: HIGH

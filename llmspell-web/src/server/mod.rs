@@ -22,26 +22,34 @@ impl WebServer {
         let state = AppState {
             kernel: Arc::new(Mutex::new(kernel)),
             metrics_recorder: recorder_handle,
+            config: config.clone(),
         };
+
+        use crate::middleware::auth::auth_middleware;
+
+        let api_routes = Router::new()
+            .route("/scripts/execute", post(handlers::scripts::execute_script))
+            .route("/sessions", get(handlers::sessions::list_sessions))
+            .route("/sessions/:id", get(handlers::sessions::get_session))
+            .route("/memory/search", get(handlers::memory::search_memory))
+            .route("/agents", get(handlers::agents::list_agents))
+            .route("/agents/:id/execute", post(handlers::agents::execute_agent))
+            .route("/tools", get(handlers::tools::list_tools))
+            .route("/tools/:id/execute", post(handlers::tools::execute_tool))
+            // Templates API
+            .route("/templates", get(handlers::templates::list_templates))
+            .route("/templates/:id", get(handlers::templates::get_template))
+            .route("/templates/:id/launch", post(handlers::templates::launch_template))
+            // Config API
+            .route("/config", get(handlers::config::get_config).put(handlers::config::update_config))
+            .layer(axum::middleware::from_fn_with_state(state.clone(), auth_middleware));
 
         let app = Router::new()
             .route("/health", get(health_check))
             .route("/metrics", get(handlers::metrics::get_metrics))
-            .route("/api/scripts/execute", post(handlers::scripts::execute_script))
+            .route("/login", post(handlers::auth::login))
             .route("/ws/stream", get(handlers::ws::ws_handler))
-            .route("/api/sessions", get(handlers::sessions::list_sessions))
-            .route("/api/sessions/:id", get(handlers::sessions::get_session))
-            .route("/api/memory/search", get(handlers::memory::search_memory))
-            .route("/api/agents", get(handlers::agents::list_agents))
-            .route("/api/agents/:id/execute", post(handlers::agents::execute_agent))
-            .route("/api/tools", get(handlers::tools::list_tools))
-            .route("/api/tools/:id/execute", post(handlers::tools::execute_tool))
-            // Templates API
-            .route("/api/templates", get(handlers::templates::list_templates))
-            .route("/api/templates/:id", get(handlers::templates::get_template))
-            .route("/api/templates/:id/launch", post(handlers::templates::launch_template))
-            // Config API
-            .route("/api/config", get(handlers::config::get_config).put(handlers::config::update_config))
+            .nest("/api", api_routes)
             .layer(axum::middleware::from_fn(track_metrics))
             .with_state(state)
             .fallback(handlers::assets::static_handler);

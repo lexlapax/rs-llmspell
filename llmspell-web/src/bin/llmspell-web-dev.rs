@@ -25,10 +25,13 @@ async fn main() -> Result<()> {
         .expect("Failed to start kernel");
 
     // 4. Configure Web Server
+    // 4. Configure Web Server
     let web_config = WebConfig {
         port: 3000,
         host: "127.0.0.1".to_string(),
         cors_origins: vec!["http://localhost:5173".to_string()],
+        auth_secret: "dev_secret_do_not_use_in_prod".to_string(),
+        api_keys: vec!["dev-key-123".to_string()],
     };
 
     println!("Starting dev server on http://{}:{}", web_config.host, web_config.port);

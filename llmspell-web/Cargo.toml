@@ -28,6 +28,7 @@ llmspell-config = { path = "../llmspell-config" }
 uuid = { version = "1.4", features = ["serde", "v4"] }
 tracing-subscriber = "0.3"
 llmspell-bridge = { path = "../llmspell-bridge", default-features = false, features = ["lua"] }
+jsonwebtoken = "9.2"
 
 [dev-dependencies]
 http-body-util = "0.1"
