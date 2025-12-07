@@ -1111,6 +1111,22 @@
 - [x] **Tools Lifecycle Test**: Add automated test case for listing and executing a tool.
 - [x] **Cleanliness**: Ensure tests clean up any environment side effects.
 
+### Task 14.5.1d: End-to-End UI Validation (Real World)
+**Description**: Perform a full "black box" validation of the Web UI running against the actual `llmspell web` binary. This ensures the Frontend and Backend integrate correctly in a real execution environment.
+**Status**: Pending
+- [ ] **Environment Setup**: Start `llmspell web` in daemon/server mode with a fresh database/storage path.
+- [ ] **Home Dashboard**: Verify system status, version display, and connectivity indicators.
+- [ ] **Template Launch**: Navigate to Templates tab, select "Code Generator", launch it, and verify redirection to Session view.
+- [ ] **Session Interaction**: In the active session, send a message (e.g., "Hello") and verify the streaming response appears.
+- [ ] **Tools & Agents**:
+    - [ ] Navigate to Tools tab, verify "calculator" is listed.
+    - [ ] Navigate to Agents tab, verify available agents.
+- [ ] **Configuration**:
+    - [ ] Navigate to Settings/Config tab.
+    - [ ] Change a non-critical runtime setting (e.g., a test variable or log level if exposed).
+    - [ ] Refresh page to verify persistence.
+- [ ] **Browser Automation**: Implement a Playwright/Browser test to automate this flow (optional but recommended for CI).
+
 **Quality Gates**:
 - [ ] `./scripts/quality/quality-check-minimal.sh` passes
 - [ ] `./scripts/quality/quality-check-fast.sh` passes
