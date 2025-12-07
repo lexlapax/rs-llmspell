@@ -89,5 +89,24 @@ pub async fn handle_web_command(
             }
             Ok(())
         }
+
+        WebCommands::Open { port, host } => {
+            let url = format!("http://{}:{}", host, port);
+            println!("Opening {}", url);
+
+            #[cfg(target_os = "macos")]
+            let cmd = "open";
+            #[cfg(target_os = "windows")]
+            let cmd = "start";
+            #[cfg(target_os = "linux")]
+            let cmd = "xdg-open";
+
+            std::process::Command::new(cmd)
+                .arg(&url)
+                .spawn()
+                .map_err(|e| anyhow::anyhow!("Failed to open browser ({} {}): {}", cmd, url, e))?;
+
+            Ok(())
+        }
     }
 }

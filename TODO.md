@@ -1025,7 +1025,9 @@
 - Integrated `llmspell-web` directly into `llmspell-cli` to create a unified binary.
 - Added `web` subcommand (covering Task 14.4.3 requirements).
 - Reused `llmspell-kernel`'s `PidFile` for process tracking.
+- Reused `llmspell-kernel`'s `PidFile` for process tracking.
 - Implemented `stop` and `status` using `nix` signals for direct process control.
+- Added `open` command to launch browser for convenient access.
 
 ### Task 14.4.3: CLI Web Subcommand (COMPLETED)
 **Priority**: CRITICAL

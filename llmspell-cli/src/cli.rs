@@ -1794,6 +1794,18 @@ EXAMPLES:
         #[arg(long)]
         pid_file: Option<PathBuf>,
     },
+
+    /// Open the web interface in the default browser
+    #[command(long_about = "Open the web interface in the default browser.")]
+    Open {
+        /// Port to connect to (default: 3000)
+        #[arg(long, default_value = "3000")]
+        port: u16,
+
+        /// Host to connect to (default: 127.0.0.1)
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+    },
 }
 
 /// Parse key=value pairs from command line
