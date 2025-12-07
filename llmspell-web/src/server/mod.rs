@@ -11,6 +11,7 @@ use llmspell_kernel::api::KernelHandle;
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::Mutex;
+use tracing::{info, warn};
 
 pub struct WebServer;
 
@@ -73,7 +74,7 @@ impl WebServer {
                     // Ensure kv_store tables exist (V7 migration)
                     // In a real app we might want centralized migration management
                     if let Err(e) = backend.run_migrations().await {
-                        tracing::warn!("Failed to run storage migrations: {}", e);
+                        warn!("Failed to run storage migrations: {}", e);
                     }
 
                     let store = Arc::new(llmspell_storage::backends::sqlite::SqliteKVStorage::new(
@@ -84,7 +85,7 @@ impl WebServer {
                     // Load persisted configuration overrides
                     if let Ok(keys) = store.list_keys("config:").await {
                         if !keys.is_empty() {
-                            tracing::info!(
+                            info!(
                                 "Loading {} persisted configuration overrides from SQLite",
                                 keys.len()
                             );
@@ -107,7 +108,7 @@ impl WebServer {
                     Some(store)
                 }
                 Err(e) => {
-                    tracing::warn!(
+                    warn!(
                         "Failed to initialize SQLite storage for config persistence: {}",
                         e
                     );

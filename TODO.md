@@ -1155,18 +1155,18 @@
     - [x] **End-to-End**: Change Vector Backend -> Restart -> Verify new backend is active.
 
 **Quality Gates**:
-- [ ] `./scripts/quality/quality-check-minimal.sh` passes
-- [ ] `./scripts/quality/quality-check-fast.sh` passes
-- [ ] Zero clippy warnings
+- [x] `./scripts/quality/quality-check-minimal.sh` passes
+- [x] `./scripts/quality/quality-check-fast.sh` passes
+- [x] Zero clippy warnings
 
 **Definition of Done**:
-- [ ] All tests pass
-- [ ] Coverage >90%
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
+- [x] All tests pass
+- [x] Coverage >90%
+- [x] Functional tests pass
+- [x] Zero clippy warnings
 
 
-### Task 14.5.1g: Dynamic Template Instantiation
+### Task 14.5.1g: real live - Dynamic Template Instantiation (no mocks)
 **Description**: Implement a robust "Launch" flow that respects template parameter schemas. Users should be able to customize template execution environment (Model selection, System prompts, specific inputs) before launch.
 **Status**: Pending
 - [ ] **Parameter Schema**: Ensure all templates expose a clear parameter schema (Inputs, Variables).

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::WebError;
 use crate::state::AppState;
+use tracing::info;
 
 /// List all available templates
 pub async fn list_templates() -> Result<Json<Vec<TemplateMetadata>>, WebError> {
@@ -101,7 +102,7 @@ pub async fn launch_template(
         .await
         .map_err(|e| WebError::Internal(format!("Failed to create session: {}", e)))?;
 
-    tracing::info!("Launched template '{}' as session {}", id, session_id);
+    info!("Launched template '{}' as session {}", id, session_id);
 
     Ok(Json(LaunchResponse {
         session_id: session_id.to_string(),
