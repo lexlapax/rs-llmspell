@@ -1,7 +1,7 @@
 use axum::{
     body::Body,
     http::{Request, StatusCode},
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use http_body_util::BodyExt; // for collect()
@@ -15,8 +15,7 @@ async fn test_templates_api_list() {
     // 1. Setup Router without state (since current handlers don't use it)
     let app = Router::new()
         .route("/api/templates", get(handlers::templates::list_templates))
-        .route("/api/templates/:id", get(handlers::templates::get_template))
-        .route("/api/templates/:id/launch", post(handlers::templates::launch_template));
+        .route("/api/templates/:id", get(handlers::templates::get_template));
 
     // 2. Test GET /api/templates
     let response = app

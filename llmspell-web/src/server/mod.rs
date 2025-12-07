@@ -15,7 +15,14 @@ use crate::middleware::metrics::track_metrics;
 
 impl WebServer {
     pub async fn run(config: WebConfig, kernel: KernelHandle) -> Result<()> {
-        let recorder_handle = PrometheusBuilder::new()
+        Self::run_with_custom_setup(config, kernel).await
+    }
+
+    pub async fn run_with_custom_setup(config: WebConfig, kernel: KernelHandle) -> Result<()> {
+         // Setup metrics - this will panic if called twice (e.g. in multiple tests running in parallel if not careful)
+         // For production usage this is fine.
+         // For integration tests, we should construct State manually and call build_app directly.
+         let recorder_handle = PrometheusBuilder::new()
             .install_recorder()
             .expect("failed to install Prometheus recorder");
 
@@ -25,6 +32,14 @@ impl WebServer {
             config: config.clone(),
         };
 
+        let app = Self::build_app(state);
+
+        let listener = tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await?;
+        axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
+        Ok(())
+    }
+
+    pub fn build_app(state: AppState) -> Router {
         use crate::middleware::auth::auth_middleware;
 
         let api_routes = Router::new()
@@ -44,7 +59,7 @@ impl WebServer {
             .route("/config", get(handlers::config::get_config).put(handlers::config::update_config))
             .layer(axum::middleware::from_fn_with_state(state.clone(), auth_middleware));
 
-        let app = Router::new()
+        Router::new()
             .route("/health", get(health_check))
             .route("/metrics", get(handlers::metrics::get_metrics))
             .route("/login", post(handlers::auth::login))
@@ -52,11 +67,7 @@ impl WebServer {
             .nest("/api", api_routes)
             .layer(axum::middleware::from_fn(track_metrics))
             .with_state(state)
-            .fallback(handlers::assets::static_handler);
-
-        let listener = tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await?;
-        axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
-        Ok(())
+            .fallback(handlers::assets::static_handler)
     }
 }
 

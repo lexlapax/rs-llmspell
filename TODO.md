@@ -1069,19 +1069,19 @@
 
 **Acceptance Criteria**:
 - [ ] Unit tests for all handlers
-- [ ] Integration tests for full flow
+- [x] Integration tests for full flow (Verified via `tests/api_integration.rs`)
 - [ ] E2E tests (Playwright) for UI
 - [ ] Load tests (k6)
-- [ ] Functional tests pass
+- [x] Functional tests pass
 - [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
-- `llmspell-web/tests/api_integration.rs` (NEW)
+- `llmspell-web/tests/api_integration.rs` (NEW) ✅
 - `llmspell-web/e2e/` (NEW)
 
 **Implementation Steps**:
 1.  Write handler unit tests.
-2.  Create `tests/api_integration.rs`.
+2.  Create `tests/api_integration.rs`. ✅
 3.  Setup Playwright.
 
 **Quality Gates**:

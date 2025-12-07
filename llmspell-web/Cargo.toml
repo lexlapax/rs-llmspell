@@ -31,4 +31,6 @@ llmspell-bridge = { path = "../llmspell-bridge", default-features = false, featu
 jsonwebtoken = "9.2"
 
 [dev-dependencies]
+dotenv = "0.15.0"
 http-body-util = "0.1"
+tempfile.workspace = true
