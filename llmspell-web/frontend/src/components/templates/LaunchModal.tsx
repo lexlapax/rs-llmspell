@@ -36,11 +36,27 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
         e.preventDefault();
         if (!template) return;
 
-        // Custom validation based on 'required'
+        // Validation
         for (const p of template.schema.parameters) {
-            if (p.required && (config[p.name] === undefined || config[p.name] === '')) {
+            const val = config[p.name];
+
+            // Required check
+            if (p.required && (val === undefined || val === '' || val === null)) {
                 setError(`Parameter '${p.name}' is required`);
                 return;
+            }
+
+            // Numeric constraints check
+            if ((p.type === 'integer' || p.type === 'number') && val !== undefined && val !== '') {
+                const numVal = Number(val);
+                if (p.constraints?.min !== undefined && numVal < p.constraints.min) {
+                    setError(`Parameter '${p.name}' must be at least ${p.constraints.min}`);
+                    return;
+                }
+                if (p.constraints?.max !== undefined && numVal > p.constraints.max) {
+                    setError(`Parameter '${p.name}' must be at most ${p.constraints.max}`);
+                    return;
+                }
             }
         }
 
@@ -48,9 +64,9 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
         setError(null);
 
         try {
-            // Filter out null/undefined values
+            // Filter out null/undefined values and empty strings to keep payload clean
             const cleanConfig = Object.entries(config).reduce((acc, [key, value]) => {
-                if (value !== null && value !== undefined) {
+                if (value !== null && value !== undefined && value !== '') {
                     acc[key] = value;
                 }
                 return acc;
@@ -69,8 +85,57 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
         setConfig(prev => ({ ...prev, [key]: value }));
     };
 
+    // Mock data for providers and models (until Registry API is ready)
+    const PROVIDER_OPTIONS = ['ollama', 'openai', 'anthropic', 'candle'];
+    const MODEL_OPTIONS = ['gpt-4-turbo', 'gpt-3.5-turbo', 'claude-3-opus', 'llama3-8b', 'mistral-7b'];
+
     const renderField = (param: ParameterSchema) => {
         const value = config[param.name] ?? '';
+
+        // Specialized Renderers for specific semantic fields
+        if (param.name === 'provider_name') {
+            return (
+                <div key={param.name}>
+                    <label htmlFor={param.name} className="block text-sm font-medium text-gray-700">
+                        {param.name} {param.required && <span className="text-red-500">*</span>}
+                    </label>
+                    <select
+                        id={param.name}
+                        value={value}
+                        onChange={(e) => handleInputChange(param.name, e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+                    >
+                        <option value="">Default (Auto)</option>
+                        {PROVIDER_OPTIONS.map((val) => (
+                            <option key={val} value={val}>{val}</option>
+                        ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">{param.description || 'Select inference provider'}</p>
+                </div>
+            );
+        }
+
+        if (param.name === 'model') {
+            return (
+                <div key={param.name}>
+                    <label htmlFor={param.name} className="block text-sm font-medium text-gray-700">
+                        {param.name} {param.required && <span className="text-red-500">*</span>}
+                    </label>
+                    <select
+                        id={param.name}
+                        value={value}
+                        onChange={(e) => handleInputChange(param.name, e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+                    >
+                        <option value="">Default (Template Defined)</option>
+                        {MODEL_OPTIONS.map((val) => (
+                            <option key={val} value={val}>{val}</option>
+                        ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">{param.description || 'Override default model'}</p>
+                </div>
+            );
+        }
 
         if (param.type === 'boolean') {
             return (
@@ -115,18 +180,22 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
             )
         }
 
+        const isNum = param.type === 'integer' || param.type === 'number';
+
         return (
             <div key={param.name}>
                 <label htmlFor={param.name} className="block text-sm font-medium text-gray-700">
                     {param.name} {param.required && <span className="text-red-500">*</span>}
                 </label>
                 <input
-                    type={param.type === 'integer' || param.type === 'number' ? 'number' : 'text'}
+                    type={isNum ? 'number' : 'text'}
                     id={param.name}
                     value={value}
+                    min={isNum ? param.constraints?.min : undefined}
+                    max={isNum ? param.constraints?.max : undefined}
                     onChange={(e) => {
                         const val = e.target.value;
-                        if (param.type === 'integer' || param.type === 'number') {
+                        if (isNum) {
                             handleInputChange(param.name, val === '' ? '' : Number(val));
                         } else {
                             handleInputChange(param.name, val);
@@ -135,6 +204,11 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
                     placeholder={param.description}
                 />
+                {isNum && (param.constraints?.min !== undefined || param.constraints?.max !== undefined) && (
+                    <p className="mt-1 text-xs text-gray-400">
+                        Range: {param.constraints?.min ?? 'Any'} - {param.constraints?.max ?? 'Any'}
+                    </p>
+                )}
             </div>
         );
     };

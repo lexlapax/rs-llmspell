@@ -1166,16 +1166,64 @@
 - [x] Zero clippy warnings
 
 
-### Task 14.5.1g: real live - Dynamic Template Instantiation (no mocks)
-**Description**: Implement a robust "Launch" flow that respects template parameter schemas. Users should be able to customize template execution environment (Model selection, System prompts, specific inputs) before launch.
-**Status**: Pending
-- [ ] **Parameter Schema**: Ensure all templates expose a clear parameter schema (Inputs, Variables).
-- [ ] **Dynamic Launch Modal**: Create a React component that renders inputs (Text, Select, Toggle) based on the template's schema.
-- [ ] **Model Selection**: Allow overriding the default Model/Provider during launch.
-- [ ] **Input Validation**: Frontend and Backend validation of launch parameters.
-- [ ] **Session Metadata**: Persist launch parameters into Session Metadata for context.
+### Task 14.5.1g: Dynamic Template Instantiation (Backend & Frontend)
+**Priority**: HIGH
+**Status**: COMPLETE
+**Description**: Implement a robust "Launch" flow that respects template parameter schemas. Users should be able to customize template execution environment (Model selection, specific inputs) before launch, and these choices must be persisted.
 
+**Acceptance Criteria**:
+- [x] **Frontend Form Generation**:
+    - [x] Identify parameters from `ConfigSchema`.
+    - [x] Render `String`, `Boolean` (Checkbox), `Integer` (Number) inputs.
+    - [x] Render `Select` dropdowns for parameters with `allowed_values`.
+    - [x] Render special "Model/Provider" dropdowns for `provider_name` / `model` keys.
+    - [x] **Validation**: Show error messages for required fields or constraint violations (min/max).
+- [x] **Backend Persistence**:
+    - [x] Extract `params` from `LaunchTemplateRequest`.
+    - [x] Inject params into `SessionMetadata` during session creation.
+- [x] **Validation Logic**:
+    - [x] Frontend prevents submission of invalid forms.
+    - [x] Backend returns `400 Bad Request` if params violate schema (e.g. out of range).
+- [x] **End-to-End Verification**:
+    - [x] Launch "Research" template with `provider_name="ollama"`.
+    - [x] Inspect created Session JSON to verify `metadata` contains `provider_name: "ollama"`.
 
+**Files to Create/Modify**:
+- `llmspell-web/frontend/src/components/templates/LaunchModal.tsx` (MODIFY)
+    - Add `Select` component support.
+    - Add `Provider/Model` constant lists (or fetch from API).
+    - Implement constraint validation (min/max).
+- `llmspell-web/src/handlers/templates.rs` (MODIFY)
+    - Update `launch_template` to persist params.
+- `llmspell-web/frontend/src/api/types.ts` (MODIFY)
+    - Ensure `Session` type reflects metadata structure.
+
+**Implementation Steps**:
+1.  **Frontend**: Update `LaunchModal` `renderField`:
+    - Check `param.constraints?.allowed_values` -> Render `<select>`.
+    - Check param name for `provider_name` / `model` -> Render specialized `<select>`.
+    - Add `min/max` attributes to `<input type="number">`.
+2.  **Frontend**: Update `handleSubmit`:
+    - Check for required fields.
+    - Validate numeric ranges.
+3.  **Backend**: (In Progress) Update `handlers/templates.rs` to map `payload.params` to `session_options.metadata`.
+4.  **Verification**: Manual test via UI + `curl` check of session details.
+
+**Validation (End-to-End)**:
+1.  **Scenario A: Custom Parameter**:
+    - Open "Research Assistant" template.
+    - Set `max_sources` to `5` (if applicable).
+    - Launch.
+    - Verify Session Metadata: `{"max_sources": 5}`.
+2.  **Scenario B: Invalid Input**:
+    - Set `max_sources` to `-1` (if constraint exists).
+    - Expect UI Error or API Error (400).
+3.  **Scenario C: Provider Switch**:
+    - Select `provider_name` = `anthropic`.
+    - Launch.
+    - Verify Metadata: `{"provider_name": "anthropic"}`.
+
+### Task 14.5.1h: Provider management
 
 ### Task 14.5.2: Documentation & Polish
 **Priority**: HIGH

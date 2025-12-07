@@ -112,6 +112,7 @@ export interface SessionDetails {
     created_at: string;
     status: string;
     workflow: WorkflowExecution;
+    metadata: Record<string, any>;
     logs: string[]; // Placeholder for logs
 }
 

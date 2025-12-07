@@ -94,7 +94,9 @@ pub async fn launch_template(
         .add_tag("template".to_string())
         .add_tag(id.clone());
 
-    let options = options_builder.build();
+    let options = options_builder
+        .metadata(params.values.into_iter().collect())
+        .build();
 
     let session_manager = kernel.session_manager();
     let session_id = session_manager

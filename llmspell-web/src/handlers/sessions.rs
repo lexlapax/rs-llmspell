@@ -25,6 +25,7 @@ pub struct SessionResponse {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub tags: Vec<String>,
+    pub metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 pub async fn list_sessions(
@@ -60,6 +61,7 @@ pub async fn list_sessions(
             created_at: s.created_at,
             updated_at: s.updated_at,
             tags: s.tags,
+            metadata: s.custom_metadata,
         })
         .collect();
 
@@ -100,5 +102,6 @@ pub async fn get_session(
         created_at: metadata.created_at,
         updated_at: metadata.updated_at,
         tags: metadata.tags,
+        metadata: metadata.custom_metadata,
     }))
 }
