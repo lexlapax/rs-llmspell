@@ -73,9 +73,19 @@ pub async fn update_config(
     }
 
     // Update internal registry overrides so subsequent gets reflect changes immediately
-    // without needing full reload logic.
     registry.with_overrides(payload.overrides.clone())
         .map_err(|e| WebError::Internal(e))?;
+        
+    // Task 14.5.1e: Persist changes to SQLite
+    if let Some(storage) = &state.config_store {
+        use llmspell_core::traits::storage::StorageBackend;
+        for (key, value) in &payload.overrides {
+            let storage_key = format!("config:{}", key);
+            storage.set(&storage_key, value.as_bytes().to_vec())
+                .await
+                .map_err(|e| WebError::Internal(format!("Failed to persist config: {}", e)))?;
+        }
+    }
     
     Ok(Json(UpdateConfigResponse {
         status: "updated".to_string(), 

@@ -1120,7 +1120,39 @@
 - [x] **Session Interaction**: Verified chat interaction in active session.
 - [x] **Tools & Agents**: Verified Tools list visibility.
 - [x] **Configuration**: Verified Configuration page loads and displays items.
-- [ ] **Browser Automation**: Manual automation performed via subagent (artifacts saved).
+- [x] **Browser Automation**: Manual automation performed via subagent (artifacts saved).
+
+### Task 14.5.1e: Real World Configuration Management
+**Description**: Evolve the configuration UI from a read-only list to a functional management interface. Users should be able to modify and persist key system settings (Providers, Defaults, Limits) from the web interface.
+**Status**: Verified ✅
+- [x] **Config Schema**: Expose editable configuration schema (JSON Schema) via API (implied by `ConfigItem`).
+- [x] **UI Form Editor**: Dynamically generated settings form in Config tab (Updated `Config.tsx`, removed simulation warning).
+- [x] **Persistence Layer**: Integrated `llmspell-storage` (`SqliteKVStorage` "system") into `WebServer` and `update_config`.
+- [x] **Persistence Verification**: Verified that configuration updates survive server restarts (via `curl` and log check).
+- [x] **Hot Reload**: `registry.with_overrides()` allows immediate usage of new values.
+
+### Task 14.5.1f: Hot-Reloadable Static Configuration
+**Description**: Implement full lifecycle management for the static `llmspell.toml` configuration file. This layers on top of the Runtime Configuration (Task 14.5.1e) to allow users to modify deep architectural settings (RAG Backends, Vector Dimensions, Memory Providers) and restart the kernel to apply them.
+**Status**: Pending
+**Prerequisites**: Task 14.5.1e (Runtime Config)
+- [ ] **Source Awareness**:
+    - [ ] Update `llmspell-cli` to pass the resolved config file path (`PathBuf`) to `WebServer`.
+    - [ ] Store this path in `AppState` as `static_config_path`.
+- [ ] **Configuration File API**:
+    - [ ] `GET /api/config/source`: Return raw TOML content of `llmspell.toml`.
+    - [ ] `PUT /api/config/source`: Write updated TOML content (atomic write with backup).
+    - [ ] `GET /api/config/schema`: Expose JSON Schema for `LLMSpellConfig` (for UI form generation).
+    - [ ] `GET /api/config/profiles`: List available presets/layers from `ProfileComposer`.
+- [ ] **Hot Reload Logic**:
+    - [ ] Implement `KernelManager::restart()` to tear down and rebuild the `ScriptExecutor` graph.
+    - [ ] Signal handling: When `PUT /api/config/source` succeeds, trigger optional restart or prompt user.
+- [ ] **UI Implementation**:
+    - [ ] **Source Editor**: Add "Advanced / Static Config" tab with Monaco Editor for raw TOML editing.
+    - [ ] **Schema Form**: Use `rjsf` (React JSON Schema Form) to render friendly UI for known `LLMSpellConfig` structs.
+    - [ ] **Restart Action**: Add "Restart Server" or "Apply Static Changes" button in UI with countdown/status.
+- [ ] **Verification**:
+    - [ ] **Corruption Safety**: Verify invalid TOML is rejected or doesn't overwrite working config without validation.
+    - [ ] **End-to-End**: Change Vector Backend -> Restart -> Verify new backend is active.
 
 **Quality Gates**:
 - [ ] `./scripts/quality/quality-check-minimal.sh` passes
@@ -1132,6 +1164,18 @@
 - [ ] Coverage >90%
 - [ ] Functional tests pass
 - [ ] Zero clippy warnings
+
+
+### Task 14.5.1g: Dynamic Template Instantiation
+**Description**: Implement a robust "Launch" flow that respects template parameter schemas. Users should be able to customize template execution environment (Model selection, System prompts, specific inputs) before launch.
+**Status**: Pending
+- [ ] **Parameter Schema**: Ensure all templates expose a clear parameter schema (Inputs, Variables).
+- [ ] **Dynamic Launch Modal**: Create a React component that renders inputs (Text, Select, Toggle) based on the template's schema.
+- [ ] **Model Selection**: Allow overriding the default Model/Provider during launch.
+- [ ] **Input Validation**: Frontend and Backend validation of launch parameters.
+- [ ] **Session Metadata**: Persist launch parameters into Session Metadata for context.
+
+
 
 ### Task 14.5.2: Documentation & Polish
 **Priority**: HIGH

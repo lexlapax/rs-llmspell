@@ -7,6 +7,7 @@ use llmspell_kernel::api::KernelHandle;
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::Mutex;
+use llmspell_core::traits::storage::StorageBackend;
 
 pub struct WebServer;
 
@@ -28,8 +29,74 @@ impl WebServer {
 
         // Initialize Shared Runtime Config
         let runtime_config = llmspell_config::env::EnvRegistry::new();
+        
+        // Register known variables for Web UI Management (Task 14.5.1e)
+        use llmspell_config::env::{EnvVarDefBuilder, EnvCategory};
+        let _ = runtime_config.register_var(
+            EnvVarDefBuilder::new("RUST_LOG")
+                .description("Rust logging level/filter")
+                .category(EnvCategory::Runtime)
+                .default("info")
+                .build()
+        );
+        let _ = runtime_config.register_var(
+            EnvVarDefBuilder::new("TEST_PERSIST_VAR")
+                .description("Test variable for persistence verification")
+                .category(EnvCategory::Runtime)
+                .build()
+        );
+
         // Ignoring error on load_from_env as it's best-effort
         let _ = runtime_config.load_from_env();
+        
+        // Initialize Storage for Config Persistence (Task 14.5.1e)
+        // Assume default DB path for now, matching kernel default if possible
+        // Ideally this should come from config or shared constant
+        let db_path = "llmspell.db"; 
+        let sqlite_config = llmspell_storage::backends::sqlite::SqliteConfig::new(db_path);
+        
+        let config_store = match llmspell_storage::backends::sqlite::SqliteBackend::new(sqlite_config).await {
+            Ok(backend) => {
+                let backend = Arc::new(backend);
+                // Ensure kv_store tables exist (V7 migration)
+                // In a real app we might want centralized migration management
+                 if let Err(e) = backend.run_migrations().await {
+                     tracing::warn!("Failed to run storage migrations: {}", e);
+                 }
+
+                let store = Arc::new(llmspell_storage::backends::sqlite::SqliteKVStorage::new(
+                    backend, 
+                    "system".to_string()
+                ));
+                
+                // Load persisted configuration overrides
+                if let Ok(keys) = store.list_keys("config:").await {
+                    if !keys.is_empty() {
+                         tracing::info!("Loading {} persisted configuration overrides from SQLite", keys.len());
+                         if let Ok(values) = store.get_batch(&keys).await {
+                             let mut overrides = std::collections::HashMap::new();
+                             for (k, v) in values {
+                                 if let Ok(val_str) = String::from_utf8(v) {
+                                     // Key format "config:VAR_NAME" -> "VAR_NAME"
+                                     let var_name = k.trim_start_matches("config:");
+                                     std::env::set_var(var_name, &val_str);
+                                     overrides.insert(var_name.to_string(), val_str);
+                                 }
+                             }
+                             // Sync registry with persisted overrides
+                             let _ = runtime_config.with_overrides(overrides);
+                         }
+                    }
+                }
+                
+                Some(store)
+            },
+            Err(e) => {
+                tracing::warn!("Failed to initialize SQLite storage for config persistence: {}", e);
+                None
+            }
+        };
+
         let runtime_config = Arc::new(tokio::sync::RwLock::new(runtime_config));
 
         let state = AppState {
@@ -37,6 +104,7 @@ impl WebServer {
             metrics_recorder: recorder_handle,
             config: config.clone(),
             runtime_config,
+            config_store,
         };
 
         let app = Self::build_app(state);
