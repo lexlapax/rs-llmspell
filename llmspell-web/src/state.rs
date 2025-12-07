@@ -9,4 +9,5 @@ pub struct AppState {
     pub kernel: Arc<Mutex<KernelHandle>>,
     pub metrics_recorder: PrometheusHandle,
     pub config: WebConfig,
+    pub runtime_config: Arc<tokio::sync::RwLock<llmspell_config::env::EnvRegistry>>,
 }

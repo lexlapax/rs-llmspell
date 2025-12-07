@@ -8,7 +8,6 @@ use llmspell_config::LLMSpellConfig;
 use llmspell_kernel::api::start_embedded_kernel_with_executor;
 use llmspell_web::{config::WebConfig, server::WebServer, state::AppState};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tower::ServiceExt; // for oneshot
 use metrics_exporter_prometheus::PrometheusBuilder;
 
@@ -63,17 +62,33 @@ async fn setup_env() -> (AppState, tempfile::TempDir) {
         .await
         .expect("Failed to start kernel");
 
-    // Setup Metrics (mock/real handle)
-    // In tests, if multiple run in parallel, installing recorder might fail.
-    // We try to install, if fails we assume it's there.
+    // Setup Metrics
+    // Since this is a standalone integration test binary, we can install the recorder once.
     let recorder_handle = PrometheusBuilder::new()
         .install_recorder()
-        .expect("Failed to install Prometheus recorder - ensure tests run in isolation or --test-threads=1");
+        .expect("Failed to install Prometheus recorder");
+
+    // Init runtime config
+    let runtime_config = llmspell_config::env::EnvRegistry::new();
     
+    // Register a test variable so it appears in list_vars()
+    // We need this for the config update test
+    let def = llmspell_config::env::EnvVarDefBuilder::new("TEST_RUNTIME_VAR")
+        .description("Test variable")
+        .category(llmspell_config::env::EnvCategory::Runtime)
+        .default("default_value")
+        .build();
+    runtime_config.register_var(def).expect("Failed to register test var");
+    
+    let runtime_config = Arc::new(tokio::sync::RwLock::new(runtime_config));
+    
+    let web_config = WebConfig::default();
+
     let state = AppState {
-        kernel: Arc::new(Mutex::new(kernel)),
+        kernel: Arc::new(tokio::sync::Mutex::new(kernel)),
         metrics_recorder: recorder_handle,
-        config: WebConfig::default(),
+        config: web_config,
+        runtime_config,
     };
 
     (state, temp_dir)
@@ -157,4 +172,68 @@ async fn test_full_integration_flow() {
     // Session handler returns SessionResponse (flat structure)
     assert_eq!(session_details["id"], session_id);
     println!("Verified session exists: {}", session_id);
+
+    // 4. Test Real Configuration Update
+    let config_update_payload = serde_json::json!({
+        "overrides": {
+            "TEST_RUNTIME_VAR": "updated_value"
+        }
+    });
+
+    let response = app.clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri("/api/config")
+                .header("Content-Type", "application/json")
+                .header("X-API-Key", api_key)
+                .body(Body::from(serde_json::to_vec(&config_update_payload).unwrap()))
+                .unwrap()
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify update persisted in state
+    let response = app.clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/config")
+                .header("X-API-Key", api_key)
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let config_items: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    
+    // Find our var
+    let found_item = config_items.iter().find(|i| i["name"] == "TEST_RUNTIME_VAR");
+    assert!(found_item.is_some(), "Should find updated config variable");
+    assert_eq!(found_item.unwrap()["value"], "updated_value");
+    println!("Verified real config update");
+
+    // 5. Test Tools Listing (Real Tools)
+    let response = app.clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/tools")
+                .header("X-API-Key", api_key)
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let tools: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    println!("Found {} tools", tools.len());
+    
+    if let Some(tool) = tools.first() {
+        println!("Tool available: {}", tool["name"]);
+        // If we have "echo" or similar safe tool, we could test execute.
+        // For now, listing proves registry integration.
+    }
 }

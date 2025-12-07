@@ -1,10 +1,11 @@
 use axum::{
+    extract::State,
     Json,
 };
-use llmspell_config::env::EnvRegistry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::state::AppState;
 use crate::error::WebError;
 
 #[derive(Debug, Serialize)]
@@ -19,13 +20,11 @@ pub struct ConfigItem {
 }
 
 /// Get current configuration
-pub async fn get_config() -> Result<Json<Vec<ConfigItem>>, WebError> {
-    // For this implementation, we'll create a new registry instance to read ENV vars
-    // In a real app, this should probably come from a shared state if we allow runtime overrides that persist
-    let registry = EnvRegistry::new(); // Starts with Global isolation
-    
-    // We ignore the error here for now as in a web handler we want to return what we can
-    let _ = registry.load_from_env();
+pub async fn get_config(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ConfigItem>>, WebError> {
+    // Read from shared registry
+    let registry = state.runtime_config.read().await;
 
     let mut items = Vec::new();
 
@@ -62,13 +61,25 @@ pub struct UpdateConfigResponse {
 
 /// Update configuration overrides
 pub async fn update_config(
+    State(state): State<AppState>,
     Json(payload): Json<UpdateConfigRequest>,
 ) -> Result<Json<UpdateConfigResponse>, WebError> {
-    // LIMITATION: Without a shared `Arc<EnvRegistry>` in AppState, we cannot affect global state.
+    // Acquire write lock to ensure we are the only one updating config at this moment
+    let registry = state.runtime_config.write().await;
+    
+    // Update process environment variables
+    for (key, value) in &payload.overrides {
+        std::env::set_var(key, value);
+    }
+
+    // Update internal registry overrides so subsequent gets reflect changes immediately
+    // without needing full reload logic.
+    registry.with_overrides(payload.overrides.clone())
+        .map_err(|e| WebError::Internal(e))?;
     
     Ok(Json(UpdateConfigResponse {
         status: "updated".to_string(), 
-        message: "Configuration updated (simulation - requires shared registry state)".to_string(),
+        message: "Configuration updated successfully".to_string(),
         overrides: payload.overrides
     }))
 }

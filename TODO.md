@@ -1084,6 +1084,33 @@
 2.  Create `tests/api_integration.rs`. ✅
 3.  Setup Playwright.
 
+- [ ] Zero clippy warnings
+
+### Task 14.5.1a: Real Configuration Management Implementation
+**Description**: Replace simulated configuration endpoints with genuine runtime state management backed by `llmspell-config` and `EnvRegistry`.
+**Status**: Verified ✅
+- [x] **State Architecture**: Add `runtime_config: Arc<RwLock<EnvRegistry>>` to `AppState` to allow safe concurrent access.
+- [x] **Initialization**: Initialize `EnvRegistry` in `WebServer::run_with_custom_setup` and propagate to Axum state.
+- [x] **Read Handler**: Update `get_config` to acquire read lock and fetch variables from shared registry.
+- [x] **Write Handler**: Update `update_config` to acquire write lock, update process environment variables, and ensure registry reflects changes.
+- [x] **Integration Test**: Verify `PUT /api/config` persists changes across subsequent `GET /api/config` calls in the same process.
+
+### Task 14.5.1b: Real Tools Execution Verification
+**Description**: Ensure the `IntegratedKernel` properly loads and exposes the standard toolset, enabling real execution via the Web API.
+**Status**: Pending
+- [ ] **Kernel Verification**: Audit `IntegratedKernel` instantiation to ensure `ScriptExecutor` includes the component registry with default tools.
+- [ ] **API Verification**: Test `GET /api/tools` returns a non-empty list of standard tools (e.g., `echo`, `calculator`).
+- [ ] **Execution Verification**: Test `POST /api/tools/:id/execute` with valid parameters calls the actual tool logic and returns correct output.
+- [ ] **Parameter Validation**: Verify the API correctly maps JSON payloads to `AgentInput` parameters.
+
+### Task 14.5.1c: Expanded Integration Test Suite
+**Description**: Consolidate all real-implementation tests into `api_integration.rs`.
+**Status**: Pending
+- [ ] **Fix Compilation**: Update `api_integration.rs` to construct `AppState` with the new `runtime_config` field.
+- [ ] **Config Persistence Test**: Add automated test case for setting a test env var and retrieving it.
+- [ ] **Tools Lifecycle Test**: Add automated test case for listing and executing a tool.
+- [ ] **Cleanliness**: Ensure tests clean up any environment side effects.
+
 **Quality Gates**:
 - [ ] `./scripts/quality/quality-check-minimal.sh` passes
 - [ ] `./scripts/quality/quality-check-fast.sh` passes

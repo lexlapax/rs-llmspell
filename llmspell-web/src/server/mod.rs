@@ -26,10 +26,17 @@ impl WebServer {
             .install_recorder()
             .expect("failed to install Prometheus recorder");
 
+        // Initialize Shared Runtime Config
+        let runtime_config = llmspell_config::env::EnvRegistry::new();
+        // Ignoring error on load_from_env as it's best-effort
+        let _ = runtime_config.load_from_env();
+        let runtime_config = Arc::new(tokio::sync::RwLock::new(runtime_config));
+
         let state = AppState {
             kernel: Arc::new(Mutex::new(kernel)),
             metrics_recorder: recorder_handle,
             config: config.clone(),
+            runtime_config,
         };
 
         let app = Self::build_app(state);
