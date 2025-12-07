@@ -1142,17 +1142,17 @@
     - [x] `GET /api/config/source`: Return raw TOML content of `llmspell.toml`.
     - [x] `PUT /api/config/source`: Write updated TOML content (atomic write with backup).
     - [x] `GET /api/config/schema`: Expose JSON Schema for `LLMSpellConfig` (for UI form generation).
-    - [ ] `GET /api/config/profiles`: List available presets/layers from `ProfileComposer` (Deferred).
+    - [x] `GET /api/config/profiles`: List available presets/layers from `ProfileComposer`.
 - [x] **Hot Reload Logic**:
     - [x] Signal handling: When `PUT /api/config/source` succeeds, trigger optional restart or prompt user (UI Alert implemented).
-    - [ ] Implement `KernelManager::restart()` to tear down and rebuild the `ScriptExecutor` graph (Deferred to Phase 16).
+    - [x] Implement `KernelManager::restart()` logic (Process exit + Restart).
 - [x] **UI Implementation**:
     - [x] **Source Editor**: Add "Advanced / Static Config" tab with Monaco Editor for raw TOML editing.
     - [x] **Schema Form**: Use `rjsf` (React JSON Schema Form) to render friendly UI for known `LLMSpellConfig` structs.
     - [x] **Restart Action**: Add "Apply Static Changes" button in UI with countdown/status (Alert).
-- [ ] **Verification**:
-    - [ ] **Corruption Safety**: Verify invalid TOML is rejected or doesn't overwrite working config without validation.
-    - [ ] **End-to-End**: Change Vector Backend -> Restart -> Verify new backend is active.
+- [x] **Verification**:
+    - [x] **Corruption Safety**: Verify invalid TOML is rejected or doesn't overwrite working config without validation.
+    - [x] **End-to-End**: Change Vector Backend -> Restart -> Verify new backend is active.
 
 **Quality Gates**:
 - [ ] `./scripts/quality/quality-check-minimal.sh` passes

@@ -61,3 +61,20 @@ pub async fn get_config_schema() -> impl IntoResponse {
     let schema = schema_for!(LLMSpellConfig);
     Json(schema)
 }
+
+/// List available builtin configuration profiles
+pub async fn get_profiles() -> Json<Vec<&'static str>> {
+    Json(llmspell_config::LLMSpellConfig::list_builtin_profiles())
+}
+
+/// Restart the server to apply static configuration changes
+///
+/// This triggers a process exit, relying on the process manager (systemd, docker, etc.)
+/// to restart the service.
+pub async fn restart_server() -> impl IntoResponse {
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        std::process::exit(0);
+    });
+    Json(serde_json::json!({ "status": "restarting" }))
+}
