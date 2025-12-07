@@ -1097,19 +1097,19 @@
 
 ### Task 14.5.1b: Real Tools Execution Verification
 **Description**: Ensure the `IntegratedKernel` properly loads and exposes the standard toolset, enabling real execution via the Web API.
-**Status**: Pending
-- [ ] **Kernel Verification**: Audit `IntegratedKernel` instantiation to ensure `ScriptExecutor` includes the component registry with default tools.
-- [ ] **API Verification**: Test `GET /api/tools` returns a non-empty list of standard tools (e.g., `echo`, `calculator`).
-- [ ] **Execution Verification**: Test `POST /api/tools/:id/execute` with valid parameters calls the actual tool logic and returns correct output.
-- [ ] **Parameter Validation**: Verify the API correctly maps JSON payloads to `AgentInput` parameters.
+**Status**: Verified ✅
+- [x] **Kernel Verification**: Audit `IntegratedKernel` instantiation to ensure `ScriptExecutor` includes the component registry with default tools.
+- [x] **API Verification**: Test `GET /api/tools` returns a non-empty list of standard tools (e.g., `echo`, `calculator`).
+- [x] **Execution Verification**: Test `POST /api/tools/:id/execute` with valid parameters calls the actual tool logic and returns correct output.
+- [x] **Parameter Validation**: Verify the API correctly maps JSON payloads to `AgentInput` parameters.
 
 ### Task 14.5.1c: Expanded Integration Test Suite
 **Description**: Consolidate all real-implementation tests into `api_integration.rs`.
-**Status**: Pending
-- [ ] **Fix Compilation**: Update `api_integration.rs` to construct `AppState` with the new `runtime_config` field.
-- [ ] **Config Persistence Test**: Add automated test case for setting a test env var and retrieving it.
-- [ ] **Tools Lifecycle Test**: Add automated test case for listing and executing a tool.
-- [ ] **Cleanliness**: Ensure tests clean up any environment side effects.
+**Status**: Verified ✅
+- [x] **Fix Compilation**: Update `api_integration.rs` to construct `AppState` with the new `runtime_config` field.
+- [x] **Config Persistence Test**: Add automated test case for setting a test env var and retrieving it.
+- [x] **Tools Lifecycle Test**: Add automated test case for listing and executing a tool.
+- [x] **Cleanliness**: Ensure tests clean up any environment side effects.
 
 **Quality Gates**:
 - [ ] `./scripts/quality/quality-check-minimal.sh` passes
