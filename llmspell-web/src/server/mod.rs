@@ -169,6 +169,14 @@ impl WebServer {
                 "/config/schema",
                 get(handlers::static_config::get_config_schema),
             )
+            .route(
+                "/config/profiles",
+                get(handlers::static_config::get_profiles),
+            )
+            .route(
+                "/config/restart",
+                post(handlers::static_config::restart_server),
+            )
             .layer(axum::middleware::from_fn_with_state(
                 state.clone(),
                 auth_middleware,

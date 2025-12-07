@@ -42,5 +42,3 @@ async fn test_templates_api_list() {
     let templates = body_json.as_array().unwrap();
     println!("Found {} templates", templates.len());
 }
-
-

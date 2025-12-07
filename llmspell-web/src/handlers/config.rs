@@ -74,7 +74,7 @@ pub async fn update_config(
     // Update internal registry overrides so subsequent gets reflect changes immediately
     registry
         .with_overrides(payload.overrides.clone())
-        .map_err(|e| WebError::Internal(e))?;
+        .map_err(WebError::Internal)?;
 
     // Task 14.5.1e: Persist changes to SQLite
     if let Some(storage) = &state.config_store {
