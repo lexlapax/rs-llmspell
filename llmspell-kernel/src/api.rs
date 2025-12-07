@@ -581,7 +581,9 @@ impl KernelHandle {
     }
 
     /// Get the component registry
-    pub fn component_registry(&self) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
+    pub fn component_registry(
+        &self,
+    ) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
         self.kernel.get_component_registry()
     }
 }

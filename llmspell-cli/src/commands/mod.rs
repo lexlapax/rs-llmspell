@@ -63,8 +63,6 @@ pub mod web;
 
 // ...
 
-
-
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
 use crate::execution_context::ExecutionContext;
 use anyhow::Result;
@@ -107,6 +105,7 @@ pub async fn execute_command(
     command: Commands,
     runtime_config: LLMSpellConfig,
     output_format: OutputFormat,
+    config_path: Option<std::path::PathBuf>,
 ) -> Result<()> {
     match command {
         Commands::Run {
@@ -242,7 +241,7 @@ pub async fn execute_command(
         }
 
         Commands::Web { command } => {
-            web::handle_web_command(command, runtime_config).await
+            web::handle_web_command(command, runtime_config, config_path).await
         }
 
         Commands::Version(version_cmd) => version::execute(version_cmd, output_format).await,

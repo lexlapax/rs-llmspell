@@ -1,5 +1,5 @@
 use axum::{
-    extract::{State, Json},
+    extract::{Json, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -35,7 +35,8 @@ pub async fn login(
         let expiration = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_secs() as usize + 3600; // 1 hour expiration
+            .as_secs() as usize
+            + 3600; // 1 hour expiration
 
         let claims = Claims {
             sub: "user".to_owned(),
@@ -43,8 +44,12 @@ pub async fn login(
         };
 
         let secret = state.config.auth_secret.as_bytes();
-        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret))
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let token = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret),
+        )
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         Ok(Json(LoginResponse { token }))
     } else {

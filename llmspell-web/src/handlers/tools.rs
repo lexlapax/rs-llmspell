@@ -1,11 +1,11 @@
+use crate::error::WebError;
+use crate::state::AppState;
 use axum::{
     extract::{Path, State},
     Json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::state::AppState;
-use crate::error::WebError;
 
 #[derive(Serialize)]
 pub struct ToolResponse {
@@ -29,7 +29,7 @@ pub async fn list_tools(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ToolResponse>>, WebError> {
     let kernel = state.kernel.lock().await;
-    
+
     let registry = kernel
         .component_registry()
         .ok_or_else(|| WebError::Internal("Component registry not available".to_string()))?;
@@ -41,7 +41,7 @@ pub async fn list_tools(
         if let Some(tool) = registry.get_tool(&name).await {
             let metadata = tool.metadata();
             let schema = tool.schema().to_json_schema();
-            
+
             tools.push(ToolResponse {
                 name: metadata.name.clone(),
                 description: metadata.description.clone(),
@@ -60,7 +60,7 @@ pub async fn execute_tool(
     Json(payload): Json<ExecuteToolRequest>,
 ) -> Result<Json<ExecuteToolResponse>, WebError> {
     let kernel = state.kernel.lock().await;
-    
+
     let registry = kernel
         .component_registry()
         .ok_or_else(|| WebError::Internal("Component registry not available".to_string()))?;
@@ -72,17 +72,19 @@ pub async fn execute_tool(
 
     // Create execution context
     let context = llmspell_core::ExecutionContext::new();
-    
+
     // Create input with parameters
     // Tool execution typically expects parameters in the input
     // We use a dummy prompt since tools are usually invoked with params
     let mut input = llmspell_core::types::AgentInput::text("tool_execution");
-    
+
     // Add parameters to input
     if let Value::Object(params) = payload.parameters {
         input = input.with_parameter("parameters", Value::Object(params));
     } else {
-        return Err(WebError::BadRequest("Parameters must be a JSON object".to_string()));
+        return Err(WebError::BadRequest(
+            "Parameters must be a JSON object".to_string(),
+        ));
     }
 
     // Execute tool

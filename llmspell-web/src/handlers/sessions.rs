@@ -1,11 +1,11 @@
+use crate::error::WebError;
+use crate::state::AppState;
 use axum::{
     extract::{Path, Query, State},
     Json,
 };
 use llmspell_kernel::sessions::types::{SessionQuery, SessionSortBy, SessionStatus};
 use serde::{Deserialize, Serialize};
-use crate::state::AppState;
-use crate::error::WebError;
 
 #[derive(Deserialize)]
 pub struct ListSessionsParams {
@@ -79,7 +79,7 @@ pub async fn get_session(
     // but looking at manager.rs (which I saw earlier via cat), it takes &SessionId.
     // I need to parse it.
     // Wait, SessionId implements FromStr.
-    
+
     // Actually, let's check if I can use SessionId directly.
     // I'll try to parse it.
     use std::str::FromStr;

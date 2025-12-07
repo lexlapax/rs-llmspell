@@ -43,7 +43,7 @@ fn main() -> Result<()> {
         let runtime_config = load_runtime_config(config_path.as_deref(), profile).await?;
 
         // Execute the command with new architecture
-        execute_command(cli.command, runtime_config, cli.output).await
+        execute_command(cli.command, runtime_config, cli.output, config_path).await
     })
 }
 
@@ -73,7 +73,12 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
                     pid_file,
                     ..
                 },
-        } => (*port, Some("web".to_string()), log_file.clone(), pid_file.clone()),
+        } => (
+            *port,
+            Some("web".to_string()),
+            log_file.clone(),
+            pid_file.clone(),
+        ),
 
         _ => unreachable!("Already checked this is a daemon start command"),
     };
@@ -153,7 +158,7 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
         let runtime_config = load_runtime_config(config_path.as_deref(), profile).await?;
 
         // Execute the command (now in daemon mode with fresh runtime)
-        execute_command(cli.command, runtime_config, cli.output).await
+        execute_command(cli.command, runtime_config, cli.output, config_path).await
     })
 }
 

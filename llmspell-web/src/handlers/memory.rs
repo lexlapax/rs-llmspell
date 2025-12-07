@@ -1,10 +1,10 @@
+use crate::error::WebError;
+use crate::state::AppState;
 use axum::{
     extract::{Query, State},
     Json,
 };
 use serde::{Deserialize, Serialize};
-use crate::state::AppState;
-use crate::error::WebError;
 
 #[derive(Deserialize)]
 pub struct SearchMemoryParams {
@@ -26,7 +26,7 @@ pub async fn search_memory(
     Query(params): Query<SearchMemoryParams>,
 ) -> Result<Json<Vec<MemoryEntryResponse>>, WebError> {
     let kernel = state.kernel.lock().await;
-    
+
     let memory_manager = kernel
         .memory_manager()
         .ok_or_else(|| WebError::Internal("Memory manager not available".to_string()))?;

@@ -3,6 +3,7 @@
 
 use anyhow::{Context, Result};
 use llmspell_core::error::LLMSpellError;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::env as std_env;
 use std::path::{Path, PathBuf};
@@ -64,7 +65,7 @@ pub struct ProfileMetadata {
 }
 
 /// Central LLMSpell configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct LLMSpellConfig {
     /// Default script engine to use
@@ -1111,7 +1112,7 @@ impl LLMSpellConfig {
     /// # Errors
     ///
     /// Returns `ConfigError::NotFound` if the profile name is not recognized.
-    fn load_builtin_profile(name: &str) -> Result<Self, ConfigError> {
+    pub fn load_builtin_profile(name: &str) -> Result<Self, ConfigError> {
         use crate::profile_composer::ProfileComposer;
         use crate::profile_resolver::resolve_profile_spec;
 
@@ -1311,7 +1312,7 @@ impl Default for LLMSpellConfigBuilder {
 }
 
 /// Global runtime configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct GlobalRuntimeConfig {
     /// Maximum concurrent scripts
@@ -1430,7 +1431,7 @@ impl Default for GlobalRuntimeConfigBuilder {
 }
 
 /// Security configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct SecurityConfig {
     /// Allow file system access
@@ -1458,7 +1459,7 @@ impl Default for SecurityConfig {
 }
 
 /// State persistence configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct StatePersistenceConfig {
     /// Enable state persistence (flattened from flags.core.enabled)
@@ -1480,7 +1481,7 @@ pub struct StatePersistenceConfig {
 }
 
 /// Backup configuration for state persistence
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct BackupConfig {
     /// Directory for backup storage
     pub backup_dir: Option<String>,
@@ -1528,7 +1529,7 @@ impl Default for BackupConfig {
 }
 
 /// Hook system configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct HookConfig {
     /// Enable hook system
@@ -1553,7 +1554,7 @@ impl Default for HookConfig {
 }
 
 /// Session management configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct SessionConfig {
     /// Enable session management
@@ -1584,7 +1585,7 @@ impl Default for SessionConfig {
 }
 
 /// Event system configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct EventsConfig {
     /// Enable event system globally
@@ -1621,7 +1622,7 @@ impl Default for EventsConfig {
 }
 
 /// Event filtering configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct EventFilterConfig {
     /// Event types to include (glob patterns)
@@ -1646,7 +1647,7 @@ impl Default for EventFilterConfig {
 }
 
 /// Event export configuration
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, JsonSchema)]
 #[serde(default)]
 pub struct EventExportConfig {
     /// Export events to stdout (for debugging)

@@ -2,12 +2,13 @@
 //!
 //! Provides configuration structures and parsing for the debug system.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Debug configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct DebugConfig {
     /// Whether debugging is enabled
@@ -43,7 +44,7 @@ impl Default for DebugConfig {
 }
 
 /// Debug output configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct DebugOutputConfig {
     /// Enable stdout output
@@ -75,7 +76,7 @@ impl Default for DebugOutputConfig {
 }
 
 /// File output configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FileOutputConfig {
     /// Path to debug log file
     pub path: PathBuf,
@@ -91,7 +92,7 @@ pub struct FileOutputConfig {
 }
 
 /// Buffer configuration for debug capture
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BufferConfig {
     /// Whether to enable buffer capture
     pub enabled: bool,
@@ -110,7 +111,7 @@ impl Default for BufferConfig {
 }
 
 /// Module filter configuration
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct ModuleFilterConfig {
     /// Modules to enable (wildcards supported)
@@ -124,7 +125,7 @@ pub struct ModuleFilterConfig {
 }
 
 /// Performance profiling configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PerformanceConfig {
     /// Enable performance tracking
     pub enabled: bool,
@@ -151,7 +152,7 @@ impl Default for PerformanceConfig {
 }
 
 /// Stack trace configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct StackTraceConfig {
     /// Enable stack trace capture
     pub enabled: bool,

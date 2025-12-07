@@ -1,11 +1,12 @@
 //! ABOUTME: RAG (Retrieval-Augmented Generation) configuration
 //! ABOUTME: Handles vector storage, embedding, and chunking configuration
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Comprehensive RAG configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct RAGConfig {
     /// Enable RAG functionality
@@ -25,7 +26,7 @@ pub struct RAGConfig {
 }
 
 /// Vector storage backend configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct VectorStorageConfig {
     /// Vector dimensions (384, 768, 1536, etc.)
@@ -53,7 +54,7 @@ impl Default for VectorStorageConfig {
 }
 
 /// Vector storage backend types
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum VectorBackend {
     /// HNSW (Hierarchical Navigable Small World) index
@@ -61,7 +62,7 @@ pub enum VectorBackend {
 }
 
 /// HNSW index configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct HNSWConfig {
     /// Number of bi-directional links for each node (typical: 16)
@@ -229,7 +230,7 @@ impl HNSWConfig {
 }
 
 /// Distance metrics for vector similarity
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum DistanceMetric {
     /// Cosine similarity (most common for embeddings)
@@ -241,7 +242,7 @@ pub enum DistanceMetric {
 }
 
 /// Embedding provider configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct EmbeddingConfig {
     /// Default provider to use (openai, local, etc.)
@@ -275,7 +276,7 @@ impl Default for EmbeddingConfig {
 }
 
 /// Document chunking configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct ChunkingConfig {
     /// Default chunking strategy
@@ -303,7 +304,7 @@ impl Default for ChunkingConfig {
 }
 
 /// Document chunking strategies
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChunkingStrategy {
     /// Simple sliding window approach
@@ -315,7 +316,7 @@ pub enum ChunkingStrategy {
 }
 
 /// RAG caching configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct RAGCacheConfig {
     /// Enable search result caching

@@ -633,7 +633,6 @@ EXAMPLES:
         #[command(subcommand)]
         command: WebCommands,
     },
-
 }
 
 /// Application management subcommands

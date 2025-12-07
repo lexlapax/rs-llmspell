@@ -34,10 +34,13 @@ async fn main() -> Result<()> {
         api_keys: vec!["dev-key-123".to_string()],
     };
 
-    println!("Starting dev server on http://{}:{}", web_config.host, web_config.port);
+    println!(
+        "Starting dev server on http://{}:{}",
+        web_config.host, web_config.port
+    );
 
     // 5. Run Server
-    WebServer::run(web_config, kernel_handle).await?;
+    WebServer::run(web_config, kernel_handle, None).await?;
 
     Ok(())
 }

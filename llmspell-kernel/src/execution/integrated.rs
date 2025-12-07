@@ -602,7 +602,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     }
 
     /// Get the component registry
-    pub fn get_component_registry(&self) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
+    pub fn get_component_registry(
+        &self,
+    ) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
         self.script_executor.component_registry()
     }
 

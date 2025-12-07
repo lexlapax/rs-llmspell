@@ -9,11 +9,11 @@ fn main() {
         if let Err(e) = fs::create_dir_all(dist_dir) {
             println!("cargo:warning=Failed to create frontend/dist: {}", e);
         } else {
-             // Create a dummy index.html so the fallback doesn't crash runtime if accessed
-             let index_path = dist_dir.join("index.html");
-             if !index_path.exists() {
-                 let _ = fs::write(index_path, "<html><body>Frontend not built. Run 'npm run build' in llmspell-web/frontend</body></html>");
-             }
+            // Create a dummy index.html so the fallback doesn't crash runtime if accessed
+            let index_path = dist_dir.join("index.html");
+            if !index_path.exists() {
+                let _ = fs::write(index_path, "<html><body>Frontend not built. Run 'npm run build' in llmspell-web/frontend</body></html>");
+            }
         }
     }
 

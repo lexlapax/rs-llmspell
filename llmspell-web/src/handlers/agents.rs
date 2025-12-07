@@ -1,10 +1,10 @@
+use crate::error::WebError;
+use crate::state::AppState;
 use axum::{
     extract::{Path, State},
     Json,
 };
 use serde::{Deserialize, Serialize};
-use crate::state::AppState;
-use crate::error::WebError;
 
 #[derive(Serialize)]
 pub struct AgentResponse {
@@ -26,7 +26,7 @@ pub async fn list_agents(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AgentResponse>>, WebError> {
     let kernel = state.kernel.lock().await;
-    
+
     let registry = kernel
         .component_registry()
         .ok_or_else(|| WebError::Internal("Component registry not available".to_string()))?;
@@ -47,7 +47,7 @@ pub async fn execute_agent(
     Json(payload): Json<ExecuteAgentRequest>,
 ) -> Result<Json<ExecuteAgentResponse>, WebError> {
     let kernel = state.kernel.lock().await;
-    
+
     let registry = kernel
         .component_registry()
         .ok_or_else(|| WebError::Internal("Component registry not available".to_string()))?;
@@ -63,10 +63,10 @@ pub async fn execute_agent(
     // I'll check Agent trait next, but for now assuming standard interface.
     // Wait, I should check Agent trait first to be sure.
     // But I'll write this and fix if needed.
-    
+
     // Create execution context
     let context = llmspell_core::ExecutionContext::new();
-    
+
     // Create input
     let input = llmspell_core::types::AgentInput::text(payload.input);
 

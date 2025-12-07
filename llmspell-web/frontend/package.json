@@ -12,6 +12,9 @@
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "@monaco-editor/react": "^4.7.0",
+    "@rjsf/core": "^6.1.2",
+    "@rjsf/utils": "^6.1.2",
+    "@rjsf/validator-ajv8": "^6.1.2",
     "ansi-to-html": "^0.7.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.555.0",
@@ -19,6 +22,7 @@
     "react-dom": "^19.2.0",
     "react-force-graph-2d": "^1.29.0",
     "react-router-dom": "^7.10.1",
+    "smol-toml": "^1.5.2",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

@@ -20,6 +20,11 @@ export interface UpdateConfigResponse {
     overrides: Record<string, string>;
 }
 
+export interface ConfigSource {
+    format: 'toml';
+    content: string;
+}
+
 export type ConnectionState = 'CONNECTING' | 'OPEN' | 'CLOSED' | 'ERROR';
 
 export interface UseWebSocketReturn {

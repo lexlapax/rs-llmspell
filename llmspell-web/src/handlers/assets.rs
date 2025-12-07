@@ -29,7 +29,7 @@ pub async fn static_handler(uri: Uri) -> impl IntoResponse {
 
     // SPA fallback: serve index.html for unknown routes (excluding API)
     if let Some(index) = Assets::get("index.html") {
-         return Response::builder()
+        return Response::builder()
             .header(header::CONTENT_TYPE, "text/html")
             .body(Body::from(index.data))
             .unwrap()

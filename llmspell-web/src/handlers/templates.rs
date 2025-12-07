@@ -16,7 +16,7 @@ use crate::state::AppState;
 pub async fn list_templates() -> Result<Json<Vec<TemplateMetadata>>, WebError> {
     let registry = global_registry();
     let templates = registry.list_metadata();
-    
+
     // Sort by name for better UX
     let mut templates = templates;
     templates.sort_by(|a, b| a.name.cmp(&b.name));
@@ -33,17 +33,13 @@ pub struct TemplateDetails {
 /// Get details for a specific template
 pub async fn get_template(Path(id): Path<String>) -> Result<Json<TemplateDetails>, WebError> {
     let registry = global_registry();
-    
+
     match registry.get(&id) {
-        Ok(template) => {
-            Ok(Json(TemplateDetails {
-                metadata: template.metadata().clone(),
-                schema: template.config_schema(),
-            }))
-        },
-        Err(_) => {
-            Err(WebError::NotFound(format!("Template '{}' not found", id)))
-        }
+        Ok(template) => Ok(Json(TemplateDetails {
+            metadata: template.metadata().clone(),
+            schema: template.config_schema(),
+        })),
+        Err(_) => Err(WebError::NotFound(format!("Template '{}' not found", id))),
     }
 }
 
@@ -70,7 +66,7 @@ pub async fn launch_template(
     Json(payload): Json<LaunchTemplateRequest>,
 ) -> Result<Json<LaunchResponse>, WebError> {
     let registry = global_registry();
-    
+
     let template = match registry.get(&id) {
         Ok(t) => t,
         Err(_) => return Err(WebError::NotFound(format!("Template '{}' not found", id))),
@@ -80,16 +76,16 @@ pub async fn launch_template(
 
     // Validate parameters
     if let Err(e) = template.validate(&params) {
-         return Err(WebError::BadRequest(format!("Invalid parameters: {}", e)));
+        return Err(WebError::BadRequest(format!("Invalid parameters: {}", e)));
     }
 
     // Create a real session using the Kernel's SessionManager
     let kernel = state.kernel.lock().await;
 
     // Build session options based on template
-    let session_name = payload.session_id.unwrap_or_else(|| {
-        format!("template-{}", id)
-    });
+    let session_name = payload
+        .session_id
+        .unwrap_or_else(|| format!("template-{}", id));
 
     let options_builder = llmspell_kernel::sessions::CreateSessionOptionsBuilder::default()
         .name(session_name)
@@ -100,7 +96,9 @@ pub async fn launch_template(
     let options = options_builder.build();
 
     let session_manager = kernel.session_manager();
-    let session_id = session_manager.create_session(options).await
+    let session_id = session_manager
+        .create_session(options)
+        .await
         .map_err(|e| WebError::Internal(format!("Failed to create session: {}", e)))?;
 
     tracing::info!("Launched template '{}' as session {}", id, session_id);

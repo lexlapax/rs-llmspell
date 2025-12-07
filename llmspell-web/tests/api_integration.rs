@@ -7,9 +7,9 @@ use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
 use llmspell_kernel::api::start_embedded_kernel_with_executor;
 use llmspell_web::{config::WebConfig, server::WebServer, state::AppState};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use std::sync::Arc;
 use tower::ServiceExt; // for oneshot
-use metrics_exporter_prometheus::PrometheusBuilder;
 
 // Helper to setup a real kernel environment
 async fn setup_env() -> (AppState, tempfile::TempDir) {
@@ -25,34 +25,34 @@ async fn setup_env() -> (AppState, tempfile::TempDir) {
     // We modify the default config to use our temp storage
     // using a builder or manual modification if fields are public
     // LLMSpellConfig fields are public mostly.
-    
+
     // We need to load defaults then override
     // LLMSpellConfig::default() might look for config files, so we should be careful.
     // Ideally we constructs a clean config.
     // Let's rely on default() but override storage paths.
-    
+
     // NOTE: We're not using load_runtime_config to avoid reading user's config file
     // unless we explicitely want to test user's config (which we don't for isolation).
-    
+
     // Actually LLMSpellConfig::default() is just the struct defaults.
     // We should make sure we point everything to temp_dir.
-    
-    // We don't have easy mutable access to all config paths in one go, 
+
+    // We don't have easy mutable access to all config paths in one go,
     // but the critical one is where SessionManager stores data.
     // SessionManager uses `storage.base_path`.
-    
+
     // Wait, LLMSpellConfig is a bit complex. Let's look at what helps us.
     // We will trust default() provides reasonable starting point and just verify storage.
-    
+
     // It seems LLMSpellConfig doesn't expose all paths easily mutably?
     // Let's assume default is specific enough or we can set it.
     // However, `start_embedded_kernel_with_executor` takes `LLMSpellConfig`.
-    
+
     // Let's try to construct a minimal valid config.
     let config = LLMSpellConfig::default();
-    
+
     // We also need to set script_engine config if we want to run scripts.
-    
+
     let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
@@ -70,7 +70,7 @@ async fn setup_env() -> (AppState, tempfile::TempDir) {
 
     // Init runtime config
     let runtime_config = llmspell_config::env::EnvRegistry::new();
-    
+
     // Register a test variable so it appears in list_vars()
     // We need this for the config update test
     let def = llmspell_config::env::EnvVarDefBuilder::new("TEST_RUNTIME_VAR")
@@ -78,10 +78,12 @@ async fn setup_env() -> (AppState, tempfile::TempDir) {
         .category(llmspell_config::env::EnvCategory::Runtime)
         .default("default_value")
         .build();
-    runtime_config.register_var(def).expect("Failed to register test var");
-    
+    runtime_config
+        .register_var(def)
+        .expect("Failed to register test var");
+
     let runtime_config = Arc::new(tokio::sync::RwLock::new(runtime_config));
-    
+
     let web_config = WebConfig::default();
 
     let state = AppState {
@@ -89,6 +91,8 @@ async fn setup_env() -> (AppState, tempfile::TempDir) {
         metrics_recorder: recorder_handle,
         config: web_config,
         runtime_config,
+        static_config_path: None,
+        config_store: None,
     };
 
     (state, temp_dir)
@@ -102,24 +106,28 @@ async fn test_full_integration_flow() {
     let api_key = "dev-key-123";
 
     // 1. List Templates
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/api/templates")
                 .header("X-API-Key", api_key)
                 .body(Body::empty())
-                .unwrap()
+                .unwrap(),
         )
         .await
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let templates: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    
+
     // We expect some templates to be registered
-    assert!(!templates.is_empty(), "Should have templates loaded from default registry");
+    assert!(
+        !templates.is_empty(),
+        "Should have templates loaded from default registry"
+    );
     let template_id = templates[0]["id"].as_str().unwrap().to_string();
     println!("Found template: {}", template_id);
 
@@ -131,7 +139,8 @@ async fn test_full_integration_flow() {
         // session_id is optional
     });
 
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
@@ -139,28 +148,31 @@ async fn test_full_integration_flow() {
                 .header("Content-Type", "application/json")
                 .header("X-API-Key", api_key)
                 .body(Body::from(serde_json::to_vec(&launch_payload).unwrap()))
-                .unwrap()
+                .unwrap(),
         )
         .await
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    
+
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let launch_res: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    let session_id = launch_res["session_id"].as_str().expect("Response should contain session_id");
+    let session_id = launch_res["session_id"]
+        .as_str()
+        .expect("Response should contain session_id");
     println!("Created session: {}", session_id);
-    
+
     assert_eq!(launch_res["status"], "created");
 
     // 3. Verify Session Exists
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri(format!("/api/sessions/{}", session_id))
                 .header("X-API-Key", api_key)
                 .body(Body::empty())
-                .unwrap()
+                .unwrap(),
         )
         .await
         .unwrap();
@@ -168,7 +180,7 @@ async fn test_full_integration_flow() {
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let session_details: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     // Session handler returns SessionResponse (flat structure)
     assert_eq!(session_details["id"], session_id);
     println!("Verified session exists: {}", session_id);
@@ -180,49 +192,56 @@ async fn test_full_integration_flow() {
         }
     });
 
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("PUT")
                 .uri("/api/config")
                 .header("Content-Type", "application/json")
                 .header("X-API-Key", api_key)
-                .body(Body::from(serde_json::to_vec(&config_update_payload).unwrap()))
-                .unwrap()
+                .body(Body::from(
+                    serde_json::to_vec(&config_update_payload).unwrap(),
+                ))
+                .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
     // Verify update persisted in state
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/api/config")
                 .header("X-API-Key", api_key)
                 .body(Body::empty())
-                .unwrap()
+                .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let config_items: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    
+
     // Find our var
-    let found_item = config_items.iter().find(|i| i["name"] == "TEST_RUNTIME_VAR");
+    let found_item = config_items
+        .iter()
+        .find(|i| i["name"] == "TEST_RUNTIME_VAR");
     assert!(found_item.is_some(), "Should find updated config variable");
     assert_eq!(found_item.unwrap()["value"], "updated_value");
     println!("Verified real config update");
 
     // 5. Test Tools Listing (Real Tools)
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/api/tools")
                 .header("X-API-Key", api_key)
                 .body(Body::empty())
-                .unwrap()
+                .unwrap(),
         )
         .await
         .unwrap();
@@ -230,11 +249,11 @@ async fn test_full_integration_flow() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let tools: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
     println!("Found {} tools", tools.len());
-    
+
     // 6. Test Tool Execution (Calculator)
     // Find calculator tool
     let calculator = tools.iter().find(|t| t["name"] == "calculator");
-    
+
     if let Some(_calc) = calculator {
         println!("Testing calculator execution...");
         let exec_payload = serde_json::json!({
@@ -244,7 +263,8 @@ async fn test_full_integration_flow() {
             }
         });
 
-        let response = app.clone()
+        let response = app
+            .clone()
             .oneshot(
                 Request::builder()
                     .method("POST")
@@ -252,7 +272,7 @@ async fn test_full_integration_flow() {
                     .header("Content-Type", "application/json")
                     .header("X-API-Key", api_key)
                     .body(Body::from(serde_json::to_vec(&exec_payload).unwrap()))
-                    .unwrap()
+                    .unwrap(),
             )
             .await
             .unwrap();
@@ -260,16 +280,23 @@ async fn test_full_integration_flow() {
         assert_eq!(response.status(), StatusCode::OK);
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let exec_res: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        
+
         let output_text = exec_res["output"].as_str().unwrap();
         println!("Calculator output: {}", output_text);
-        
+
         // Output text is JSON string
-        let output_json: serde_json::Value = serde_json::from_str(output_text).expect("Tool output should be JSON");
+        let output_json: serde_json::Value =
+            serde_json::from_str(output_text).expect("Tool output should be JSON");
         assert_eq!(output_json["result"]["result"].as_f64(), Some(42.0));
         println!("Verified calculator result: 42");
     } else {
-        println!("WARNING: Calculator tool not found - skipping execution test. Found: {:?}", tools.iter().map(|t| t["name"].as_str().unwrap_or("?")).collect::<Vec<_>>());
+        println!(
+            "WARNING: Calculator tool not found - skipping execution test. Found: {:?}",
+            tools
+                .iter()
+                .map(|t| t["name"].as_str().unwrap_or("?"))
+                .collect::<Vec<_>>()
+        );
         // We should assert we found it if we expect it strictly, but for now warning is safer until we confirm availability across environments
         // Actually, integration tests should be strict.
         // assert!(calculator.is_some(), "Calculator tool must be available in default registry");

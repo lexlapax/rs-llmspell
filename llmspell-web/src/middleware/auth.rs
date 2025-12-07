@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    extract::{State, Request},
+    extract::{Request, State},
     http::{HeaderMap, StatusCode},
     middleware::Next,
     response::Response,
@@ -36,7 +36,7 @@ pub async fn auth_middleware(
         if let Ok(auth_str) = auth_header.to_str() {
             if let Some(token) = auth_str.strip_prefix("Bearer ") {
                 let secret = state.config.auth_secret.as_bytes();
-                
+
                 // Validate token
                 let validation = Validation::default();
                 let decoding_key = DecodingKey::from_secret(secret);
@@ -47,7 +47,6 @@ pub async fn auth_middleware(
             }
         }
     }
-
 
     // 3. Fallback: Unauthorized
     Err(StatusCode::UNAUTHORIZED)
