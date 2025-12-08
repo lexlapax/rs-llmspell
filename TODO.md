@@ -1321,7 +1321,32 @@ The "bunch of numbers" observed in stdout is specifically caused by `rig-core`'s
     2.  **Release Build**: `cargo run --release` (Often removes `dbg!` calls if guarded).
     3.  **Upstream Fix**: Submit PR to `rig-core` to replace `dbg!` with `tracing::debug!`.
 
-### Task 14.5.3: Documentation & Polish
+### Task 14.5.3: OpenAPI Generation
+**Priority**: MEDIUM
+**Estimated Time**: 4 hours
+**Assignee**: Backend Developer
+
+**Description**: Integrate utoipa for automatic OpenAPI spec generation.
+
+**Acceptance Criteria**:
+- [ ] OpenAPI JSON endpoint
+- [ ] Swagger UI (optional)
+- [ ] Functional tests pass
+- [ ] Zero clippy warnings
+
+**Files to Create/Modify**:
+- `llmspell-web/src/api_docs.rs` (NEW)
+
+**Implementation Steps**:
+1.  Add `utoipa` dependency.
+2.  Annotate handlers.
+3.  Serve spec at `/api/openapi.json`.
+
+**Definition of Done**:
+- [ ] Valid OpenAPI spec generated
+
+
+### Task 14.5.4: Documentation & Polish
 **Priority**: HIGH
 **Estimated Time**: 8 hours
 **Assignee**: Tech Writer
@@ -1346,26 +1371,3 @@ The "bunch of numbers" observed in stdout is specifically caused by `rig-core`'s
 - [ ] Functional tests pass
 - [ ] Zero clippy warnings
 
-### Task 14.5.4: OpenAPI Generation
-**Priority**: MEDIUM
-**Estimated Time**: 4 hours
-**Assignee**: Backend Developer
-
-**Description**: Integrate utoipa for automatic OpenAPI spec generation.
-
-**Acceptance Criteria**:
-- [ ] OpenAPI JSON endpoint
-- [ ] Swagger UI (optional)
-- [ ] Functional tests pass
-- [ ] Zero clippy warnings
-
-**Files to Create/Modify**:
-- `llmspell-web/src/api_docs.rs` (NEW)
-
-**Implementation Steps**:
-1.  Add `utoipa` dependency.
-2.  Annotate handlers.
-3.  Serve spec at `/api/openapi.json`.
-
-**Definition of Done**:
-- [ ] Valid OpenAPI spec generated

@@ -35,6 +35,8 @@ jsonwebtoken = "9.2"
 llmspell-storage = { path = "../llmspell-storage" }
 schemars = "0.8"
 toml = "0.8"
+utoipa = { version = "4.2", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
 
 
 [dev-dependencies]

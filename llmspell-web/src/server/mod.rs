@@ -17,6 +17,7 @@ pub struct WebServer;
 
 use crate::middleware::metrics::track_metrics;
 use metrics_exporter_prometheus::PrometheusBuilder;
+use utoipa::OpenApi;
 
 impl WebServer {
     pub async fn run(
@@ -141,6 +142,7 @@ impl WebServer {
         use crate::middleware::auth::auth_middleware;
 
         let api_routes = Router::new()
+            .route("/openapi.json", get(serve_openapi))
             .route("/scripts/execute", post(handlers::scripts::execute_script))
             .route("/sessions", get(handlers::sessions::list_sessions))
             .route("/sessions/:id", get(handlers::sessions::get_session))
@@ -192,8 +194,14 @@ impl WebServer {
             .nest("/api", api_routes)
             .layer(axum::middleware::from_fn(track_metrics))
             .with_state(state)
+            // OpenAPI
+            .merge(utoipa_swagger_ui::SwaggerUi::new("/swagger-ui").url("/api/openapi.json", crate::api_docs::ApiDoc::openapi()))
             .fallback(handlers::assets::static_handler)
     }
+}
+
+async fn serve_openapi() -> impl axum::response::IntoResponse {
+    axum::Json(crate::api_docs::ApiDoc::openapi())
 }
 
 async fn shutdown_signal() {

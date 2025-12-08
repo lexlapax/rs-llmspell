@@ -5,6 +5,14 @@ use serde_json::{json, Value};
 use tracing::{debug, instrument};
 
 /// List available providers and their capabilities
+#[utoipa::path(
+    get,
+    path = "/api/providers",
+    tag = "providers",
+    responses(
+        (status = 200, description = "List of configured providers and their status")
+    )
+)]
 #[instrument(skip(state))]
 pub async fn list_providers(State(state): State<AppState>) -> Result<Json<Value>, WebError> {
     debug!("Handling list_providers request");

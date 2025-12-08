@@ -71,6 +71,14 @@ pub async fn get_profiles() -> Json<Vec<&'static str>> {
 ///
 /// This triggers a process exit, relying on the process manager (systemd, docker, etc.)
 /// to restart the service.
+#[utoipa::path(
+    post,
+    path = "/api/config/restart",
+    tag = "config",
+    responses(
+        (status = 200, description = "Server restarting")
+    )
+)]
 pub async fn restart_server() -> impl IntoResponse {
     tokio::spawn(async {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
