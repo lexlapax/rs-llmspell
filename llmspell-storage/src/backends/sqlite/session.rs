@@ -105,7 +105,6 @@ impl SessionStorage for SqliteSessionStorage {
             data.artifact_count as i64,
             now
         ])
-        .await
         .map_err(|e| SqliteError::Query(format!("Failed to execute create_session: {}", e)))?;
 
         Ok(())
@@ -117,14 +116,13 @@ impl SessionStorage for SqliteSessionStorage {
         let now = Utc::now().timestamp();
 
         // Update last_accessed_at (throttled to 1 minute in application logic)
-        let stmt_update = conn
+        let mut stmt_update = conn
             .prepare(
                 "UPDATE sessions
                  SET last_accessed_at = ?1
                  WHERE tenant_id = ?2 AND session_id = ?3
                    AND (last_accessed_at IS NULL OR last_accessed_at < ?4)",
             )
-            .await
             .map_err(|e| {
                 SqliteError::Query(format!("Failed to prepare update last_accessed: {}", e))
             })?;
@@ -132,32 +130,29 @@ impl SessionStorage for SqliteSessionStorage {
         // Update if last access was >60 seconds ago
         let throttle_threshold = now - 60;
         stmt_update
-            .execute(libsql::params![
+            .execute(params![
                 now,
                 tenant_id,
                 session_id,
                 throttle_threshold
             ])
-            .await
             .ok(); // Ignore errors - update is best-effort
 
         // Retrieve session
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT session_data, status, created_at, expires_at, artifact_count
                  FROM sessions
                  WHERE tenant_id = ?1 AND session_id = ?2",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare get_session: {}", e)))?;
 
         let mut rows = stmt
-            .query(libsql::params![tenant_id, session_id])
-            .await
+            .query(params![tenant_id, session_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute get_session: {}", e)))?;
 
-        match rows.next().await {
-            Ok(Some(row)) => {
+        match rows.next().map_err(|e| SqliteError::Query(format!("Failed to fetch session row: {}", e)))? {
+            Some(row) => {
                 let session_data_json: String = row
                     .get(0)
                     .map_err(|e| anyhow!("Failed to get session_data: {}", e))?;
@@ -201,8 +196,7 @@ impl SessionStorage for SqliteSessionStorage {
                     artifact_count: artifact_count as usize,
                 }))
             }
-            Ok(None) => Ok(None),
-            Err(e) => Err(anyhow!("Failed to fetch session row: {}", e)),
+            None => Ok(None),
         }
     }
 
@@ -223,17 +217,16 @@ impl SessionStorage for SqliteSessionStorage {
         let expires_at = data.expires_at.map(|dt| dt.timestamp());
         let now = Utc::now().timestamp();
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "UPDATE sessions
                  SET session_data = ?1, status = ?2, expires_at = ?3, artifact_count = ?4, updated_at = ?5
                  WHERE tenant_id = ?6 AND session_id = ?7",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare update_session: {}", e)))?;
 
         let rows_affected = stmt
-            .execute(libsql::params![
+            .execute(params![
                 session_data_json,
                 status,
                 expires_at,
@@ -242,7 +235,6 @@ impl SessionStorage for SqliteSessionStorage {
                 tenant_id,
                 session_id
             ])
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to execute update_session: {}", e)))?;
 
         if rows_affected == 0 {
@@ -256,13 +248,11 @@ impl SessionStorage for SqliteSessionStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("DELETE FROM sessions WHERE tenant_id = ?1 AND session_id = ?2")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare delete_session: {}", e)))?;
 
-        stmt.execute(libsql::params![tenant_id, session_id])
-            .await
+        stmt.execute(params![tenant_id, session_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute delete_session: {}", e)))?;
 
         Ok(())
@@ -272,25 +262,23 @@ impl SessionStorage for SqliteSessionStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT session_id FROM sessions
                  WHERE tenant_id = ?1 AND status = 'active'
                  ORDER BY created_at DESC",
             )
-            .await
             .map_err(|e| {
                 SqliteError::Query(format!("Failed to prepare list_active_sessions: {}", e))
             })?;
 
-        let mut rows = stmt.query(libsql::params![tenant_id]).await.map_err(|e| {
+        let mut rows = stmt.query(params![tenant_id]).map_err(|e| {
             SqliteError::Query(format!("Failed to execute list_active_sessions: {}", e))
         })?;
 
         let mut session_ids = Vec::new();
         while let Some(row) = rows
             .next()
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to fetch session row: {}", e)))?
         {
             let session_id: String = row
@@ -307,19 +295,17 @@ impl SessionStorage for SqliteSessionStorage {
         let conn = self.backend.get_connection().await?;
         let now = Utc::now().timestamp();
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "DELETE FROM sessions
                  WHERE tenant_id = ?1
                    AND expires_at IS NOT NULL
                    AND expires_at < ?2",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare cleanup_expired: {}", e)))?;
 
         let rows_affected = stmt
-            .execute(libsql::params![tenant_id, now])
-            .await
+            .execute(params![tenant_id, now])
             .map_err(|e| SqliteError::Query(format!("Failed to execute cleanup_expired: {}", e)))?;
 
         Ok(rows_affected)
@@ -349,10 +335,8 @@ mod tests {
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V1__initial_setup.sql"
         ))
-        .await
         .unwrap();
         conn.execute_batch(include_str!("../../../migrations/sqlite/V9__sessions.sql"))
-            .await
             .unwrap();
 
         let tenant_id = format!("test_tenant_{}", uuid::Uuid::new_v4());

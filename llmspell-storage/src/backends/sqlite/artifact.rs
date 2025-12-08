@@ -1,4 +1,5 @@
-//! SQLite artifact storage implementation
+// ABOUTME: SQLite artifact storage implementation
+//! ABOUTME: SQLite artifact storage with deduplication and rusqlite
 //!
 //! Content-addressed artifact storage with deduplication using 2-table structure:
 //! - artifact_content: Content storage with reference counting
@@ -14,44 +15,10 @@ use std::sync::Arc;
 
 /// SQLite artifact storage implementation
 ///
-/// Implements ArtifactStorage trait using libsql with content-addressed deduplication.
+/// Implements ArtifactStorage trait using rusqlite with content-addressed deduplication.
 /// Uses 2-table structure:
 /// - artifact_content: Content storage (BLOB) with blake3 hash + reference counting
 /// - artifacts: Metadata with foreign key to content
-///
-/// # Architecture
-///
-/// - **Content Addressing**: blake3 hash (64 hex chars) uniquely identifies content
-/// - **Deduplication**: Reference counting managed in application code (no triggers)
-/// - **Tenant Isolation**: Application-level filtering via tenant_id
-/// - **BLOB Storage**: SQLite handles all sizes efficiently
-///
-/// # Examples
-///
-/// ```no_run
-/// use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig};
-/// use llmspell_storage::backends::sqlite::SqliteArtifactStorage;
-/// use llmspell_core::traits::storage::ArtifactStorage;
-/// use llmspell_core::types::storage::{Artifact, ArtifactType};
-/// use std::sync::Arc;
-///
-/// # async fn example() -> anyhow::Result<()> {
-/// let config = SqliteConfig::new("./test.db");
-/// let backend = Arc::new(SqliteBackend::new(config).await?);
-/// backend.set_tenant_context("tenant-1").await?;
-/// let storage = SqliteArtifactStorage::new(backend.clone(), "tenant-1".to_string());
-///
-/// // Store artifact (automatic deduplication)
-/// let artifact = Artifact::new(
-///     "hash123".to_string(),
-///     "session-1".to_string(),
-///     ArtifactType::Code,
-///     b"fn main() {}".to_vec(),
-/// );
-/// let id = storage.store_artifact(&artifact).await?;
-/// # Ok(())
-/// # }
-/// ```
 pub struct SqliteArtifactStorage {
     backend: Arc<SqliteBackend>,
     tenant_id: String,
@@ -59,11 +26,6 @@ pub struct SqliteArtifactStorage {
 
 impl SqliteArtifactStorage {
     /// Create new SQLite artifact storage
-    ///
-    /// # Arguments
-    ///
-    /// * `backend` - Shared SQLite backend
-    /// * `tenant_id` - Tenant identifier for isolation
     pub fn new(backend: Arc<SqliteBackend>, tenant_id: String) -> Self {
         Self { backend, tenant_id }
     }
@@ -80,39 +42,26 @@ impl SqliteArtifactStorage {
     /// Returns true if content already exists, false if new
     async fn increment_refcount(&self, content_hash: &str, content: &[u8]) -> Result<bool> {
         let conn = self.backend.get_connection().await?;
-
+        let tenant_id = self.tenant_id.clone();
+        
         // Check if content exists
-        let mut rows = conn
-            .query(
-                "SELECT reference_count FROM artifact_content
-                 WHERE tenant_id = ?1 AND content_hash = ?2",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(content_hash.to_string()),
-                ],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to check content existence: {}", e)))?;
+        let exists: Option<i64> = conn.query_row(
+            "SELECT reference_count FROM artifact_content
+             WHERE tenant_id = ?1 AND content_hash = ?2",
+            rusqlite::params![tenant_id, content_hash],
+            |row| row.get(0)
+        ).optional()
+         .map_err(|e| SqliteError::Query(format!("Failed to check content existence: {}", e)))?;
 
-        let exists = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to fetch content row: {}", e)))?
-            .and_then(|row| row.get::<i64>(0).ok());
-
-        if let Some(_refcount) = exists {
+        if exists.is_some() {
             // Increment existing reference count
             conn.execute(
                 "UPDATE artifact_content
                  SET reference_count = reference_count + 1,
                      last_accessed_at = strftime('%s', 'now')
                  WHERE tenant_id = ?1 AND content_hash = ?2",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(content_hash.to_string()),
-                ],
+                rusqlite::params![tenant_id, content_hash],
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to increment refcount: {}", e)))?;
 
             Ok(true)
@@ -125,15 +74,14 @@ impl SqliteArtifactStorage {
                 "INSERT INTO artifact_content
                  (tenant_id, content_hash, data, size_bytes, is_compressed, reference_count)
                  VALUES (?1, ?2, ?3, ?4, ?5, 1)",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(content_hash.to_string()),
-                    libsql::Value::Blob(content.to_vec()),
-                    libsql::Value::Integer(size_bytes),
-                    libsql::Value::Integer(is_compressed),
+                rusqlite::params![
+                    tenant_id,
+                    content_hash,
+                    content,
+                    size_bytes,
+                    is_compressed
                 ],
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to insert content: {}", e)))?;
 
             Ok(false)
@@ -145,20 +93,16 @@ impl SqliteArtifactStorage {
     /// Deletes content if reference count reaches 1 (will become 0)
     async fn decrement_refcount(&self, content_hash: &str) -> Result<()> {
         let conn = self.backend.get_connection().await?;
+        let tenant_id = self.tenant_id.clone();
 
         // Delete content if refcount = 1 (it will become 0 after decrement)
         // This avoids violating the CHECK constraint (reference_count > 0)
-        let deleted = conn
-            .execute(
-                "DELETE FROM artifact_content
-                 WHERE tenant_id = ?1 AND content_hash = ?2 AND reference_count = 1",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(content_hash.to_string()),
-                ],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to delete content: {}", e)))?;
+        let deleted = conn.execute(
+            "DELETE FROM artifact_content
+             WHERE tenant_id = ?1 AND content_hash = ?2 AND reference_count = 1",
+            rusqlite::params![tenant_id, content_hash],
+        )
+        .map_err(|e| SqliteError::Query(format!("Failed to delete content: {}", e)))?;
 
         // If we didn't delete (refcount > 1), just decrement
         if deleted == 0 {
@@ -166,12 +110,8 @@ impl SqliteArtifactStorage {
                 "UPDATE artifact_content
                  SET reference_count = reference_count - 1
                  WHERE tenant_id = ?1 AND content_hash = ?2",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(content_hash.to_string()),
-                ],
+                rusqlite::params![tenant_id, content_hash],
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to decrement refcount: {}", e)))?;
         }
 
@@ -191,6 +131,9 @@ impl SqliteArtifactStorage {
     }
 }
 
+// Helper trait to use optional() from rusqlite
+use rusqlite::OptionalExtension;
+
 #[async_trait]
 impl ArtifactStorage for SqliteArtifactStorage {
     async fn store_artifact(&self, artifact: &Artifact) -> anyhow::Result<ArtifactId> {
@@ -202,28 +145,18 @@ impl ArtifactStorage for SqliteArtifactStorage {
             .context("failed to manage content reference")?;
 
         let conn = self.backend.get_connection().await?;
+        let tenant_id = self.tenant_id.clone();
 
         // Generate artifact_id format: "{session_id}:{sequence}:{content_hash}"
         // Get next sequence number for session
-        let mut rows = conn
-            .query(
-                "SELECT COALESCE(MAX(sequence), -1) + 1
-                 FROM artifacts
-                 WHERE tenant_id = ?1 AND session_id = ?2",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(artifact.artifact_id.session_id.clone()),
-                ],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to get next sequence: {}", e)))?;
-
-        let sequence: i64 = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to fetch sequence row: {}", e)))?
-            .and_then(|row| row.get::<i64>(0).ok())
-            .unwrap_or(0);
+        let sequence: i64 = conn.query_row(
+            "SELECT COALESCE(MAX(sequence), -1) + 1
+             FROM artifacts
+             WHERE tenant_id = ?1 AND session_id = ?2",
+            rusqlite::params![tenant_id, artifact.artifact_id.session_id],
+            |row| row.get(0)
+        )
+        .map_err(|e| SqliteError::Query(format!("Failed to get next sequence: {}", e)))?;
 
         let artifact_id = format!(
             "{}:{}:{}",
@@ -257,24 +190,21 @@ impl ArtifactStorage for SqliteArtifactStorage {
              (tenant_id, artifact_id, session_id, sequence, content_hash, metadata,
               name, artifact_type, mime_type, size_bytes, created_at, created_by, stored_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, strftime('%s', 'now'))",
-            vec![
-                libsql::Value::Text(self.tenant_id.clone()),
-                libsql::Value::Text(artifact_id.clone()),
-                libsql::Value::Text(artifact.artifact_id.session_id.clone()),
-                libsql::Value::Integer(sequence),
-                libsql::Value::Text(content_hash.clone()),
-                libsql::Value::Text(metadata_json),
-                libsql::Value::Text(name.to_string()),
-                libsql::Value::Text(artifact_type_str.to_string()),
-                libsql::Value::Text(mime_type.to_string()),
-                libsql::Value::Integer(size_bytes),
-                libsql::Value::Integer(created_at),
+            rusqlite::params![
+                tenant_id,
+                artifact_id,
+                artifact.artifact_id.session_id,
+                sequence,
+                content_hash,
+                metadata_json,
+                name,
+                artifact_type_str,
+                mime_type,
+                size_bytes,
+                created_at,
                 created_by
-                    .map(|s| libsql::Value::Text(s.to_string()))
-                    .unwrap_or(libsql::Value::Null),
             ],
         )
-        .await
         .map_err(|e| SqliteError::Query(format!("Failed to insert artifact: {}", e)))?;
 
         // Update session artifact_count
@@ -282,82 +212,70 @@ impl ArtifactStorage for SqliteArtifactStorage {
             "UPDATE sessions
              SET artifact_count = artifact_count + 1
              WHERE tenant_id = ?1 AND session_id = ?2",
-            vec![
-                libsql::Value::Text(self.tenant_id.clone()),
-                libsql::Value::Text(artifact.artifact_id.session_id.clone()),
-            ],
+            rusqlite::params![tenant_id, artifact.artifact_id.session_id],
         )
-        .await
         .map_err(|e| {
             SqliteError::Query(format!("Failed to update session artifact count: {}", e))
         })?;
 
         // Return ArtifactId with the database artifact_id as content_hash
-        // This allows delete_artifact to uniquely identify the artifact row
         Ok(ArtifactId::new(
-            artifact_id.clone(), // Full database ID: "{session_id}:{sequence}:{content_hash}"
+            artifact_id, // Full database ID: "{session_id}:{sequence}:{content_hash}"
             artifact.artifact_id.session_id.clone(),
         ))
     }
 
     async fn get_artifact(&self, artifact_id: &ArtifactId) -> anyhow::Result<Option<Artifact>> {
         let conn = self.backend.get_connection().await?;
+        let tenant_id = self.tenant_id.clone();
 
         // artifact_id.content_hash contains the database artifact_id: "{session_id}:{sequence}:{content_hash}"
         // Join artifacts + artifact_content to retrieve full artifact
-        let mut rows = conn
-            .query(
-                "SELECT a.artifact_type, a.metadata, a.size_bytes, a.created_at, c.data
-                 FROM artifacts a
-                 INNER JOIN artifact_content c ON
-                     a.tenant_id = c.tenant_id AND a.content_hash = c.content_hash
-                 WHERE a.tenant_id = ?1
-                   AND a.artifact_id = ?2",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(artifact_id.content_hash.clone()), // This is the database artifact_id
-                ],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to get artifact: {}", e)))?;
+        let result = conn.query_row(
+            "SELECT a.artifact_type, a.metadata, a.size_bytes, a.created_at, c.data
+             FROM artifacts a
+             INNER JOIN artifact_content c ON
+                 a.tenant_id = c.tenant_id AND a.content_hash = c.content_hash
+             WHERE a.tenant_id = ?1
+               AND a.artifact_id = ?2",
+            rusqlite::params![tenant_id, artifact_id.content_hash],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Vec<u8>>(4)?
+                ))
+            }
+        ).optional()
+         .map_err(|e| SqliteError::Query(format!("Failed to get artifact: {}", e)))?;
 
-        let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to fetch artifact row: {}", e)))?
-        else {
-            return Ok(None);
+        let (artifact_type_str, metadata_json, size_bytes, created_at_ts, content) = match result {
+            Some(v) => v,
+            None => return Ok(None),
         };
 
-        let artifact_type_str = row
-            .get::<String>(0)
-            .context("failed to get artifact_type")?;
         let artifact_type = Self::parse_artifact_type(&artifact_type_str)?;
-
-        let metadata_json = row.get::<String>(1).context("failed to get metadata")?;
         let metadata: serde_json::Value =
             serde_json::from_str(&metadata_json).context("failed to deserialize metadata")?;
+        
+        // This cast is safe for reasonable sizes
+        let size_bytes_usize = size_bytes as usize;
 
-        let size_bytes = row.get::<i64>(2).context("failed to get size_bytes")? as usize;
-
-        let created_at_ts = row.get::<i64>(3).context("failed to get created_at")?;
         let created_at =
             chrono::DateTime::from_timestamp(created_at_ts, 0).context("invalid timestamp")?;
-
-        let content = row.get::<Vec<u8>>(4).context("failed to get content")?;
 
         // Update last_accessed_at (throttled to 1 minute in production)
         conn.execute(
             "UPDATE artifact_content
              SET last_accessed_at = strftime('%s', 'now')
-             WHERE tenant_id = ?1 AND content_hash = ?2
+             WHERE tenant_id = ?1 AND content_hash = (
+                 SELECT content_hash FROM artifacts WHERE tenant_id = ?1 AND artifact_id = ?2
+             )
                AND last_accessed_at < strftime('%s', 'now', '-1 minute')",
-            vec![
-                libsql::Value::Text(self.tenant_id.clone()),
-                libsql::Value::Text(artifact_id.content_hash.clone()),
-            ],
+            rusqlite::params![tenant_id, artifact_id.content_hash],
         )
-        .await
         .map_err(|e| SqliteError::Query(format!("Failed to update last_accessed_at: {}", e)))?;
 
         Ok(Some(Artifact {
@@ -365,54 +283,36 @@ impl ArtifactStorage for SqliteArtifactStorage {
             artifact_type,
             content,
             metadata,
-            size_bytes,
+            size_bytes: size_bytes_usize,
             created_at,
         }))
     }
 
     async fn delete_artifact(&self, artifact_id: &ArtifactId) -> anyhow::Result<bool> {
         let conn = self.backend.get_connection().await?;
-
-        // artifact_id.content_hash contains the database artifact_id: "{session_id}:{sequence}:{content_hash}"
-        // We need to extract the actual content_hash and delete by artifact_id
+        let tenant_id = self.tenant_id.clone();
 
         // First, get the content_hash before deletion
-        let mut rows = conn
-            .query(
-                "SELECT content_hash FROM artifacts
-                 WHERE tenant_id = ?1 AND artifact_id = ?2",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(artifact_id.content_hash.clone()), // This is the database artifact_id
-                ],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to get content_hash: {}", e)))?;
+        let content_hash: Option<String> = conn.query_row(
+            "SELECT content_hash FROM artifacts
+             WHERE tenant_id = ?1 AND artifact_id = ?2",
+            rusqlite::params![tenant_id, artifact_id.content_hash],
+            |row| row.get(0)
+        ).optional()
+         .map_err(|e| SqliteError::Query(format!("Failed to get content_hash: {}", e)))?;
 
-        let content_hash = if let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to fetch content_hash: {}", e)))?
-        {
-            row.get::<String>(0)
-                .context("failed to get content_hash from row")?
-        } else {
-            // Artifact doesn't exist
-            return Ok(false);
+        let content_hash = match content_hash {
+            Some(h) => h,
+            None => return Ok(false),
         };
 
         // Delete artifact metadata using artifact_id (unique identifier)
-        let rows_affected = conn
-            .execute(
-                "DELETE FROM artifacts
-                 WHERE tenant_id = ?1 AND artifact_id = ?2",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(artifact_id.content_hash.clone()), // This is the database artifact_id
-                ],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to delete artifact: {}", e)))?;
+        let rows_affected = conn.execute(
+            "DELETE FROM artifacts
+             WHERE tenant_id = ?1 AND artifact_id = ?2",
+            rusqlite::params![tenant_id, artifact_id.content_hash],
+        )
+        .map_err(|e| SqliteError::Query(format!("Failed to delete artifact: {}", e)))?;
 
         if rows_affected == 0 {
             return Ok(false);
@@ -426,17 +326,13 @@ impl ArtifactStorage for SqliteArtifactStorage {
                  ELSE 0
              END
              WHERE tenant_id = ?1 AND session_id = ?2",
-            vec![
-                libsql::Value::Text(self.tenant_id.clone()),
-                libsql::Value::Text(artifact_id.session_id.clone()),
-            ],
+            rusqlite::params![tenant_id, artifact_id.session_id],
         )
-        .await
         .map_err(|e| {
             SqliteError::Query(format!("Failed to update session artifact count: {}", e))
         })?;
 
-        // Drop connection before calling decrement_refcount to avoid nested connection acquisition
+        // Drop connection before calling decrement_refcount
         drop(conn);
 
         // Only decrement refcount if we actually deleted an artifact
@@ -449,32 +345,28 @@ impl ArtifactStorage for SqliteArtifactStorage {
 
     async fn list_session_artifacts(&self, session_id: &str) -> anyhow::Result<Vec<ArtifactId>> {
         let conn = self.backend.get_connection().await?;
+        let tenant_id = self.tenant_id.clone();
 
-        let mut rows = conn
-            .query(
-                "SELECT artifact_id, session_id
-                 FROM artifacts
-                 WHERE tenant_id = ?1 AND session_id = ?2
-                 ORDER BY stored_at DESC",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(session_id.to_string()),
-                ],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to list artifacts: {}", e)))?;
+        let mut stmt = conn.prepare(
+            "SELECT artifact_id, session_id
+             FROM artifacts
+             WHERE tenant_id = ?1 AND session_id = ?2
+             ORDER BY stored_at DESC",
+        ).map_err(|e| SqliteError::Query(format!("Failed to prepare list artifacts: {}", e)))?;
+        
+        let artifact_iter = stmt.query_map(
+            rusqlite::params![tenant_id, session_id],
+            |row| {
+                Ok(ArtifactId::new(
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                ))
+            }
+        ).map_err(|e| SqliteError::Query(format!("Failed to list artifacts: {}", e)))?;
 
         let mut artifacts = Vec::new();
-        while let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to iterate artifacts: {}", e)))?
-        {
-            let artifact_id_str = row.get::<String>(0).context("failed to get artifact_id")?;
-            let session_id = row.get::<String>(1).context("failed to get session_id")?;
-
-            // Store database artifact_id in ArtifactId.content_hash field
-            artifacts.push(ArtifactId::new(artifact_id_str, session_id));
+        for artifact in artifact_iter {
+            artifacts.push(artifact.map_err(|e| SqliteError::Query(format!("Failed to read artifact row: {}", e)))?);
         }
 
         Ok(artifacts)
@@ -482,35 +374,20 @@ impl ArtifactStorage for SqliteArtifactStorage {
 
     async fn get_storage_stats(&self, session_id: &str) -> anyhow::Result<SessionStorageStats> {
         let conn = self.backend.get_connection().await?;
+        let tenant_id = self.tenant_id.clone();
 
-        // Aggregate storage stats for session
-        let mut rows = conn
-            .query(
-                "SELECT COUNT(*) as count, COALESCE(SUM(size_bytes), 0) as total_size
-                 FROM artifacts
-                 WHERE tenant_id = ?1 AND session_id = ?2",
-                vec![
-                    libsql::Value::Text(self.tenant_id.clone()),
-                    libsql::Value::Text(session_id.to_string()),
-                ],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to get storage stats: {}", e)))?;
-
-        let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to fetch stats row: {}", e)))?
-        else {
-            return Ok(SessionStorageStats::new());
-        };
-
-        let artifact_count = row.get::<i64>(0).context("failed to get count")? as usize;
-        let total_size_bytes = row.get::<i64>(1).context("failed to get total_size")? as usize;
+        let (count, total_size): (i64, i64) = conn.query_row(
+            "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0)
+             FROM artifacts
+             WHERE tenant_id = ?1 AND session_id = ?2",
+            rusqlite::params![tenant_id, session_id],
+            |row| Ok((row.get(0)?, row.get(1)?))
+        )
+        .map_err(|e| SqliteError::Query(format!("Failed to get storage stats: {}", e)))?;
 
         Ok(SessionStorageStats {
-            artifact_count,
-            total_size_bytes,
+            artifact_count: count as usize,
+            total_size_bytes: total_size as usize,
             last_updated: chrono::Utc::now(),
         })
     }
@@ -519,31 +396,30 @@ impl ArtifactStorage for SqliteArtifactStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::backends::sqlite::SqliteConfig;
+    use crate::backends::sqlite::{SqliteConfig, SqliteBackend};
     use llmspell_core::types::storage::ArtifactType;
+
+    // Helper to run migrations for tests
+    fn run_migrations(conn: &rusqlite::Connection) {
+        conn.execute_batch(include_str!("../../../migrations/sqlite/V1__initial_setup.sql"))
+            .unwrap();
+        conn.execute_batch(include_str!("../../../migrations/sqlite/V9__sessions.sql"))
+            .unwrap();
+        conn.execute_batch(include_str!("../../../migrations/sqlite/V10__artifacts.sql"))
+            .unwrap();
+    }
 
     async fn create_test_storage() -> (tempfile::TempDir, Arc<SqliteBackend>, SqliteArtifactStorage)
     {
         let temp_dir = tempfile::tempdir().unwrap();
         let db_path = temp_dir.path().join("test.db");
         let config = SqliteConfig::new(db_path.to_str().unwrap());
+        // SqlitePool::new creates the file and pool
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
 
         // Execute migrations
         let conn = backend.get_connection().await.unwrap();
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V1__initial_setup.sql"
-        ))
-        .await
-        .unwrap();
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V9__sessions.sql"))
-            .await
-            .unwrap();
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V10__artifacts.sql"
-        ))
-        .await
-        .unwrap();
+        run_migrations(&conn);
 
         backend.set_tenant_context("test-tenant").await.unwrap();
 
@@ -553,9 +429,8 @@ mod tests {
         conn.execute(
             "INSERT INTO sessions (tenant_id, session_id, session_data, status)
              VALUES ('test-tenant', 'test-session', '{}', 'active')",
-            Vec::<libsql::Value>::new(),
+            [],
         )
-        .await
         .unwrap();
 
         (temp_dir, backend, storage)
@@ -566,7 +441,7 @@ mod tests {
         let (_temp_dir, _backend, storage) = create_test_storage().await;
 
         let artifact = Artifact::new(
-            "hash123".to_string(),
+            "hash123".to_string(), // This is misleadingly named in test as content_hash but treated as artifact_id part
             "test-session".to_string(),
             ArtifactType::Code,
             b"fn main() {}".to_vec(),
@@ -696,7 +571,7 @@ mod tests {
             .unwrap();
         assert_eq!(artifacts.len(), 2);
 
-        // Content hash should be same (blake3 deterministic)
+        // Content hash should be same
         let hash1 = SqliteArtifactStorage::compute_hash(content);
         let hash2 = SqliteArtifactStorage::compute_hash(content);
         assert_eq!(hash1, hash2);
@@ -730,15 +605,12 @@ mod tests {
         // Check reference count = 2
         {
             let conn = backend.get_connection().await.unwrap();
-            let mut rows = conn
-                .query(
-                    "SELECT reference_count FROM artifact_content
-                     WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
-                    vec![libsql::Value::Text(content_hash.clone())],
-                )
-                .await
-                .unwrap();
-            let refcount: i64 = rows.next().await.unwrap().unwrap().get(0).unwrap();
+            let refcount: i64 = conn.query_row(
+                "SELECT reference_count FROM artifact_content
+                 WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
+                rusqlite::params![content_hash],
+                |row| row.get(0)
+            ).unwrap();
             assert_eq!(refcount, 2);
         }
 
@@ -748,34 +620,28 @@ mod tests {
         // Refcount should be 1
         {
             let conn = backend.get_connection().await.unwrap();
-            let mut rows = conn
-                .query(
-                    "SELECT reference_count FROM artifact_content
-                     WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
-                    vec![libsql::Value::Text(content_hash.clone())],
-                )
-                .await
-                .unwrap();
-            let refcount: i64 = rows.next().await.unwrap().unwrap().get(0).unwrap();
+            let refcount: i64 = conn.query_row(
+                "SELECT reference_count FROM artifact_content
+                 WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
+                rusqlite::params![content_hash],
+                |row| row.get(0)
+            ).unwrap();
             assert_eq!(refcount, 1);
         }
 
         // Delete second artifact
         storage.delete_artifact(&id2).await.unwrap();
 
-        // Content should be deleted (refcount 0)
+        // Content should be deleted
         {
             let conn = backend.get_connection().await.unwrap();
-            let mut rows = conn
-                .query(
-                    "SELECT 1 FROM artifact_content
-                     WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
-                    vec![libsql::Value::Text(content_hash)],
-                )
-                .await
-                .unwrap();
-            let content_exists = rows.next().await.unwrap();
-            assert!(content_exists.is_none());
+            let exists: Option<i64> = conn.query_row(
+                "SELECT 1 FROM artifact_content
+                 WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
+                rusqlite::params![content_hash],
+                |row| row.get(0)
+            ).optional().unwrap();
+            assert!(exists.is_none());
         }
     }
 
@@ -791,9 +657,8 @@ mod tests {
         conn.execute(
             "INSERT INTO sessions (tenant_id, session_id, session_data, status)
              VALUES ('tenant-2', 'session-2', '{}', 'active')",
-            Vec::<libsql::Value>::new(),
+            [],
         )
-        .await
         .unwrap();
 
         // Store artifacts for both tenants
@@ -844,7 +709,7 @@ mod tests {
         // Different content = different hash
         assert_ne!(hash1, hash3);
 
-        // blake3 produces 64 hex chars
+        // blake3 produces 64 hex chars (actually sha256 in implementation: 64 chars too)
         assert_eq!(hash1.len(), 64);
     }
 }

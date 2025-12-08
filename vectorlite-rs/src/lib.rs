@@ -38,7 +38,7 @@ use rusqlite::vtab::{
     eponymous_only_module, sqlite3_vtab, sqlite3_vtab_cursor, Context, IndexInfo, VTab,
     VTabConnection, VTabCursor,
 };
-use rusqlite::{ffi, Connection, Result as SqliteResult};
+use rusqlite::{Connection, Result as SqliteResult};
 use std::marker::PhantomData;
 use std::os::raw::c_int;
 
@@ -51,55 +51,17 @@ pub use distance::{distance_cosine, distance_inner_product, distance_l2, Distanc
 pub use error::{Error, Result};
 pub use hnsw::HnswIndex;
 
-/// SQLite extension entry point (macOS/Linux)
+/// Programmatic entry point for static linking.
 ///
-/// This function is called when the extension is loaded via load_extension().
-/// It registers the vectorlite virtual table module.
-///
-/// # Safety
-///
-/// This function interfaces directly with SQLite's C API and must follow
-/// SQLite's extension loading contract:
-/// - Must be exported with C ABI
-/// - Must return SQLITE_OK (0) on success
-/// - Must not panic or unwind across FFI boundary
-#[no_mangle]
-pub unsafe extern "C" fn sqlite3_vectorlite_init(
-    db: *mut ffi::sqlite3,
-    _pz_err_msg: *mut *mut std::os::raw::c_char,
-    _p_api: *mut ffi::sqlite3_api_routines,
-) -> c_int {
-    // Wrap the raw db pointer in a Connection
-    let conn = match Connection::from_handle(db) {
-        Ok(conn) => conn,
-        Err(_) => return ffi::SQLITE_ERROR,
-    };
-
-    // Register the vectorlite virtual table module
-    // Use eponymous_only_module for read-only vector search tables
-    if let Err(e) = conn.create_module("vectorlite", eponymous_only_module::<VectorLiteTab>(), None)
-    {
-        eprintln!("Failed to register vectorlite module: {e}");
-        return ffi::SQLITE_ERROR;
-    }
-
-    // IMPORTANT: Prevent conn from closing the database connection when dropped!
-    // The connection is owned by the host process, we just borrowed it.
-    std::mem::forget(conn);
-
-    ffi::SQLITE_OK
+/// Registers the `vectorlite` module with the given connection.
+/// This should be called by the host application (llmspell-storage) during initialization.
+pub fn register_vectorlite(conn: &Connection) -> SqliteResult<()> {
+    conn.create_module("vectorlite", eponymous_only_module::<VectorLiteTab>(), None)
 }
 
-/// Windows extension entry point
-#[cfg(windows)]
-#[no_mangle]
-pub unsafe extern "C" fn sqlite3_vectorlite_init_win32(
-    db: *mut ffi::sqlite3,
-    pz_err_msg: *mut *mut std::os::raw::c_char,
-    p_api: *mut ffi::sqlite3_api_routines,
-) -> c_int {
-    sqlite3_vectorlite_init(db, pz_err_msg, p_api)
-}
+// REMOVED: C-ABI entry points (sqlite3_vectorlite_init, sqlite3_vectorlite_init_win32)
+// REMOVED: SQLITE3_API global hack
+// We are now a standard Rust library linked statically.
 
 /// VectorLite virtual table implementation
 ///

@@ -3,13 +3,21 @@
 //! Exports data from PostgreSQL or SQLite backends to standardized JSON format
 //! for bidirectional migration and backup.
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use super::converters::TypeConverters;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use super::format::*;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use anyhow::{Context, Result};
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use base64::Engine;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::collections::HashMap;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::path::Path;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::sync::Arc;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use tracing::info;
 
 // ============================================================================
@@ -600,48 +608,50 @@ impl SqliteExporter {
 
     /// Export all data to JSON format
     pub async fn export_all(&self) -> Result<ExportFormat> {
-        let migrations = self.detect_migrations().await?;
+        let migrations = self.detect_migrations()?;
         let mut export = ExportFormat::new("sqlite".to_string(), migrations.clone());
+
+        let conn = self.backend.get_connection().await?;
 
         info!("Starting SQLite export");
 
         // Export each data type
         if migrations.contains(&"V3".to_string()) {
-            export.data.vector_embeddings = self.export_vector_embeddings().await?;
+            export.data.vector_embeddings = self.export_vector_embeddings(&conn)?;
         }
         if migrations.contains(&"V4".to_string()) {
-            export.data.knowledge_graph = Some(self.export_knowledge_graph().await?);
+            export.data.knowledge_graph = Some(self.export_knowledge_graph(&conn)?);
         }
         if migrations.contains(&"V5".to_string()) {
-            export.data.procedural_memory = self.export_procedural_memory().await?;
+            export.data.procedural_memory = self.export_procedural_memory(&conn)?;
         }
         if migrations.contains(&"V6".to_string()) {
-            export.data.agent_state = self.export_agent_state().await?;
+            export.data.agent_state = self.export_agent_state(&conn)?;
         }
         if migrations.contains(&"V7".to_string()) {
-            export.data.kv_store = self.export_kv_store().await?;
+            export.data.kv_store = self.export_kv_store(&conn)?;
         }
         if migrations.contains(&"V8".to_string()) {
-            export.data.workflow_states = self.export_workflow_states().await?;
+            export.data.workflow_states = self.export_workflow_states(&conn)?;
         }
         if migrations.contains(&"V9".to_string()) {
-            export.data.sessions = self.export_sessions().await?;
+            export.data.sessions = self.export_sessions(&conn)?;
         }
         if migrations.contains(&"V10".to_string()) {
-            export.data.artifacts = Some(self.export_artifacts().await?);
+            export.data.artifacts = Some(self.export_artifacts(&conn)?);
         }
         if migrations.contains(&"V11".to_string()) {
-            export.data.event_log = self.export_event_log().await?;
+            export.data.event_log = self.export_event_log(&conn)?;
         }
         if migrations.contains(&"V13".to_string()) {
-            export.data.hook_history = self.export_hook_history().await?;
+            export.data.hook_history = self.export_hook_history(&conn)?;
         }
 
         info!("SQLite export completed");
         Ok(export)
     }
 
-    async fn detect_migrations(&self) -> Result<Vec<String>> {
+    fn detect_migrations(&self) -> Result<Vec<String>> {
         // SQLite doesn't have refinery_schema_history, but we can detect tables
         Ok(vec![
             "V3".to_string(),
@@ -657,18 +667,15 @@ impl SqliteExporter {
         ])
     }
 
-    async fn export_vector_embeddings(&self) -> Result<HashMap<usize, Vec<VectorEmbeddingExport>>> {
-        let conn = self.backend.get_connection().await?;
-
+    fn export_vector_embeddings(&self, conn: &rusqlite::Connection) -> Result<HashMap<usize, Vec<VectorEmbeddingExport>>> {
         // SQLite stores vectors in vector_metadata table
-        let stmt = conn
-            .prepare("SELECT id, tenant_id, scope, dimension, metadata, created_at, updated_at FROM vector_metadata")
-            .await?;
+        let mut stmt = conn
+            .prepare("SELECT id, tenant_id, scope, dimension, metadata, created_at, updated_at FROM vector_metadata")?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut all_vectors: HashMap<usize, Vec<VectorEmbeddingExport>> = HashMap::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let id: String = row.get(0)?;
             let dimension: i32 = row.get(3)?;
             let dim = dimension as usize;
@@ -683,30 +690,27 @@ impl SqliteExporter {
                 dimension: dim,
                 embedding: String::new(), // Embedding stored separately in vectorlite
                 metadata,
-                created_at: row.get::<i64>(5)?,
-                updated_at: row.get::<i64>(6)?,
+                created_at: row.get::<_, i64>(5)?,
+                updated_at: row.get::<_, i64>(6)?,
             });
         }
 
         Ok(all_vectors)
     }
 
-    async fn export_knowledge_graph(&self) -> Result<KnowledgeGraphExport> {
-        let conn = self.backend.get_connection().await?;
-
+    fn export_knowledge_graph(&self, conn: &rusqlite::Connection) -> Result<KnowledgeGraphExport> {
         // Export entities
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT entity_id, tenant_id, entity_type, name, properties,
                      valid_time_start, valid_time_end, transaction_time_start,
                      transaction_time_end, created_at FROM entities",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut entities = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let props_str: String = row.get(4)?;
             let properties: serde_json::Value = serde_json::from_str(&props_str)?;
 
@@ -725,18 +729,17 @@ impl SqliteExporter {
         }
 
         // Export relationships
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT relationship_id, tenant_id, from_entity, to_entity,
                      relationship_type, properties, valid_time_start, valid_time_end,
                      transaction_time_start, transaction_time_end, created_at FROM relationships",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut relationships = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let props_str: String = row.get(5)?;
             let properties: serde_json::Value = serde_json::from_str(&props_str)?;
 
@@ -761,19 +764,17 @@ impl SqliteExporter {
         })
     }
 
-    async fn export_procedural_memory(&self) -> Result<Vec<PatternExport>> {
-        let conn = self.backend.get_connection().await?;
-        let stmt = conn
+    fn export_procedural_memory(&self, conn: &rusqlite::Connection) -> Result<Vec<PatternExport>> {
+        let mut stmt = conn
             .prepare(
                 "SELECT pattern_id, tenant_id, scope, key, value, frequency,
                      first_seen, last_seen, created_at, updated_at FROM procedural_patterns",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut patterns = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             patterns.push(PatternExport {
                 pattern_id: row.get(0)?,
                 tenant_id: row.get(1)?,
@@ -791,19 +792,17 @@ impl SqliteExporter {
         Ok(patterns)
     }
 
-    async fn export_agent_state(&self) -> Result<Vec<AgentStateExport>> {
-        let conn = self.backend.get_connection().await?;
-        let stmt = conn
+    fn export_agent_state(&self, conn: &rusqlite::Connection) -> Result<Vec<AgentStateExport>> {
+        let mut stmt = conn
             .prepare(
                 "SELECT state_id, tenant_id, agent_id, agent_type, state_data,
                      schema_version, data_version, checksum, created_at, updated_at FROM agent_states",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut states = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let data_str: String = row.get(4)?;
             let state_data: serde_json::Value = serde_json::from_str(&data_str)?;
 
@@ -824,16 +823,14 @@ impl SqliteExporter {
         Ok(states)
     }
 
-    async fn export_kv_store(&self) -> Result<Vec<KVEntryExport>> {
-        let conn = self.backend.get_connection().await?;
-        let stmt = conn
-            .prepare("SELECT kv_id, tenant_id, key, value, metadata, created_at, updated_at FROM kv_store")
-            .await?;
+    fn export_kv_store(&self, conn: &rusqlite::Connection) -> Result<Vec<KVEntryExport>> {
+        let mut stmt = conn
+            .prepare("SELECT kv_id, tenant_id, key, value, metadata, created_at, updated_at FROM kv_store")?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut entries = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let value_bytes: Vec<u8> = row.get(3)?;
             let value_base64 = base64::engine::general_purpose::STANDARD.encode(&value_bytes);
             let metadata_opt: Option<String> = row.get(4)?;
@@ -852,19 +849,17 @@ impl SqliteExporter {
         Ok(entries)
     }
 
-    async fn export_workflow_states(&self) -> Result<Vec<WorkflowStateExport>> {
-        let conn = self.backend.get_connection().await?;
-        let stmt = conn
+    fn export_workflow_states(&self, conn: &rusqlite::Connection) -> Result<Vec<WorkflowStateExport>> {
+        let mut stmt = conn
             .prepare(
                 "SELECT tenant_id, workflow_id, workflow_name, state_data, current_step, status,
                      started_at, completed_at, last_updated, created_at FROM workflow_states",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut states = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let data_str: String = row.get(3)?;
             let state_data: serde_json::Value = serde_json::from_str(&data_str)?;
             let started_opt: Option<i64> = row.get(6)?;
@@ -887,19 +882,17 @@ impl SqliteExporter {
         Ok(states)
     }
 
-    async fn export_sessions(&self) -> Result<Vec<SessionExport>> {
-        let conn = self.backend.get_connection().await?;
-        let stmt = conn
+    fn export_sessions(&self, conn: &rusqlite::Connection) -> Result<Vec<SessionExport>> {
+        let mut stmt = conn
             .prepare(
                 "SELECT id, tenant_id, session_id, session_data, status, created_at,
                      last_accessed_at, expires_at, artifact_count, updated_at FROM sessions",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut sessions = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let data_str: String = row.get(3)?;
             let session_data: serde_json::Value = serde_json::from_str(&data_str)?;
             let expires_opt: Option<i64> = row.get(7)?;
@@ -917,26 +910,22 @@ impl SqliteExporter {
                 updated_at: row.get(9)?,
             });
         }
-
         Ok(sessions)
     }
 
-    async fn export_artifacts(&self) -> Result<ArtifactsExport> {
-        let conn = self.backend.get_connection().await?;
-
+    fn export_artifacts(&self, conn: &rusqlite::Connection) -> Result<ArtifactsExport> {
         // Export content
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT tenant_id, content_hash, data, size_bytes, is_compressed,
                      original_size_bytes, reference_count, created_at, last_accessed_at
                      FROM artifact_content",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut content = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let data_blob: Vec<u8> = row.get(2)?;
             let data = Some(base64::Engine::encode(
                 &base64::engine::general_purpose::STANDARD,
@@ -958,18 +947,17 @@ impl SqliteExporter {
         }
 
         // Export metadata
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT tenant_id, artifact_id, session_id, sequence, content_hash, metadata,
                      name, artifact_type, mime_type, size_bytes, created_at, created_by, version,
                      parent_artifact_id, tags, stored_at, updated_at FROM artifacts",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut artifacts = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let meta_str: String = row.get(5)?;
             let metadata: serde_json::Value = serde_json::from_str(&meta_str)?;
             let tags_str: String = row.get(14)?;
@@ -999,19 +987,17 @@ impl SqliteExporter {
         Ok(ArtifactsExport { content, artifacts })
     }
 
-    async fn export_event_log(&self) -> Result<Vec<EventExport>> {
-        let conn = self.backend.get_connection().await?;
-        let stmt = conn
+    fn export_event_log(&self, conn: &rusqlite::Connection) -> Result<Vec<EventExport>> {
+        let mut stmt = conn
             .prepare(
                 "SELECT id, tenant_id, event_id, event_type, correlation_id,
                      timestamp, sequence, language, payload FROM event_log",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut events = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let payload_str: String = row.get(8)?;
             let payload: serde_json::Value = serde_json::from_str(&payload_str)?;
 
@@ -1031,19 +1017,17 @@ impl SqliteExporter {
         Ok(events)
     }
 
-    async fn export_hook_history(&self) -> Result<Vec<HookExport>> {
-        let conn = self.backend.get_connection().await?;
-        let stmt = conn
+    fn export_hook_history(&self, conn: &rusqlite::Connection) -> Result<Vec<HookExport>> {
+        let mut stmt = conn
             .prepare(
                 "SELECT id, execution_id, tenant_id, hook_id, hook_type, correlation_id,
                      hook_context, result_data, timestamp, duration_ms FROM hook_history",
-            )
-            .await?;
+            )?;
 
-        let mut rows = stmt.query(libsql::params![]).await?;
+        let mut rows = stmt.query([])?;
         let mut hooks = Vec::new();
 
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let context_bytes: Vec<u8> = row.get(6)?;
             let hook_context_base64 =
                 base64::engine::general_purpose::STANDARD.encode(&context_bytes);

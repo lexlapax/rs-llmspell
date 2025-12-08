@@ -2,27 +2,12 @@
 //! ABOUTME: Applies versioned SQL migrations from migrations/sqlite/ directory
 
 use super::SqliteBackend;
+use rusqlite::params;
 
 impl SqliteBackend {
     /// Run all database migrations
     ///
     /// Applies all SQL migration files from `migrations/sqlite/` directory.
-    /// Migrations are applied in order (V1, V3, V4, V5, V6, V7, V8, V9, V10, V11, V13).
-    ///
-    /// # Returns
-    /// * `Result<()>` - Success or migration error
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig};
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let config = SqliteConfig::new("./llmspell.db");
-    ///     let backend = SqliteBackend::new(config).await.unwrap();
-    ///     backend.run_migrations().await.unwrap();
-    /// }
-    /// ```
     pub async fn run_migrations(&self) -> anyhow::Result<()> {
         let conn = self.get_connection().await?;
 
@@ -31,110 +16,81 @@ impl SqliteBackend {
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V1__initial_setup.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V1 migration failed: {}", e))?;
 
         // V3: Vector embeddings
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V3__vector_embeddings.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V3 migration failed: {}", e))?;
 
         // V4: Temporal graph
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V4__temporal_graph.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V4 migration failed: {}", e))?;
 
         // V5: Procedural memory
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V5__procedural_memory.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V5 migration failed: {}", e))?;
 
         // V6: Agent state
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V6__agent_state.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V6 migration failed: {}", e))?;
 
         // V7: KV store
         conn.execute_batch(include_str!("../../../migrations/sqlite/V7__kv_store.sql"))
-            .await
             .map_err(|e| anyhow::anyhow!("V7 migration failed: {}", e))?;
 
         // V8: Workflow states
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V8__workflow_states.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V8 migration failed: {}", e))?;
 
         // V9: Sessions
         conn.execute_batch(include_str!("../../../migrations/sqlite/V9__sessions.sql"))
-            .await
             .map_err(|e| anyhow::anyhow!("V9 migration failed: {}", e))?;
 
         // V10: Artifacts
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V10__artifacts.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V10 migration failed: {}", e))?;
 
         // V11: Event log
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V11__event_log.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V11 migration failed: {}", e))?;
 
         // V13: Hook history
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V13__hook_history.sql"
         ))
-        .await
         .map_err(|e| anyhow::anyhow!("V13 migration failed: {}", e))?;
 
         Ok(())
     }
 
     /// Get current migration version
-    ///
-    /// Returns the highest migration version from _migrations table.
-    ///
-    /// # Returns
-    /// * `Result<usize>` - Current migration version (0 if no migrations)
     pub async fn migration_version(&self) -> anyhow::Result<usize> {
         let conn = self.get_connection().await?;
 
         // Query _migrations table for highest version
-        let stmt = conn
-            .prepare("SELECT MAX(version) FROM _migrations")
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to query migration version: {}", e))?;
+        // Rusqlite sync call
+        let version: Option<i64> = conn.query_row(
+            "SELECT MAX(version) FROM _migrations",
+            [],
+            |row| row.get(0)
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to query migration version: {}", e))?;
 
-        let mut rows = stmt
-            .query(())
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to execute migration version query: {}", e))?;
-
-        if let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to fetch migration version row: {}", e))?
-        {
-            let version: Option<i64> = row
-                .get(0)
-                .map_err(|e| anyhow::anyhow!("Failed to get version value: {}", e))?;
-            Ok(version.unwrap_or(0) as usize)
-        } else {
-            Ok(0)
-        }
+        Ok(version.unwrap_or(0) as usize)
     }
 }
 
@@ -163,26 +119,20 @@ mod tests {
         let conn = backend.get_connection().await.unwrap();
 
         // Check kv_store table
-        let stmt = conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='kv_store'")
-            .await
-            .unwrap();
-        let mut rows = stmt.query(()).await.unwrap();
-        assert!(
-            rows.next().await.unwrap().is_some(),
-            "kv_store table should exist"
-        );
+        let exists: bool = conn.query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='kv_store'",
+            [],
+            |_| Ok(true)
+        ).unwrap_or(false);
+        assert!(exists, "kv_store table should exist");
 
-        // Check agent_states table (note: plural)
-        let stmt = conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_states'")
-            .await
-            .unwrap();
-        let mut rows = stmt.query(()).await.unwrap();
-        assert!(
-            rows.next().await.unwrap().is_some(),
-            "agent_states table should exist"
-        );
+        // Check agent_states table
+        let exists: bool = conn.query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_states'",
+            [],
+            |_| Ok(true)
+        ).unwrap_or(false);
+        assert!(exists, "agent_states table should exist");
     }
 
     #[tokio::test]
@@ -202,3 +152,4 @@ mod tests {
         assert_eq!(version, 13);
     }
 }
+

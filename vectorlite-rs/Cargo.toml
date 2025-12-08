@@ -8,21 +8,22 @@ repository.workspace = true
 license.workspace = true
 
 [lib]
-# Build both:
-# - cdylib: Loadable SQLite extension (.so/.dylib/.dll)
-# - rlib: Rust library for integration tests
-crate-type = ["cdylib", "rlib"]
+# Build as standard Rust library for static linking
+# crate-type = ["cdylib", "rlib"] # Old dynamic loading setup
+path = "src/lib.rs"
 
 [dependencies]
 # HNSW vector indexing
 hnsw_rs = "0.3.2"
 
-# SQLite virtual table API (using libsql's fork to avoid symbol conflicts)
-# vtab feature: Virtual table trait implementations
-# Note: libsql-rusqlite provides same API as rusqlite but uses libsql's SQLite
-libsql-rusqlite = { version = "0.9", default-features = false, features = ["vtab"] }
-# Re-export as rusqlite for compatibility
-rusqlite = { package = "libsql-rusqlite", version = "0.9", default-features = false, features = ["vtab"] }
+# Using standard rusqlite.
+# For static linking, we don't need "loadable_extension" or "vtab".
+# The host (llmspell-storage) provides the SQLite implementation via its own rusqlite/libsql dependency.
+# WE MUST USE "bundled" or rely on the host's linker if we were a dylib,
+# but as an rlib, we just compile against rusqlite traits.
+# IMPORTANT: common rusqlite version is critical.
+rusqlite = { version = "0.32", default-features = false, features = ["vtab"] }
+# libsqlite3-sys removed (no longer needed for manual API init)
 
 # Serialization for metadata and configuration
 serde = { workspace = true, features = ["derive"] }

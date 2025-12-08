@@ -15,6 +15,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use parking_lot::RwLock;
+use rusqlite::params;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -100,10 +101,10 @@ pub struct SqliteVectorStorage {
     /// - ef_construction: Candidate list size during index build (default: 200)
     /// - ef_search: Candidate list size during search (default: 50)
     /// - max_elements: Maximum vectors per index (default: 100,000)
+    max_elements: usize,
     m: usize,
     ef_construction: usize,
     ef_search: usize,
-    max_elements: usize,
 
     /// Whether HNSW indexing is available
     hnsw_available: bool,
@@ -144,8 +145,7 @@ impl SqliteVectorStorage {
             "CREATE TABLE IF NOT EXISTS vec_embeddings_{} (rowid INTEGER PRIMARY KEY, embedding BLOB)",
             dimension
         );
-        conn.execute(&create_table_sql, ())
-            .await
+        conn.execute(&create_table_sql, [])
             .with_context(|| format!("Failed to create vec_embeddings_{} table", dimension))?;
 
         let persistence_path = PathBuf::from("./data/hnsw_indices");
@@ -301,20 +301,18 @@ impl SqliteVectorStorage {
             "SELECT m.rowid FROM vector_metadata m WHERE m.dimension = ? AND m.scope = ?"
                 .to_string();
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare(&query_sql)
-            .await
             .with_context(|| format!("Failed to prepare query for namespace {}", namespace))?;
 
         // Query all rowids for this namespace
         let mut rows = stmt
-            .query(libsql::params![self.dimension as i64, namespace])
-            .await
+            .query(params![self.dimension as i64, namespace])
             .with_context(|| format!("Failed to query metadata for namespace {}", namespace))?;
 
         // Collect rowids
         let mut rowids = Vec::new();
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let rowid: i64 = row.get(0)?;
             rowids.push(rowid);
         }
@@ -350,11 +348,12 @@ impl SqliteVectorStorage {
             self.table_name()
         );
 
+        let mut embed_stmt = conn.prepare(&embeddings_query)?;
+        
         for rowid in rowids {
-            let embed_stmt = conn.prepare(&embeddings_query).await?;
-            let mut embed_rows = embed_stmt.query(libsql::params![rowid]).await?;
+            let mut embed_rows = embed_stmt.query(params![rowid])?;
 
-            if let Some(embed_row) = embed_rows.next().await? {
+            if let Some(embed_row) = embed_rows.next()? {
                 let embedding_blob: Vec<u8> = embed_row.get(1)?;
 
                 // Convert Vec<u8> to Vec<f32>
@@ -436,15 +435,15 @@ impl VectorStorage for SqliteVectorStorage {
         let mut ids = Vec::with_capacity(vectors.len());
 
         // Get connection once for the entire batch
-        let conn = self.backend.get_connection().await?;
+        let mut conn = self.backend.get_connection().await?;
 
         // Wrap in transaction for atomicity and performance
-        conn.execute("BEGIN IMMEDIATE", ()).await?;
+        let tx = conn.transaction()?;
 
         for entry in vectors {
             // Validate dimension
             if entry.embedding.len() != self.dimension {
-                let _ = conn.execute("ROLLBACK", ()).await;
+                // Transaction rollback handled by drop
                 anyhow::bail!(
                     "Vector dimension mismatch: expected {}, got {}",
                     self.dimension,
@@ -467,17 +466,13 @@ impl VectorStorage for SqliteVectorStorage {
             let vec_table = self.table_name();
             let insert_vec_sql = format!("INSERT INTO {} (embedding) VALUES (?)", vec_table);
 
-            conn.execute(&insert_vec_sql, libsql::params![embedding_json.clone()])
-                .await
+            tx.execute(&insert_vec_sql, params![embedding_json.clone()])
                 .with_context(|| format!("Failed to insert into {}", vec_table))?;
 
             // Get the rowid of the inserted vector
-            let rowid: i64 = conn
-                .prepare("SELECT last_insert_rowid()")
-                .await?
-                .query_row(())
-                .await?
-                .get(0)?;
+            let rowid: i64 = tx
+                .prepare("SELECT last_insert_rowid()")?
+                .query_row([], |row| row.get(0))?;
 
             // 2. Insert metadata into vector_metadata table
             let metadata_json = serde_json::to_string(&entry.metadata)?;
@@ -492,9 +487,9 @@ impl VectorStorage for SqliteVectorStorage {
                 .unwrap()
                 .as_secs() as i64;
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO vector_metadata (rowid, id, tenant_id, scope, dimension, metadata, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                libsql::params![
+                params![
                     rowid,
                     id.clone(),
                     entry.tenant_id.as_deref().unwrap_or("default"),
@@ -505,7 +500,6 @@ impl VectorStorage for SqliteVectorStorage {
                     updated_at,
                 ],
             )
-            .await
             .with_context(|| "Failed to insert into vector_metadata")?;
 
             // 3. Insert into HNSW index
@@ -543,7 +537,7 @@ impl VectorStorage for SqliteVectorStorage {
         }
 
         // Commit transaction
-        conn.execute("COMMIT", ()).await?;
+        tx.commit()?;
 
         Ok(ids)
     }
@@ -597,19 +591,19 @@ impl VectorStorage for SqliteVectorStorage {
         // Query metadata for the results
         let conn = self.backend.get_connection().await?;
         let mut results = Vec::with_capacity(neighbors.len());
+        
+        // Prepare statement outside loop
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, tenant_id, scope, metadata, created_at, updated_at
+                 FROM vector_metadata WHERE rowid = ?",
+            )?;
 
         for (rowid, distance) in neighbors {
             // Query vector_metadata for full entry
-            let stmt = conn
-                .prepare(
-                    "SELECT id, tenant_id, scope, metadata, created_at, updated_at
-                     FROM vector_metadata WHERE rowid = ?",
-                )
-                .await?;
+            let mut rows = stmt.query(params![rowid])?;
 
-            let mut rows = stmt.query(libsql::params![rowid]).await?;
-
-            if let Some(row) = rows.next().await? {
+            if let Some(row) = rows.next()? {
                 let id: String = row.get(0)?;
                 let _tenant_id: String = row.get(1)?;
                 let scope_str: String = row.get(2)?;
@@ -643,9 +637,6 @@ impl VectorStorage for SqliteVectorStorage {
                     StateScope::Custom(scope_str)
                 };
 
-                // Query embedding (if needed)
-                // For now, we don't return embeddings in search results
-
                 results.push(VectorResult {
                     id,
                     score: 1.0 - distance, // Convert distance to score (higher is better)
@@ -669,9 +660,8 @@ impl VectorStorage for SqliteVectorStorage {
 
         conn.execute(
             "UPDATE vector_metadata SET metadata = ?, updated_at = ? WHERE id = ?",
-            libsql::params![metadata_json, updated_at, id],
+            params![metadata_json, updated_at, id],
         )
-        .await
         .with_context(|| format!("Failed to update metadata for id {}", id))?;
 
         Ok(())
@@ -683,30 +673,27 @@ impl VectorStorage for SqliteVectorStorage {
         }
 
         let conn = self.backend.get_connection().await?;
+        let mut stmt = conn
+            .prepare("SELECT rowid, scope FROM vector_metadata WHERE id = ?")?;
 
         for id in ids {
             // Get rowid and namespace before deleting
-            let stmt = conn
-                .prepare("SELECT rowid, scope FROM vector_metadata WHERE id = ?")
-                .await?;
-            let mut rows = stmt.query(libsql::params![id.as_str()]).await?;
+            let mut rows = stmt.query(params![id.as_str()])?;
 
-            if let Some(row) = rows.next().await? {
+            if let Some(row) = rows.next()? {
                 let rowid: i64 = row.get(0)?;
                 let scope_str: String = row.get(1)?;
 
                 // Delete from vector_metadata
                 conn.execute(
                     "DELETE FROM vector_metadata WHERE id = ?",
-                    libsql::params![id.as_str()],
-                )
-                .await?;
+                    params![id.as_str()],
+                )?;
 
                 // Delete from vec_embeddings_*
                 let vec_table = self.table_name();
                 let delete_vec_sql = format!("DELETE FROM {} WHERE rowid = ?", vec_table);
-                conn.execute(&delete_vec_sql, libsql::params![rowid])
-                    .await?;
+                conn.execute(&delete_vec_sql, params![rowid])?;
 
                 // Remove from HNSW index (requires rebuild)
                 // For now, we'll just warn and rebuild on next access
@@ -728,15 +715,13 @@ impl VectorStorage for SqliteVectorStorage {
         let conn = self.backend.get_connection().await?;
 
         // Get all rowids for this scope
-        let stmt = conn
-            .prepare("SELECT rowid FROM vector_metadata WHERE scope = ? AND dimension = ?")
-            .await?;
+        let mut stmt = conn
+            .prepare("SELECT rowid FROM vector_metadata WHERE scope = ? AND dimension = ?")?;
         let mut rows = stmt
-            .query(libsql::params![namespace.clone(), self.dimension as i64])
-            .await?;
+            .query(params![namespace.clone(), self.dimension as i64])?;
 
         let mut rowids = Vec::new();
-        while let Some(row) = rows.next().await? {
+        while let Some(row) = rows.next()? {
             let rowid: i64 = row.get(0)?;
             rowids.push(rowid);
         }
@@ -750,16 +735,14 @@ impl VectorStorage for SqliteVectorStorage {
         // Delete from vector_metadata
         conn.execute(
             "DELETE FROM vector_metadata WHERE scope = ? AND dimension = ?",
-            libsql::params![namespace.clone(), self.dimension as i64],
-        )
-        .await?;
+            params![namespace.clone(), self.dimension as i64],
+        )?;
 
         // Delete from vec_embeddings_*
         let vec_table = self.table_name();
         for rowid in rowids {
             let delete_vec_sql = format!("DELETE FROM {} WHERE rowid = ?", vec_table);
-            conn.execute(&delete_vec_sql, libsql::params![rowid])
-                .await?;
+            conn.execute(&delete_vec_sql, params![rowid])?;
         }
 
         // Remove HNSW index for this namespace
@@ -774,22 +757,20 @@ impl VectorStorage for SqliteVectorStorage {
         let conn = self.backend.get_connection().await?;
 
         // Count total vectors for this dimension
-        let mut stmt = conn
-            .prepare("SELECT COUNT(*) FROM vector_metadata WHERE dimension = ?")
-            .await?;
-        let total_vectors: i64 = stmt
-            .query_row(libsql::params![self.dimension as i64])
-            .await?
-            .get(0)?;
+        let total_vectors: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM vector_metadata WHERE dimension = ?",
+                params![self.dimension as i64],
+                |row| row.get(0),
+            )?;
 
         // Count unique scopes
-        let mut stmt = conn
-            .prepare("SELECT COUNT(DISTINCT scope) FROM vector_metadata WHERE dimension = ?")
-            .await?;
-        let total_scopes: i64 = stmt
-            .query_row(libsql::params![self.dimension as i64])
-            .await?
-            .get(0)?;
+        let total_scopes: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT scope) FROM vector_metadata WHERE dimension = ?",
+                params![self.dimension as i64],
+                |row| row.get(0),
+            )?;
 
         Ok(StorageStats {
             total_vectors: total_vectors as usize,
@@ -800,6 +781,39 @@ impl VectorStorage for SqliteVectorStorage {
             dimensions: Some(self.dimension),
         })
     }
+    
+    async fn scoped_stats(&self, scope: &StateScope) -> Result<ScopedStats> {
+         let conn = self.backend.get_connection().await?;
+         let namespace = Self::scope_to_namespace(scope);
+
+         let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM vector_metadata WHERE scope = ? AND dimension = ?",
+            params![namespace, self.dimension as i64],
+            |row| row.get(0)
+         )?;
+
+         // Calculate memory usage of HNSW index if loaded
+         let index_size = if let Some(index) = self.hnsw_indices.get(&namespace) {
+             if let Some(ref idx) = *index.read() {
+                 idx.len() * self.dimension * 4 // Approximation
+             } else {
+                 0
+             }
+         } else {
+             0
+         };
+
+         Ok(ScopedStats {
+             scope: scope.clone(),
+             vector_count: count as usize,
+             storage_bytes: index_size,
+             query_count: 0,
+             tokens_processed: 0,
+             estimated_cost: 0.0,
+
+         })
+    }
+
 
     async fn stats_for_scope(&self, scope: &StateScope) -> Result<ScopedStats> {
         let namespace = Self::scope_to_namespace(scope);

@@ -15,8 +15,8 @@ use std::sync::Arc;
 /// Stores agent states with:
 /// - Tenant isolation via application-level filtering
 /// - Automatic versioning (data_version auto-increments on state changes)
-/// - SHA256 checksum validation for state integrity
 /// - JSON functional indexes for nested field queries
+/// - SHA256 checksum validation for state integrity
 ///
 /// # Performance Target
 /// <10ms for write, <5ms for read (Task 13c.2.6)
@@ -96,20 +96,18 @@ impl SqliteAgentStateStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT state_data, checksum FROM agent_states
                  WHERE tenant_id = ?1 AND agent_id = ?2",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare get_agent_state: {}", e)))?;
 
         let mut rows = stmt
-            .query(libsql::params![tenant_id, agent_id])
-            .await
+            .query(rusqlite::params![tenant_id, agent_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute get_agent_state: {}", e)))?;
 
-        match rows.next().await {
+        match rows.next() {
             Ok(Some(row)) => {
                 let state_data: String = row
                     .get(0)
@@ -156,7 +154,7 @@ impl SqliteAgentStateStorage {
             .map_err(|e| SqliteError::Query(format!("Invalid UTF-8 in state_data: {}", e)))?;
 
         // UPSERT with version trigger handling
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "INSERT INTO agent_states
                  (tenant_id, agent_id, agent_type, state_data, checksum, created_at, updated_at)
@@ -167,13 +165,11 @@ impl SqliteAgentStateStorage {
                    checksum = excluded.checksum,
                    updated_at = excluded.updated_at",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare set_agent_state: {}", e)))?;
 
-        stmt.execute(libsql::params![
+        stmt.execute(rusqlite::params![
             tenant_id, agent_id, agent_type, state_data, checksum, now, now
         ])
-        .await
         .map_err(|e| SqliteError::Query(format!("Failed to execute set_agent_state: {}", e)))?;
 
         Ok(())
@@ -212,13 +208,11 @@ impl StorageBackend for SqliteAgentStateStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("DELETE FROM agent_states WHERE tenant_id = ?1 AND agent_id = ?2")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare delete: {}", e)))?;
 
-        stmt.execute(libsql::params![tenant_id, agent_id])
-            .await
+        stmt.execute(rusqlite::params![tenant_id, agent_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute delete: {}", e)))?;
 
         Ok(())
@@ -231,21 +225,15 @@ impl StorageBackend for SqliteAgentStateStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("SELECT 1 FROM agent_states WHERE tenant_id = ?1 AND agent_id = ?2 LIMIT 1")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare exists: {}", e)))?;
 
-        let mut rows = stmt
-            .query(libsql::params![tenant_id, agent_id])
-            .await
+        let exists = stmt
+            .exists(rusqlite::params![tenant_id, agent_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute exists: {}", e)))?;
 
-        Ok(rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to check exists: {}", e)))?
-            .is_some())
+        Ok(exists)
     }
 
     async fn list_keys(&self, prefix: &str) -> anyhow::Result<Vec<String>> {
@@ -256,24 +244,21 @@ impl StorageBackend for SqliteAgentStateStorage {
         let conn = self.backend.get_connection().await?;
 
         let pattern = format!("{}%", agent_id_prefix);
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT agent_id FROM agent_states
                  WHERE tenant_id = ?1 AND agent_id LIKE ?2
                  ORDER BY agent_id",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare list_keys: {}", e)))?;
 
         let mut rows = stmt
-            .query(libsql::params![tenant_id, pattern])
-            .await
+            .query(rusqlite::params![tenant_id, pattern])
             .map_err(|e| SqliteError::Query(format!("Failed to execute list_keys: {}", e)))?;
 
         let mut keys = Vec::new();
         while let Some(row) = rows
             .next()
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to fetch key row: {}", e)))?
         {
             let agent_id: String = row
@@ -315,13 +300,11 @@ impl StorageBackend for SqliteAgentStateStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("DELETE FROM agent_states WHERE tenant_id = ?1")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare clear: {}", e)))?;
 
-        stmt.execute(libsql::params![tenant_id])
-            .await
+        stmt.execute(rusqlite::params![tenant_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute clear: {}", e)))?;
 
         Ok(())
@@ -382,14 +365,12 @@ mod tests {
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V1__initial_setup.sql"
         ))
-        .await
         .unwrap();
 
         // V6: Agent states
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V6__agent_state.sql"
         ))
-        .await
         .unwrap();
 
         // Create unique tenant ID
@@ -546,12 +527,10 @@ mod tests {
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V1__initial_setup.sql"
         ))
-        .await
         .unwrap();
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V6__agent_state.sql"
         ))
-        .await
         .unwrap();
 
         let storage1 = SqliteAgentStateStorage::new(Arc::clone(&backend), "tenant-1".to_string());

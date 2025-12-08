@@ -1223,7 +1223,35 @@
     - Launch.
     - Verify Metadata: `{"provider_name": "anthropic"}`.
 
-### Task 14.5.1h: Provider Management & Discovery
+### Task 14.5.1h: SQLite dynamic loading of vectorsql - research and fix
+**Priority**: CRITICAL
+**Status**: IN PROGRESS
+**Description**: Resolve segmentation faults and SIGKILL errors when loading `vectorlite-rs` extension dynamically on Linux/macOS.
+
+**The Problem**:
+- **Symptoms**: `SIGKILL` or `SIGSEGV` immediately upon initialization or usage of the vector extension.
+- **Root Cause**: ABI Mismatch. The host application uses `libsql` (a fork of SQLite), while the extension uses `rusqlite`. Even if they link to the "same" SQLite version, the symbol interaction between the host executable and the dynamically loaded `.dylib`/`.so` is fragile, leading to conflicting `sqlite3_api` pointers or memory layout issues.
+- **Constraint**: `libsql` crate does NOT support custom Virtual Table registration (`create_module`), forcing us to use `rusqlite` for the extension.
+
+**The Solution: Static Linking & Dependency Swap**:
+To achieve 100% stability, we are pivoting from **Dynamic Loading** to **Static Linking**.
+1.  **Dependency Swap**: We replace the `libsql` dependency in `llmspell-storage` with standard `rusqlite`.
+    -   *Trade-off*: We lose `libsql`'s replication features (Phase 13c.2).
+    -   *Benefit*: We gain perfect compatibility with `vectorlite-rs` and `rusqlite` ecosystem.
+2.  **Static Linking**: `vectorlite-rs` is compiled as a standard Rust library (`rlib`), not a dynamic library (`cdylib`).
+3.  **Programmatic Registration**: We expose a safe Rust entry point `register_vectorlite(&conn)` and call it directly from `SqliteBackend` during initialization.
+
+**Execution Plan**:
+- [x] **vectorlite-rs**: Convert `Cargo.toml` to `rlib` (remove `cdylib` and `loadable_extension`).
+- [x] **vectorlite-rs**: Replace C-ABI `sqlite3_init` with safe `register_vectorlite` (Rust API).
+- [x] **llmspell-storage**: Replace `libsql` with `rusqlite` in `Cargo.toml`.
+- [x] **llmspell-storage**: Refactor `SqliteBackend` to use `rusqlite::Connection` and call `register_vectorlite`.
+- [x] **llmspell-storage**: Refactor Exporter/Importer to match `rusqlite` API.
+- [ ] **llmspell-storage**: Refactor remaining storage modules (`agent_state`, `graph`, `hook_history`, `session`) to use synchronous `rusqlite`.
+- [ ] **Verification**: Pass `sqlite_vector_verify` test.
+
+
+### Task 14.5.1i: Provider Management & Discovery
 **Priority**: HIGH
 **Status**: TODO
 **Description**: Implement a system to discover, list, and manage LLM providers (Local + API). This enables the frontend to dynamically populate model selectors with *real* available models instead of mock data, and provides visibility into configured providers.
