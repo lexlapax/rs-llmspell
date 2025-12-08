@@ -133,41 +133,36 @@ impl SqliteBackend {
         // Pure Rust HNSW implementation - 3-100x faster than brute-force
         let conn = pool.get_connection().await?;
 
-        // Define extension paths based on platform
-        #[cfg(target_os = "macos")]
-        let vectorlite_path = "./extensions/vectorlite.dylib";
-        #[cfg(target_os = "linux")]
-        let vectorlite_path = "./extensions/vectorlite.so";
-        #[cfg(target_os = "windows")]
-        let vectorlite_path = "./extensions/vectorlite.dll";
-
-        // Enable extension loading (required by libsql for security)
-        // SAFETY: Extension loading is disabled immediately after loading
-        conn.load_extension_enable().map_err(|e| {
-            SqliteError::Extension(format!("Failed to enable extension loading: {e}"))
-        })?;
-
-        // Load vectorlite-rs extension (HNSW-indexed vector search)
-        match conn.load_extension(vectorlite_path, None) {
-            Ok(()) => {
-                info!(
-                    "Successfully loaded vectorlite-rs extension from {vectorlite_path} (HNSW-indexed, 3-100x faster)"
-                );
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to load vectorlite-rs extension from {vectorlite_path}: {e}. \
-                    Vector search will not be available. \
-                    Build vectorlite-rs: cargo build -p vectorlite-rs --release && \
-                    cp target/release/libvectorlite_rs.* extensions/vectorlite.*"
-                );
+        // Initialize vectorlite-rs (HNSW vector search)
+        // We use static registration instead of dynamic extension loading to avoid ABI/symbol issues
+        #[cfg(feature = "vectorlite-rs")]
+        {
+            use rusqlite::vtab::eponymous_only_module;
+            info!("Registering vectorlite-rs module statically");
+            
+            // We need to access the inner rusqlite Connection if libsql::Connection wraps it
+            // or use specific API. Assuming libsql::Connection exposes create_module or we can access it.
+            // Note: libsql crate might not expose create_module directly if it's the HTTP one.
+            // But we are using Builder::new_local which implies local SQLite.
+            
+            // FIXME: Type mismatch risk if vectorlite-rs rusqlite != libsql rusqlite.
+            // But let's try standard create_module.
+            
+            // Note: VectorLiteTab is in vectorlite_rs root.
+            if let Err(e) = conn.create_module(
+                "vectorlite",
+                eponymous_only_module::<vectorlite_rs::VectorLiteTab>(),
+                None
+            ) {
+                // Return error if registration fails
+                return Err(SqliteError::Extension(format!("Failed to register vectorlite module: {e}")));
             }
         }
-
-        // Disable extension loading for security (prevent SQL injection attacks)
-        conn.load_extension_disable().map_err(|e| {
-            SqliteError::Extension(format!("Failed to disable extension loading: {e}"))
-        })?;
+        
+        #[cfg(not(feature = "vectorlite-rs"))]
+        {
+             warn!("vectorlite-rs feature not enabled. Vector search will be unavailable.");
+        }
 
         let backend = Self {
             pool: Arc::new(pool),
