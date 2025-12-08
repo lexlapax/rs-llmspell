@@ -12,3 +12,4 @@ pub mod ws;
 pub mod assets;
 pub mod config;
 pub mod templates;
+pub mod providers;

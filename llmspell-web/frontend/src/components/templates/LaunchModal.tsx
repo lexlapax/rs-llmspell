@@ -3,6 +3,7 @@ import { Fragment, useState, useEffect } from 'react';
 import { X, Play, Loader2 } from 'lucide-react';
 import type { TemplateDetails, ParameterSchema } from '../../api/types';
 import clsx from 'clsx';
+import { listProviders, type ProviderInfo } from '../../api/providers';
 
 interface LaunchModalProps {
     isOpen: boolean;
@@ -15,20 +16,30 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
     const [config, setConfig] = useState<Record<string, any>>({});
     const [isLaunching, setIsLaunching] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [providers, setProviders] = useState<ProviderInfo[]>([]);
+    const [isLoadingProviders, setIsLoadingProviders] = useState(false);
 
     useEffect(() => {
-        if (isOpen && template) {
-            // Initialize defaults
-            const defaults: Record<string, any> = {};
-            template.schema.parameters.forEach(p => {
-                if (p.default !== undefined && p.default !== null) {
-                    defaults[p.name] = p.default;
-                } else if (p.type === 'boolean') {
-                    defaults[p.name] = false;
-                }
-            });
-            setConfig(defaults);
-            setError(null);
+        if (isOpen) {
+            setIsLoadingProviders(true);
+            listProviders()
+                .then(data => setProviders(data))
+                .catch(err => console.error("Failed to load providers", err)) // Non-blocking
+                .finally(() => setIsLoadingProviders(false));
+
+            if (template) {
+                // Initialize defaults
+                const defaults: Record<string, any> = {};
+                template.schema.parameters.forEach(p => {
+                    if (p.default !== undefined && p.default !== null) {
+                        defaults[p.name] = p.default;
+                    } else if (p.type === 'boolean') {
+                        defaults[p.name] = false;
+                    }
+                });
+                setConfig(defaults);
+                setError(null);
+            }
         }
     }, [isOpen, template]);
 
@@ -85,9 +96,17 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
         setConfig(prev => ({ ...prev, [key]: value }));
     };
 
-    // Mock data for providers and models (until Registry API is ready)
-    const PROVIDER_OPTIONS = ['ollama', 'openai', 'anthropic', 'candle'];
-    const MODEL_OPTIONS = ['gpt-4-turbo', 'gpt-3.5-turbo', 'claude-3-opus', 'llama3-8b', 'mistral-7b'];
+    // Calculate options dynamically
+    const providerOptions = providers.map(p => p.name);
+
+    // Get models for selected provider, or flat list of all models if no provider selected
+    const selectedProviderName = config['provider_name'];
+    const modelOptions = selectedProviderName
+        ? (providers.find(p => p.name === selectedProviderName)?.capabilities.available_models || [])
+        : providers.flatMap(p => p.capabilities.available_models);
+
+    // Deduplicate models if needed
+    const uniqueModelOptions = Array.from(new Set(modelOptions));
 
     const renderField = (param: ParameterSchema) => {
         const value = config[param.name] ?? '';
@@ -104,9 +123,10 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
                         value={value}
                         onChange={(e) => handleInputChange(param.name, e.target.value)}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+                        disabled={isLoadingProviders}
                     >
-                        <option value="">Default (Auto)</option>
-                        {PROVIDER_OPTIONS.map((val) => (
+                        <option value="">{isLoadingProviders ? "Loading..." : "Default (Auto)"}</option>
+                        {providerOptions.map((val) => (
                             <option key={val} value={val}>{val}</option>
                         ))}
                     </select>
@@ -126,9 +146,10 @@ export function LaunchModal({ isOpen, onClose, template, onLaunch }: LaunchModal
                         value={value}
                         onChange={(e) => handleInputChange(param.name, e.target.value)}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+                        disabled={isLoadingProviders}
                     >
                         <option value="">Default (Template Defined)</option>
-                        {MODEL_OPTIONS.map((val) => (
+                        {uniqueModelOptions.map((val) => (
                             <option key={val} value={val}>{val}</option>
                         ))}
                     </select>

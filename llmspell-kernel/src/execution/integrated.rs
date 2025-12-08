@@ -3144,11 +3144,50 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // Handle model commands
         match command {
             "list" => self.handle_model_list(content).await,
+            "list_providers" => self.handle_list_providers(content).await,
             "pull" => self.handle_model_pull(content).await,
             "status" => self.handle_model_status(content).await,
             "info" => self.handle_model_info(content).await,
             _ => self.handle_unknown_model_command(command).await,
         }
+    }
+
+    /// Handle list providers command
+    async fn handle_list_providers(&mut self, _content: &Value) -> Result<()> {
+        debug!("Listing available providers");
+
+        let response = if let Some(provider) = self.provider_manager.as_ref() {
+            // List detailed providers including capabilities
+            let mut providers = Vec::new();
+            let available = provider.list_providers().await;
+            
+            for name in available {
+                if let Ok(caps) = provider.query_capabilities(Some(&name)).await {
+                    providers.push(json!({
+                        "name": name,
+                        "capabilities": caps
+                    }));
+                }
+            }
+
+            json!({
+                "status": "ok",
+                "providers": providers
+            })
+        } else {
+            // Fallback if no provider manager
+             json!({
+                "status": "ok",
+                "providers": []
+            })
+        };
+        
+        // Send reply
+        let full_response = json!({
+            "msg_type": "model_reply",
+            "content": response
+        });
+        self.send_model_reply(full_response).await
     }
 
     /// Handle model list command

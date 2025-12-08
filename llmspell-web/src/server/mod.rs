@@ -178,6 +178,10 @@ impl WebServer {
                 "/config/restart",
                 post(handlers::static_config::restart_server),
             )
+            .route(
+                "/providers",
+                get(handlers::providers::list_providers),
+            )
             .layer(axum::middleware::from_fn_with_state(
                 state.clone(),
                 auth_middleware,
