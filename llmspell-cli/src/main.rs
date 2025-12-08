@@ -169,22 +169,53 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
 /// This allows: `llmspell exec "code" > output.txt 2> debug.log`
 fn setup_tracing(trace_level: llmspell_cli::cli::TraceLevel) {
     use std::io;
-    use tracing::Level;
-    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::{fmt, EnvFilter};
+
+    // Define noisy crates to suppress (keep them at WARN even if level is INFO/DEBUG)
+    // Detailed debug of these crates should be done via explicit RUST_LOG env var
+    const NOISY_CRATES: &[&str] = &[
+        "rig_core", "hyper", "h2", "reqwest", "rustls", "want", "mio",
+    ];
 
     // Check if RUST_LOG is set
-    if std::env::var("RUST_LOG").is_ok() {
+    if let Ok(env_filter) = std::env::var("RUST_LOG") {
         // Use RUST_LOG environment variable with EnvFilter
-        tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::from_default_env())
+        fmt()
+            .with_env_filter(EnvFilter::new(env_filter))
             .with_writer(io::stderr) // Explicitly use stderr for tracing
             .with_target(false)
             .init();
     } else {
-        // Use --trace flag
-        let level: Level = trace_level.into();
-        tracing_subscriber::fmt()
-            .with_max_level(level)
+        // Construct filter based on trace level
+        // Map enum to string because EnvFilter parses strings nicely for directives
+        let level_str = match trace_level {
+            llmspell_cli::cli::TraceLevel::Off => "error",
+            llmspell_cli::cli::TraceLevel::Error => "error",
+            llmspell_cli::cli::TraceLevel::Warn => "warn",
+            llmspell_cli::cli::TraceLevel::Info => "info",
+            llmspell_cli::cli::TraceLevel::Debug => "debug",
+            llmspell_cli::cli::TraceLevel::Trace => "trace",
+        };
+
+        // Start with the base level
+        let mut filter_str = level_str.to_string();
+
+        // If the user requested INFO or higher (DEBUG/TRACE), suppress noisy dependencies to WARN
+        // This ensures application logs are visible but raw network/library noise is hidden
+        // User can still override this by setting RUST_LOG explicitly
+        if matches!(
+            trace_level,
+            llmspell_cli::cli::TraceLevel::Info
+                | llmspell_cli::cli::TraceLevel::Debug
+                | llmspell_cli::cli::TraceLevel::Trace
+        ) {
+            for krate in NOISY_CRATES {
+                filter_str.push_str(&format!(",{}=warn", krate));
+            }
+        }
+
+        fmt()
+            .with_env_filter(EnvFilter::new(filter_str))
             .with_writer(io::stderr) // Explicitly use stderr for tracing
             .with_target(false)
             .init();

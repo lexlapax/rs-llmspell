@@ -1284,7 +1284,44 @@ To achieve 100% stability, we are pivoting from **Dynamic Loading** to **Static 
 - [x] **Testing**:
     - [x] Create `tests/api_providers.rs` (Mock kernel, verify API response).
 
-### Task 14.5.2: Documentation & Polish
+### Task 14.5.2: UX, api and runtime consistency
+#### Task 14.5.2.1: Fix CLI Output Noise & Verify Web Daemon
+**Priority**: HIGH
+**Status**: DONE
+**Description**: Address user feedback regarding verbose/raw log output ("bunch of numbers") during `web start` and verify/improve visibility of the existing daemon mode for the web server.
+
+**Problem Analysis**:
+- **Output Noise**: The "bunch of numbers" is partially raw body logging from `rig-core` which uses `dbg!` in debug builds, and partially tracing noise. The tracing noise is fixed via `EnvFilter`, but `dbg!` requires release builds or daemon mode to suppress.
+- **Daemon Mode**: Verified `web start --daemon` works perfectly to hide this noise.
+
+**Acceptance Criteria**:
+- [x] **Log Noise Reduction**:
+    - [x] Modify `setup_tracing` in `llmspell-cli/src/main.rs` to use a more granular default `EnvFilter` (e.g., `warn,llmspell=info`).
+    - [x] Specifically suppress verbose/raw logs from `hyper`, `reqwest`, and `h2` (tracing sources).
+    - [x] Note: `rig-core` noise in debug builds requires daemon mode.
+- [x] **Web Daemon**:
+    - [x] Verify `llmspell web start --daemon` functionality (forking, PID file creation, log redirection).
+    - [x] Ensure `web status` and `web stop` work correctly with the daemonized process.
+    - [x] Improve `llmspell web --help` visibility if needed.
+
+**Implementation Steps**:
+1.  **Refine Logging**:
+    - [x] Update `llmspell-cli/src/main.rs` to construct a directive-based `EnvFilter`.
+2.  **Verify Daemon**:
+    - [x] Run `llmspell web start --daemon`.
+    - [x] Check process existence and PID file.
+    - [x] Run `llmspell web stop`.
+
+**Detailed Rig-Core Analysis**:
+The "bunch of numbers" observed in stdout is specifically caused by `rig-core`'s usage of the `dbg!` macro in its client implementation (likely printing raw request bodies), which writes directly to `stderr` via `std::fmt::Debug`.
+- **Why filter failed**: `dbg!` completely bypasses the `tracing` infrastructure (`RUST_LOG` / `EnvFilter`), so application-level logging config cannot suppress it.
+- **Why Daemon works**: Daemon mode redirects `stdout` and `stderr` to log files, effectively hiding this noise from the terminal.
+- **Recommended Fixes**:
+    1.  **Use Daemon Mode**: `llmspell web start --daemon` (Standard for running services).
+    2.  **Release Build**: `cargo run --release` (Often removes `dbg!` calls if guarded).
+    3.  **Upstream Fix**: Submit PR to `rig-core` to replace `dbg!` with `tracing::debug!`.
+
+### Task 14.5.3: Documentation & Polish
 **Priority**: HIGH
 **Estimated Time**: 8 hours
 **Assignee**: Tech Writer
@@ -1309,7 +1346,7 @@ To achieve 100% stability, we are pivoting from **Dynamic Loading** to **Static 
 - [ ] Functional tests pass
 - [ ] Zero clippy warnings
 
-### Task 14.5.3: OpenAPI Generation
+### Task 14.5.4: OpenAPI Generation
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Assignee**: Backend Developer

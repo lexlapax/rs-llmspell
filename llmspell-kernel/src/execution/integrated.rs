@@ -3160,7 +3160,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             // List detailed providers including capabilities
             let mut providers = Vec::new();
             let available = provider.list_providers().await;
-            
+
             for name in available {
                 if let Ok(caps) = provider.query_capabilities(Some(&name)).await {
                     providers.push(json!({
@@ -3176,12 +3176,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             })
         } else {
             // Fallback if no provider manager
-             json!({
+            json!({
                 "status": "ok",
                 "providers": []
             })
         };
-        
+
         // Send reply
         let full_response = json!({
             "msg_type": "model_reply",

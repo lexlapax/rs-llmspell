@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use llmspell_config::{LLMSpellConfig, providers::ProviderConfig};
+use llmspell_config::{providers::ProviderConfig, LLMSpellConfig};
 use llmspell_core::traits::script_executor::{ScriptExecutionOutput, ScriptExecutor};
 use llmspell_core::LLMSpellError;
 use llmspell_events::bus::EventBus;
@@ -15,10 +15,10 @@ use llmspell_web::server::WebServer;
 use llmspell_web::state::AppState;
 use serde_json::json;
 use std::any::Any;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use std::collections::HashMap;
 
 pub struct DummyScriptExecutor {
     session_manager: Arc<Mutex<Option<Arc<SessionManager>>>>,
@@ -52,7 +52,9 @@ impl ScriptExecutor for DummyScriptExecutor {
     }
     fn get_session_manager_any(&self) -> Option<Arc<dyn Any + Send + Sync>> {
         let guard = futures::executor::block_on(self.session_manager.lock());
-        guard.as_ref().map(|m| m.clone() as Arc<dyn Any + Send + Sync>)
+        guard
+            .as_ref()
+            .map(|m| m.clone() as Arc<dyn Any + Send + Sync>)
     }
     fn as_any(&self) -> &dyn Any {
         self
@@ -84,25 +86,28 @@ async fn setup_kernel_with_provider() -> Result<KernelHandle> {
 
     // Config with a test provider
     let mut config = LLMSpellConfig::default();
-    
+
     let mut providers_map = HashMap::new();
-    providers_map.insert("test-provider".to_string(), ProviderConfig {
-        provider_type: "ollama".to_string(), // Use omni/ollama as it doesn't need API key
-        enabled: true,
-        default_model: Some("test-model".to_string()),
-        base_url: Some("http://localhost:11434".to_string()),
-        api_key: None,
-        api_key_env: None,
-        timeout_seconds: Some(30),
-        max_retries: Some(3),
-        rate_limit: None,
-        retry: None,
-        temperature: None,
-        max_tokens: None,
-        options: HashMap::new(),
-        name: "test-provider".to_string(),
-    });
-    
+    providers_map.insert(
+        "test-provider".to_string(),
+        ProviderConfig {
+            provider_type: "ollama".to_string(), // Use omni/ollama as it doesn't need API key
+            enabled: true,
+            default_model: Some("test-model".to_string()),
+            base_url: Some("http://localhost:11434".to_string()),
+            api_key: None,
+            api_key_env: None,
+            timeout_seconds: Some(30),
+            max_retries: Some(3),
+            rate_limit: None,
+            retry: None,
+            temperature: None,
+            max_tokens: None,
+            options: HashMap::new(),
+            name: "test-provider".to_string(),
+        },
+    );
+
     config.providers.providers = providers_map;
 
     start_embedded_kernel_with_executor(config, executor).await
@@ -154,7 +159,7 @@ async fn test_list_providers_api() -> Result<()> {
     // 3. Authenticate
     let client = reqwest::Client::new();
     let base_url = format!("http://{}", addr);
-    
+
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     let login_resp = client
@@ -174,16 +179,18 @@ async fn test_list_providers_api() -> Result<()> {
         .await?;
 
     assert!(resp.status().is_success());
-    
+
     let body: serde_json::Value = resp.json().await?;
     println!("Providers response: {:?}", body);
-    
+
     // Check status
     assert_eq!(body["status"], "ok");
-    
+
     // Check providers list structure
-    let providers = body["providers"].as_array().expect("providers is not an array");
-    
+    let providers = body["providers"]
+        .as_array()
+        .expect("providers is not an array");
+
     // Note: We cannot guarantee 'test-provider' is available because query_capabilities
     // might fail if the backend (e.g. Ollama) is not running.
     // However, getting "status": "ok" and an array confirms the API -> Kernel -> ProviderManager path works.
