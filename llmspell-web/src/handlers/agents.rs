@@ -6,22 +6,30 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct AgentResponse {
     pub name: String,
     // Add more fields if available in Agent trait (e.g. description)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct ExecuteAgentRequest {
     pub input: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ExecuteAgentResponse {
     pub output: String,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/agents",
+    tag = "agents",
+    responses(
+        (status = 200, description = "List available agents", body = Vec<AgentResponse>)
+    )
+)]
 pub async fn list_agents(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AgentResponse>>, WebError> {
@@ -41,6 +49,19 @@ pub async fn list_agents(
     Ok(Json(response))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/agents/{id}/execute",
+    tag = "agents",
+    params(
+        ("id" = String, Path, description = "Agent ID")
+    ),
+    request_body = ExecuteAgentRequest,
+    responses(
+        (status = 200, description = "Agent execution successful", body = ExecuteAgentResponse),
+        (status = 404, description = "Agent not found")
+    )
+)]
 pub async fn execute_agent(
     State(state): State<AppState>,
     Path(id): Path<String>,

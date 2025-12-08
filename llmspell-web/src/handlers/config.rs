@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::error::WebError;
 use crate::state::AppState;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ConfigItem {
     pub name: String,
     pub description: String,
@@ -17,6 +17,14 @@ pub struct ConfigItem {
 }
 
 /// Get current configuration
+#[utoipa::path(
+    get,
+    path = "/api/config",
+    tag = "config",
+    responses(
+        (status = 200, description = "Get current configuration", body = Vec<ConfigItem>)
+    )
+)]
 pub async fn get_config(State(state): State<AppState>) -> Result<Json<Vec<ConfigItem>>, WebError> {
     // Read from shared registry
     let registry = state.runtime_config.read().await;
@@ -46,12 +54,12 @@ pub async fn get_config(State(state): State<AppState>) -> Result<Json<Vec<Config
     Ok(Json(items))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdateConfigRequest {
     pub overrides: HashMap<String, String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct UpdateConfigResponse {
     pub status: String,
     pub message: String,
@@ -59,6 +67,15 @@ pub struct UpdateConfigResponse {
 }
 
 /// Update configuration overrides
+#[utoipa::path(
+    put,
+    path = "/api/config",
+    tag = "config",
+    request_body = UpdateConfigRequest,
+    responses(
+        (status = 200, description = "Configuration updated", body = UpdateConfigResponse)
+    )
+)]
 pub async fn update_config(
     State(state): State<AppState>,
     Json(payload): Json<UpdateConfigRequest>,

@@ -14,6 +14,14 @@ use crate::state::AppState;
 use tracing::info;
 
 /// List all available templates
+#[utoipa::path(
+    get,
+    path = "/api/templates",
+    tag = "templates",
+    responses(
+        (status = 200, description = "List available templates", body = Vec<serde_json::Value>)
+    )
+)]
 pub async fn list_templates() -> Result<Json<Vec<TemplateMetadata>>, WebError> {
     let registry = global_registry();
     let templates = registry.list_metadata();
@@ -25,13 +33,27 @@ pub async fn list_templates() -> Result<Json<Vec<TemplateMetadata>>, WebError> {
     Ok(Json(templates))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct TemplateDetails {
+    #[schema(value_type = Object)]
     pub metadata: TemplateMetadata,
+    #[schema(value_type = Object)]
     pub schema: ConfigSchema,
 }
 
 /// Get details for a specific template
+#[utoipa::path(
+    get,
+    path = "/api/templates/{id}",
+    tag = "templates",
+    params(
+        ("id" = String, Path, description = "Template ID")
+    ),
+    responses(
+        (status = 200, description = "Get template details", body = TemplateDetails),
+        (status = 404, description = "Template not found")
+    )
+)]
 pub async fn get_template(Path(id): Path<String>) -> Result<Json<TemplateDetails>, WebError> {
     let registry = global_registry();
 
@@ -45,15 +67,16 @@ pub async fn get_template(Path(id): Path<String>) -> Result<Json<TemplateDetails
 }
 
 /// Request body for launching a template
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct LaunchTemplateRequest {
     /// Parameters for the template
+    #[schema(value_type = Option<Object>)]
     pub params: Option<TemplateParams>,
     /// Optional session ID to attach (if not creating new)
     pub session_id: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct LaunchResponse {
     pub session_id: String,
     pub template_id: String,
@@ -61,6 +84,20 @@ pub struct LaunchResponse {
 }
 
 /// Launch a template (Create Session)
+#[utoipa::path(
+    post,
+    path = "/api/templates/{id}/launch",
+    tag = "templates",
+    params(
+        ("id" = String, Path, description = "Template ID")
+    ),
+    request_body = LaunchTemplateRequest,
+    responses(
+        (status = 200, description = "Template launched successfully", body = LaunchResponse),
+        (status = 404, description = "Template not found"),
+        (status = 400, description = "Invalid parameters")
+    )
+)]
 pub async fn launch_template(
     State(state): State<AppState>,
     Path(id): Path<String>,

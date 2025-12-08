@@ -6,13 +6,13 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct SearchMemoryParams {
     pub query: String,
     pub limit: Option<usize>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct MemoryEntryResponse {
     pub id: String,
     pub session_id: String,
@@ -21,6 +21,15 @@ pub struct MemoryEntryResponse {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/memory/search",
+    tag = "memory",
+    params(SearchMemoryParams),
+    responses(
+        (status = 200, description = "Search memory", body = Vec<MemoryEntryResponse>)
+    )
+)]
 pub async fn search_memory(
     State(state): State<AppState>,
     Query(params): Query<SearchMemoryParams>,

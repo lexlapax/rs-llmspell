@@ -195,7 +195,10 @@ impl WebServer {
             .layer(axum::middleware::from_fn(track_metrics))
             .with_state(state)
             // OpenAPI
-            .merge(utoipa_swagger_ui::SwaggerUi::new("/swagger-ui").url("/api/openapi.json", crate::api_docs::ApiDoc::openapi()))
+            .merge(
+                utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
+                    .url("/api/openapi.json", crate::api_docs::ApiDoc::openapi()),
+            )
             .fallback(handlers::assets::static_handler)
     }
 }

@@ -2,18 +2,29 @@ use crate::state::AppState;
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+use crate::error::WebError;
+use utoipa::ToSchema;
+
+#[derive(Deserialize, ToSchema)]
 pub struct ExecuteScriptRequest {
     pub code: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct ScriptExecutionResponse {
     pub result: String,
 }
 
-use crate::error::WebError;
-
+#[utoipa::path(
+    post,
+    path = "/api/scripts/execute",
+    tag = "scripts",
+    request_body = ExecuteScriptRequest,
+    responses(
+        (status = 200, description = "Script executed successfully", body = ScriptExecutionResponse),
+        (status = 500, description = "Execution failed")
+    )
+)]
 pub async fn execute_script(
     State(state): State<AppState>,
     Json(payload): Json<ExecuteScriptRequest>,

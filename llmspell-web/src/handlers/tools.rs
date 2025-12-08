@@ -7,24 +7,34 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ToolResponse {
     pub name: String,
     pub description: String,
     pub category: String,
+    #[schema(value_type = Object)]
     pub schema: Value,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct ExecuteToolRequest {
+    #[schema(value_type = Object)]
     pub parameters: Value,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ExecuteToolResponse {
     pub output: String,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/tools",
+    tag = "tools",
+    responses(
+        (status = 200, description = "List available tools", body = Vec<ToolResponse>)
+    )
+)]
 pub async fn list_tools(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ToolResponse>>, WebError> {
@@ -54,6 +64,19 @@ pub async fn list_tools(
     Ok(Json(tools))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/tools/{id}/execute",
+    tag = "tools",
+    params(
+        ("id" = String, Path, description = "Tool ID")
+    ),
+    request_body = ExecuteToolRequest,
+    responses(
+        (status = 200, description = "Tool execution successful", body = ExecuteToolResponse),
+        (status = 404, description = "Tool not found")
+    )
+)]
 pub async fn execute_tool(
     State(state): State<AppState>,
     Path(id): Path<String>,

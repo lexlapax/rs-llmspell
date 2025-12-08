@@ -7,7 +7,7 @@ use axum::{
 use llmspell_kernel::sessions::types::{SessionQuery, SessionSortBy, SessionStatus};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct ListSessionsParams {
     pub status: Option<SessionStatus>,
     pub created_by: Option<String>,
@@ -17,17 +17,28 @@ pub struct ListSessionsParams {
     pub offset: Option<usize>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct SessionResponse {
     pub id: String,
     pub name: Option<String>,
+    #[schema(value_type = String)]
     pub status: SessionStatus,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub tags: Vec<String>,
+    #[schema(value_type = Object)]
     pub metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/sessions",
+    tag = "sessions",
+    params(ListSessionsParams),
+    responses(
+        (status = 200, description = "List sessions", body = Vec<SessionResponse>)
+    )
+)]
 pub async fn list_sessions(
     State(state): State<AppState>,
     Query(params): Query<ListSessionsParams>,
@@ -68,6 +79,18 @@ pub async fn list_sessions(
     Ok(Json(response))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/sessions/{id}",
+    tag = "sessions",
+    params(
+        ("id" = String, Path, description = "Session ID")
+    ),
+    responses(
+        (status = 200, description = "Get session details", body = SessionResponse),
+        (status = 404, description = "Session not found")
+    )
+)]
 pub async fn get_session(
     State(state): State<AppState>,
     Path(id): Path<String>,

@@ -9,6 +9,15 @@ use schemars::schema_for;
 use std::fs;
 
 /// Get the raw configuration source (TOML)
+#[utoipa::path(
+    get,
+    path = "/api/config/source",
+    tag = "config",
+    responses(
+        (status = 200, description = "Get configuration TOML source", body = String, content_type = "text/plain"),
+        (status = 404, description = "No static configuration file loaded")
+    )
+)]
 pub async fn get_config_source(State(state): State<AppState>) -> impl IntoResponse {
     match &state.static_config_path {
         Some(path) => match fs::read_to_string(path) {
@@ -26,6 +35,17 @@ pub async fn get_config_source(State(state): State<AppState>) -> impl IntoRespon
 /// Update the raw configuration source (TOML)
 /// Note: This does not reload the configuration in-memory, but persists it to disk.
 /// A server restart is required to apply changes.
+#[utoipa::path(
+    put,
+    path = "/api/config/source",
+    tag = "config",
+    request_body(content = String, content_type = "text/plain"),
+    responses(
+        (status = 200, description = "Configuration saved"),
+        (status = 400, description = "Invalid TOML configuration"),
+        (status = 500, description = "Failed to write config file")
+    )
+)]
 pub async fn update_config_source(
     State(state): State<AppState>,
     body: String,
@@ -57,12 +77,28 @@ pub async fn update_config_source(
 }
 
 /// Get the JSON Schema for the configuration
+#[utoipa::path(
+    get,
+    path = "/api/config/schema",
+    tag = "config",
+    responses(
+        (status = 200, description = "Get configuration JSON Schema", body = serde_json::Value)
+    )
+)]
 pub async fn get_config_schema() -> impl IntoResponse {
     let schema = schema_for!(LLMSpellConfig);
     Json(schema)
 }
 
 /// List available builtin configuration profiles
+#[utoipa::path(
+    get,
+    path = "/api/config/profiles",
+    tag = "config",
+    responses(
+        (status = 200, description = "List builtin configuration profiles", body = Vec<String>)
+    )
+)]
 pub async fn get_profiles() -> Json<Vec<&'static str>> {
     Json(llmspell_config::LLMSpellConfig::list_builtin_profiles())
 }
