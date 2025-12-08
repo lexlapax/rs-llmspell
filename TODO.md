@@ -1223,7 +1223,38 @@
     - Launch.
     - Verify Metadata: `{"provider_name": "anthropic"}`.
 
-### Task 14.5.1h: Provider management
+### Task 14.5.1h: Provider Management & Discovery
+**Priority**: HIGH
+**Status**: TODO
+**Description**: Implement a system to discover, list, and manage LLM providers (Local + API). This enables the frontend to dynamically populate model selectors with *real* available models instead of mock data, and provides visibility into configured providers.
+
+**Acceptance Criteria**:
+- [ ] **Backend API (`GET /api/providers`)**:
+    - [ ] Returns list of configured providers (e.g., "ollama", "openai").
+    - [ ] Returns status (Active/Error) and available models for each provider.
+    - [ ] Supports both local (Ollama/Candle) and remote (OpenAI, Anthropic) providers.
+- [ ] **Kernel Extension**:
+    - [ ] Extend `model_request` protocol to support `list_providers` command.
+    - [ ] `IntegratedKernel` queries `ProviderManager` for all registered/configured providers.
+    - [ ] Aggregates capabilities (models, features) from initialized instances.
+- [ ] **Frontend UI**:
+    - [ ] **Providers Page**: List all providers, their status, and configured models.
+    - [ ] **Launch Modal Integration**: Replace mock data with real provider/model list fetched from API.
+- [ ] **Validation**:
+    - [ ] Integration test `api_providers.rs` verifying provider discovery flow.
+
+**Implementation Steps**:
+- [ ] **Kernel & Backend**:
+    - [ ] Extend `IntegratedKernel::handle_model_request` to handle `command: "list_providers"`.
+    - [ ] Implement `ProviderManager::list_detailed_providers()` to return config + capabilities.
+    - [ ] Create `handlers/providers.rs` in `llmspell-web` with `list_providers` endpoint.
+    - [ ] Register logic in `server/mod.rs`.
+- [ ] **Frontend**:
+    - [ ] Create `src/api/providers.ts`.
+    - [ ] Create `src/pages/Providers.tsx` (Table view of providers).
+    - [ ] Update `LaunchModal.tsx` to `useProviders()` hook for data source.
+- [ ] **Testing**:
+    - [ ] Create `tests/api_providers.rs` (Mock kernel, verify API response).
 
 ### Task 14.5.2: Documentation & Polish
 **Priority**: HIGH

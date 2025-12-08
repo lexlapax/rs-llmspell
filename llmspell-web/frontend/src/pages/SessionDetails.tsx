@@ -38,7 +38,12 @@ const MOCK_SESSION: SessionDetailsType = {
         '[INFO] Executing tool "Fetch Papers"... downloaded 3 PDFs.',
         '[INFO] Agent "Outline Draft" completed.',
         '[INFO] Agent "Write Sections" started...',
-    ]
+    ],
+    metadata: {
+        provider_name: 'ollama',
+        model: 'llama3:8b',
+        max_tokens: 4000
+    }
 };
 
 export function SessionDetails() {

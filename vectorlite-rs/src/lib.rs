@@ -64,7 +64,7 @@ pub use hnsw::HnswIndex;
 /// - Must return SQLITE_OK (0) on success
 /// - Must not panic or unwind across FFI boundary
 #[no_mangle]
-pub unsafe extern "C" fn sqlite3_vectorliters_init(
+pub unsafe extern "C" fn sqlite3_vectorlite_init(
     db: *mut ffi::sqlite3,
     _pz_err_msg: *mut *mut std::os::raw::c_char,
     _p_api: *mut ffi::sqlite3_api_routines,
@@ -89,12 +89,12 @@ pub unsafe extern "C" fn sqlite3_vectorliters_init(
 /// Windows extension entry point
 #[cfg(windows)]
 #[no_mangle]
-pub unsafe extern "C" fn sqlite3_vectorliters_init_win32(
+pub unsafe extern "C" fn sqlite3_vectorlite_init_win32(
     db: *mut ffi::sqlite3,
     pz_err_msg: *mut *mut std::os::raw::c_char,
     p_api: *mut ffi::sqlite3_api_routines,
 ) -> c_int {
-    sqlite3_vectorliters_init(db, pz_err_msg, p_api)
+    sqlite3_vectorlite_init(db, pz_err_msg, p_api)
 }
 
 /// VectorLite virtual table implementation
