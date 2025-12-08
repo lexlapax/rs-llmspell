@@ -643,6 +643,13 @@ hyperfine './target/release/llmspell run examples/script-users/getting-started/0
 cargo test --workspace -- --test-threads=1 --nocapture
 ```
 
+**Issue**: "Too many open files" (OS error 24)
+```bash
+# Solution: Run with reduced concurrency (SQLite tests consume FDs)
+cargo test --workspace -- --test-threads=1
+# Or increase ulimit: ulimit -n 4096
+```
+
 **Issue**: Clippy warnings
 ```bash
 # Solution: Fix warnings (NO #[allow] except in special cases)

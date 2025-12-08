@@ -84,6 +84,7 @@ The platform is highly modular (21 crates) with feature flags for flexible build
 
 *   Use `llmspell-testing` crate helpers ONLY.
 *   Target >90% test coverage.
+*   Run tests with `--test-threads=1` if you encounter "Too many open files" (OS resource limit).
 
 ## Performance Targets
 

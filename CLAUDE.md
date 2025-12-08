@@ -59,6 +59,7 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - Use **llmspell-testing** crate helpers ONLY
 - **Feature-based testing** via Cargo features
 - **>90% test coverage, >95% API documentation coverage**
+- **Use `--test-threads=1`** if hitting "Too many open files" (OS limit)
 
 ## Performance Targets
 - Tool initialization: <10ms
