@@ -1,7 +1,7 @@
 //! ABOUTME: Benchmarks for context assembly operations
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use llmspell_bridge::ContextBridge;
+use llmspell_bridge::{ContextBridge, MemoryProvider};
 use llmspell_memory::{DefaultMemoryManager, MemoryManager};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -26,7 +26,7 @@ fn context_assemble_benchmark(c: &mut Criterion) {
             mm.episodic().add(entry).await.unwrap();
         }
 
-        Arc::new(ContextBridge::new(Arc::new(mm)))
+        Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(mm))))
     });
 
     let mut group = c.benchmark_group("context_assemble");
@@ -67,7 +67,7 @@ fn context_parallel_retrieval_benchmark(c: &mut Criterion) {
         let mm = DefaultMemoryManager::new_in_memory()
             .await
             .expect("Failed to create memory manager");
-        Arc::new(ContextBridge::new(Arc::new(mm)))
+        Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(mm))))
     });
 
     let mut group = c.benchmark_group("context_parallel_retrieval");

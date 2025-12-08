@@ -285,6 +285,9 @@ pub mod workflows; // Includes WorkflowBridge, WorkflowRegistry, and Standardize
 // Template bridge module
 pub mod template_bridge;
 
+// Memory provider for lazy initialization (Phase 14 Fix)
+pub mod memory_provider;
+
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -302,6 +305,7 @@ pub use engine::{
 pub use context_bridge::ContextBridge;
 pub use llmspell_config::LLMSpellConfig;
 pub use memory_bridge::MemoryBridge;
+pub use memory_provider::MemoryProvider;
 pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;

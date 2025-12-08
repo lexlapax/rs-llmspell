@@ -6,7 +6,8 @@ mod test_helpers;
 use llmspell_bridge::lua::globals::context::inject_context_global;
 use llmspell_bridge::lua::globals::memory::inject_memory_global;
 use llmspell_bridge::{
-    globals::types::GlobalContext, ComponentRegistry, ContextBridge, MemoryBridge, ProviderManager,
+    globals::types::GlobalContext, ComponentRegistry, ContextBridge, MemoryBridge, MemoryProvider,
+    ProviderManager,
 };
 use llmspell_config::ProviderManagerConfig;
 use llmspell_memory::{DefaultMemoryManager, EpisodicEntry, MemoryManager};
@@ -37,8 +38,12 @@ fn setup_integrated_lua_env() -> (Lua, Arc<DefaultMemoryManager>) {
     let memory_manager = Arc::new(memory_manager);
 
     // Create bridges
-    let memory_bridge = Arc::new(MemoryBridge::new(memory_manager.clone()));
-    let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));
+    let memory_bridge = Arc::new(MemoryBridge::new(MemoryProvider::new_eager(
+        memory_manager.clone(),
+    )));
+    let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(
+        memory_manager.clone(),
+    )));
 
     // Create Lua runtime
     let lua = Lua::new();
@@ -364,7 +369,7 @@ fn test_error_propagation() {
 
 /// Helper: Add entry via Rust `MemoryBridge`
 fn add_via_rust_bridge(memory_manager: Arc<DefaultMemoryManager>, session_id: &str, message: &str) {
-    let memory_bridge = MemoryBridge::new(memory_manager);
+    let memory_bridge = MemoryBridge::new(MemoryProvider::new_eager(memory_manager));
     llmspell_kernel::global_io_runtime().block_on(async {
         memory_bridge
             .episodic_add(

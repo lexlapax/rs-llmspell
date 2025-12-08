@@ -1,7 +1,7 @@
 //! ABOUTME: Integration tests for memory-aware template execution
 //! ABOUTME: Validates Task 13.11 (Template Integration - Memory-Aware Workflows)
 
-use llmspell_bridge::ContextBridge;
+use llmspell_bridge::{ContextBridge, MemoryProvider};
 use llmspell_memory::{DefaultMemoryManager, EpisodicEntry, MemoryManager};
 use llmspell_templates::{ExecutionContext, TemplateParams, TemplateRegistry};
 use serde_json::json;
@@ -27,7 +27,9 @@ async fn test_execution_context_with_memory() {
     debug!("Created DefaultMemoryManager");
 
     // Create context bridge
-    let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));
+    let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(
+        memory_manager.clone(),
+    )));
     debug!("Created ContextBridge");
 
     // Build execution context with memory support
@@ -183,7 +185,9 @@ async fn test_context_bridge_creation() {
     );
 
     // Create context bridge
-    let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));
+    let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(
+        memory_manager.clone(),
+    )));
 
     // Verify it implements ContextAssembler (compile-time check)
     let _assembler: Arc<dyn llmspell_core::ContextAssembler> = context_bridge.clone();

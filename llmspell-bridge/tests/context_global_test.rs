@@ -5,7 +5,8 @@ mod test_helpers;
 
 use llmspell_bridge::lua::globals::context::inject_context_global;
 use llmspell_bridge::{
-    globals::types::GlobalContext, ComponentRegistry, ContextBridge, ProviderManager,
+    globals::types::GlobalContext, ComponentRegistry, ContextBridge, MemoryProvider,
+    ProviderManager,
 };
 use llmspell_config::ProviderManagerConfig;
 use llmspell_memory::{DefaultMemoryManager, MemoryManager};
@@ -32,7 +33,9 @@ fn test_context_global_injection() {
     });
 
     // Create bridge
-    let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+    let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+        memory_manager,
+    ))));
 
     // Create Lua runtime
     let lua = Lua::new();
@@ -88,7 +91,9 @@ fn test_context_assemble_episodic() {
                 .expect("Failed to add entry");
         });
 
-        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -117,7 +122,9 @@ fn test_context_assemble_semantic() {
                 .expect("Failed to create memory manager")
         });
 
-        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -146,7 +153,9 @@ fn test_context_assemble_hybrid() {
                 .expect("Failed to create memory manager")
         });
 
-        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -175,7 +184,9 @@ fn test_context_strategy_validation() {
                 .expect("Failed to create memory manager")
         });
 
-        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -206,7 +217,9 @@ fn test_context_token_budget_validation() {
                 .expect("Failed to create memory manager")
         });
 
-        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -240,7 +253,9 @@ fn test_context_test() {
                 .expect("Failed to create memory manager")
         });
 
-        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -269,7 +284,9 @@ fn test_context_strategy_stats() {
                 .expect("Failed to create memory manager")
         });
 
-        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -307,7 +324,9 @@ fn test_context_assemble_rag_without_pipeline() {
         });
 
         // Create ContextBridge WITHOUT RAG pipeline
-        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -393,7 +412,7 @@ fn test_context_assemble_rag_with_pipeline() {
 
         // Create ContextBridge WITH mock RAG pipeline
         let context_bridge = Arc::new(
-            ContextBridge::new(Arc::new(memory_manager))
+            ContextBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)))
                 .with_rag_pipeline(Arc::new(MockRAGRetriever)),
         );
         let lua = Lua::new();

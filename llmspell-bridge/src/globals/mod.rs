@@ -30,6 +30,7 @@ pub mod types;
 pub mod workflow_global;
 
 // Re-exports
+use crate::MemoryProvider;
 pub use injection::{GlobalInjector, InjectionCache};
 pub use registry::{GlobalRegistry, GlobalRegistryBuilder};
 pub use template_global::TemplateGlobal;
@@ -116,21 +117,16 @@ async fn create_fallback_memory_manager() -> Option<Arc<dyn llmspell_memory::Mem
 }
 
 /// Register Memory and Context bridges with the given memory manager
-fn register_bridges(
-    builder: &mut GlobalRegistryBuilder,
-    memory_manager: Arc<dyn llmspell_memory::MemoryManager>,
-) {
+fn register_bridges(builder: &mut GlobalRegistryBuilder, provider: MemoryProvider) {
     use tracing::debug;
 
     // Register Memory global (17th global)
-    let memory_bridge = Arc::new(crate::memory_bridge::MemoryBridge::new(
-        memory_manager.clone(),
-    ));
+    let memory_bridge = Arc::new(crate::memory_bridge::MemoryBridge::new(provider.clone()));
     builder.register(Arc::new(memory_global::MemoryGlobal::new(memory_bridge)));
     debug!("Registered Memory global (17th)");
 
     // Register Context global (18th global) - depends on Memory
-    let context_bridge = Arc::new(crate::context_bridge::ContextBridge::new(memory_manager));
+    let context_bridge = Arc::new(crate::context_bridge::ContextBridge::new(provider));
     builder.register(Arc::new(context_global::ContextGlobal::new(context_bridge)));
     debug!("Registered Context global (18th)");
 }
@@ -140,22 +136,17 @@ async fn register_memory_context_globals(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
 ) {
-    use tracing::warn;
-
-    // Try to get memory_manager from context, or create in-memory fallback
+    // Try to get memory_manager from context, or create lazy fallback
     let memory_manager_from_context = extract_memory_manager(context);
 
-    let memory_manager_opt = if memory_manager_from_context.is_some() {
-        memory_manager_from_context
+    let provider = if let Some(manager) = memory_manager_from_context {
+        MemoryProvider::new_eager(manager)
     } else {
-        create_fallback_memory_manager().await
+        // Use lazy provider for fallback to avoid 400ms init cost when not used
+        MemoryProvider::new_lazy(Box::new(|| Box::pin(create_fallback_memory_manager())))
     };
 
-    if let Some(memory_manager) = memory_manager_opt {
-        register_bridges(builder, memory_manager);
-    } else {
-        warn!("Skipping Memory/Context global registration due to initialization failure");
-    }
+    register_bridges(builder, provider);
 }
 
 /// Register RAG global if all dependencies are available

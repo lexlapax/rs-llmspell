@@ -1,6 +1,7 @@
 //! ABOUTME: Context bridge providing language-agnostic context assembly operations
 //! ABOUTME: Composes `BM25Retriever` + `ContextAssembler` + `MemoryManager` for RAG workflows
 
+use crate::MemoryProvider;
 use async_trait::async_trait;
 use llmspell_context::{
     assembly::ContextAssembler as ContextAssemblerImpl,
@@ -45,8 +46,8 @@ use tracing::{debug, error, info, trace, warn};
 /// })
 /// ```
 pub struct ContextBridge {
-    /// Reference to the memory manager
-    memory_manager: Arc<dyn MemoryManager>,
+    /// Memory provider (supports lazy initialization)
+    provider: MemoryProvider,
     /// Optional RAG pipeline for hybrid RAG+Memory retrieval
     rag_pipeline: Option<Arc<dyn RAGRetriever>>,
 }
@@ -56,25 +57,30 @@ impl ContextBridge {
     ///
     /// # Arguments
     ///
-    /// * `memory_manager` - The memory manager to wrap
+    /// * `provider` - The memory provider
     ///
     /// # Example
     ///
     /// ```ignore
-    /// use llmspell_memory::DefaultMemoryManager;
-    /// use llmspell_bridge::ContextBridge;
-    /// use std::sync::Arc;
-    ///
-    /// let memory = Arc::new(DefaultMemoryManager::new_in_memory()?);
-    /// let bridge = ContextBridge::new(memory);
+    /// // Eager
+    /// let provider = MemoryProvider::new_eager(memory);
+    /// let bridge = ContextBridge::new(provider);
     /// ```
     #[must_use]
-    pub fn new(memory_manager: Arc<dyn MemoryManager>) -> Self {
+    pub fn new(provider: MemoryProvider) -> Self {
         info!("Creating ContextBridge");
         Self {
-            memory_manager,
+            provider,
             rag_pipeline: None,
         }
+    }
+
+    /// Helper to get memory manager or return error string
+    async fn get_manager(&self) -> Result<Arc<dyn MemoryManager>, String> {
+        self.provider
+            .get()
+            .await
+            .map_err(|e| format!("Memory system unavailable: {e}"))
     }
 
     /// Add RAG pipeline for hybrid RAG+Memory retrieval (builder pattern)
@@ -364,11 +370,9 @@ impl ContextBridge {
             );
 
             // Create HybridRetriever with default weights (memory-focused: 40/60)
-            let hybrid = HybridRetriever::new(
-                Some(rag.clone()),
-                self.memory_manager.clone(),
-                RetrievalWeights::default(),
-            );
+            let manager = self.get_manager().await?;
+            let hybrid =
+                HybridRetriever::new(Some(rag.clone()), manager, RetrievalWeights::default());
 
             // Retrieve hybrid results
             let ranked_chunks = hybrid
@@ -408,7 +412,8 @@ impl ContextBridge {
         debug!("Retrieving from episodic memory via vector search");
 
         // Get episodic memory reference
-        let episodic = self.memory_manager.episodic();
+        let manager = self.get_manager().await?;
+        let episodic = manager.episodic();
 
         // Search episodic memory (vector similarity)
         let entries = episodic.search(query, max_tokens).await.map_err(|e| {
@@ -440,7 +445,8 @@ impl ContextBridge {
         _query: &str,
         max_tokens: usize,
     ) -> Result<Vec<Chunk>, String> {
-        let entities = Self::query_entities(&self.memory_manager).await?;
+        let manager = self.get_manager().await?;
+        let entities = Self::query_entities(&manager).await?;
         let chunks = Self::convert_entities_to_chunks(entities, max_tokens);
         Ok(chunks)
     }
@@ -534,8 +540,8 @@ impl ContextBridge {
         debug!("Entering async get_strategy_stats");
 
         // Get episodic count (same pattern as MemoryBridge::stats)
-        let episodic_count = self
-            .memory_manager
+        let manager = self.get_manager().await?;
+        let episodic_count = manager
             .episodic()
             .search("", 10000)
             .await
@@ -543,8 +549,7 @@ impl ContextBridge {
             .unwrap_or(0);
 
         // Get semantic count
-        let semantic_count = self
-            .memory_manager
+        let semantic_count = manager
             .semantic()
             .query_by_type("")
             .await
@@ -641,7 +646,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let _bridge = ContextBridge::new(Arc::new(memory_manager));
+        let _bridge = ContextBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
         // Creation should succeed
     }
 
@@ -654,7 +659,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = ContextBridge::new(Arc::new(memory_manager));
+        let bridge = ContextBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Valid strategies should work
         let result = runtime.block_on(bridge.assemble("test query", "episodic", 1000, None));
@@ -678,7 +683,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = ContextBridge::new(Arc::new(memory_manager));
+        let bridge = ContextBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Token budget < 100 should error
         let result = runtime.block_on(bridge.assemble("test query", "episodic", 50, None));
@@ -699,7 +704,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = ContextBridge::new(Arc::new(memory_manager));
+        let bridge = ContextBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Query with no data should return empty context
         let result = runtime
@@ -720,7 +725,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = ContextBridge::new(Arc::new(memory_manager));
+        let bridge = ContextBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Query semantic memory (empty initially)
         let result = runtime
@@ -739,7 +744,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = ContextBridge::new(Arc::new(memory_manager));
+        let bridge = ContextBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Hybrid strategy combines both (both empty initially)
         let result = runtime

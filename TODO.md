@@ -1321,7 +1321,27 @@ The "bunch of numbers" observed in stdout is specifically caused by `rig-core`'s
     2.  **Release Build**: `cargo run --release` (Often removes `dbg!` calls if guarded).
     3.  **Upstream Fix**: Submit PR to `rig-core` to replace `dbg!` with `tracing::debug!`.
 
-### Task 14.5.2.2: Test failures fix and regresstion test checks
+### Task 14.5.2.2: Test failures fix and regression test checks
+**Priority**: HIGH
+**Status**: COMPLETED ✅
+**Description**: Fix performance regression in `llmspell-bridge` and ensure workspace-wide tests pass.
+
+**Analysis**:
+- ❌ `test_api_injection_overhead` in `llmspell-bridge` failed (264ms > 70ms threshold).
+  - Use `cargo test -p llmspell-bridge --test performance_test --features common` to reproduce.
+  - **Root Cause Identified**: The `MemoryGlobal` and `ContextGlobal` were eagerly initializing `DefaultMemoryManager` during registration. This triggered an in-memory SQLite connection and migration run, taking ~400ms on every script engine creation, even if memory features weren't used.
+
+**Implementation Insights**:
+- ✅ **Lazy Memory Initialization**: implemented `MemoryProvider` (eager/lazy wrapper) to defer the expensive ~400ms initialization until the first actual use of memory functions.
+- ✅ **Refactored Bridges**: Updated `MemoryBridge` and `ContextBridge` to use `MemoryProvider` instead of holding a direct `Arc<MemoryManager>`.
+- ✅ **Registry Optimization**: Modified `create_standard_registry` to use the lazy provider when falling back to in-memory storage.
+- ✅ **Performance Verified**: `test_api_injection_overhead` now passes with margin to spare (<70ms), restoring fast script startup times.
+
+**Action Plan**:
+1.  Isolate `llmspell-bridge` performance issue (DONE).
+2.  Profile `ScriptEngine::new` and API injection (DONE).
+3.  Optimize initialization (DONE - Lazy Loading).
+4.  Verify all other tests pass (DONE).
 
 
 

@@ -8,7 +8,7 @@
 //! - Multi-session isolation
 //! - Consolidation workflows
 
-use llmspell_bridge::{ContextBridge, MemoryBridge};
+use llmspell_bridge::{ContextBridge, MemoryBridge, MemoryProvider};
 use llmspell_memory::{ConsolidationMode, DefaultMemoryManager, EpisodicEntry, MemoryManager};
 use std::sync::Arc;
 use tracing::info;
@@ -24,8 +24,12 @@ async fn setup_test_env() -> (
             .await
             .expect("Failed to create memory manager"),
     );
-    let memory_bridge = Arc::new(MemoryBridge::new(memory_manager.clone()));
-    let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));
+    let memory_bridge = Arc::new(MemoryBridge::new(MemoryProvider::new_eager(
+        memory_manager.clone(),
+    )));
+    let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(
+        memory_manager.clone(),
+    )));
 
     (memory_manager, memory_bridge, context_bridge)
 }

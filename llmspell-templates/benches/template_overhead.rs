@@ -2,7 +2,7 @@
 //! ABOUTME: Measures template lookup, context assembly, and infrastructure overhead (<2ms target)
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use llmspell_bridge::ContextBridge;
+use llmspell_bridge::{ContextBridge, MemoryProvider};
 use llmspell_memory::{DefaultMemoryManager, EpisodicEntry, MemoryManager};
 use llmspell_templates::{ExecutionContext, TemplateParams, TemplateRegistry};
 use serde_json::json;
@@ -42,7 +42,8 @@ fn context_creation_benchmark(c: &mut Criterion) {
     c.bench_function("context_creation_with_memory", |b| {
         let mm = memory_manager.clone();
         b.iter(|| {
-            let context_bridge = Arc::new(ContextBridge::new(mm.clone()));
+            let context_bridge =
+                Arc::new(ContextBridge::new(MemoryProvider::new_eager(mm.clone())));
             let _context = ExecutionContext::builder()
                 .with_memory_manager(mm.clone())
                 .with_context_bridge(context_bridge)
@@ -103,7 +104,8 @@ fn template_infrastructure_overhead_benchmark(c: &mut Criterion) {
                 .expect("Template not found");
 
             // 2. Context creation
-            let context_bridge = Arc::new(ContextBridge::new(mm.clone()));
+            let context_bridge =
+                Arc::new(ContextBridge::new(MemoryProvider::new_eager(mm.clone())));
             let _context = ExecutionContext::builder()
                 .with_memory_manager(mm.clone())
                 .with_context_bridge(context_bridge)
@@ -145,7 +147,9 @@ fn memory_enabled_context_assembly_benchmark(c: &mut Criterion) {
         mm
     });
 
-    let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));
+    let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(
+        memory_manager.clone(),
+    )));
 
     c.bench_function("memory_enabled_context_retrieval", |b| {
         let cb = context_bridge.clone();
