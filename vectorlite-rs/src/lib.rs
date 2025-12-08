@@ -83,6 +83,10 @@ pub unsafe extern "C" fn sqlite3_vectorlite_init(
         return ffi::SQLITE_ERROR;
     }
 
+    // IMPORTANT: Prevent conn from closing the database connection when dropped!
+    // The connection is owned by the host process, we just borrowed it.
+    std::mem::forget(conn);
+
     ffi::SQLITE_OK
 }
 
