@@ -195,7 +195,7 @@ impl GraphBackend for SqliteGraphStorage {
             "SELECT properties FROM entities
              WHERE entity_id = ?1 AND tenant_id = ?2
                AND transaction_time_end = 9999999999
-             LIMIT 1"
+             LIMIT 1",
         )?;
 
         let mut rows = stmt
@@ -265,7 +265,7 @@ impl GraphBackend for SqliteGraphStorage {
              FROM entities
              WHERE entity_id = ?1 AND tenant_id = ?2
                AND transaction_time_end = 9999999999
-             LIMIT 1"
+             LIMIT 1",
         )?;
 
         let mut rows = stmt
@@ -338,7 +338,7 @@ impl GraphBackend for SqliteGraphStorage {
              WHERE entity_id = ?1 AND tenant_id = ?2
                AND valid_time_start <= ?3 AND valid_time_end > ?3
                AND transaction_time_end = 9999999999
-             LIMIT 1"
+             LIMIT 1",
         )?;
 
         let mut rows = stmt
@@ -484,11 +484,16 @@ impl GraphBackend for SqliteGraphStorage {
                AND r.valid_time_start <= ?4 AND r.valid_time_end > ?4
                AND r.transaction_time_end = 9999999999
                AND e.valid_time_start <= ?4 AND e.valid_time_end > ?4
-               AND e.transaction_time_end = 9999999999"
+               AND e.transaction_time_end = 9999999999",
         )?;
 
         let mut rows = stmt
-            .query(rusqlite::params![entity_id, tenant_id, relationship_type, now])
+            .query(rusqlite::params![
+                entity_id,
+                tenant_id,
+                relationship_type,
+                now
+            ])
             .map_err(|e| anyhow::anyhow!(format!("Failed to query related entities: {}", e)))?;
 
         let mut entities = Vec::new();
@@ -565,7 +570,7 @@ impl GraphBackend for SqliteGraphStorage {
              WHERE (from_entity = ?1 OR to_entity = ?1)
                AND tenant_id = ?2
                AND valid_time_start <= ?3 AND valid_time_end > ?3
-               AND transaction_time_end = 9999999999"
+               AND transaction_time_end = 9999999999",
         )?;
 
         let mut rows = stmt
@@ -698,7 +703,9 @@ impl GraphBackend for SqliteGraphStorage {
         // Convert Vec<Box<dyn ToSql>> to slice of refs tailored for params_from_iter
         // rusqlite::params_from_iter takes an iterator yielding ToSql.
         // Our params vector holds Box<dyn ToSql>, which implements ToSql.
-        let mut stmt = conn.prepare(&sql).map_err(|e| anyhow::anyhow!(format!("Failed to prepare temporal query: {}", e)))?;
+        let mut stmt = conn
+            .prepare(&sql)
+            .map_err(|e| anyhow::anyhow!(format!("Failed to prepare temporal query: {}", e)))?;
         let mut rows = stmt
             .query(rusqlite::params_from_iter(params.iter()))
             .map_err(|e| anyhow::anyhow!(format!("Failed to execute temporal query: {}", e)))?;
@@ -784,7 +791,7 @@ impl GraphBackend for SqliteGraphStorage {
             rows_affected, cutoff
         );
 
-        Ok(rows_affected as usize)
+        Ok(rows_affected)
     }
 
     /// Multi-hop graph traversal with depth limit and cycle prevention
@@ -802,14 +809,12 @@ impl GraphBackend for SqliteGraphStorage {
     ///
     /// Vector of (Entity, Depth) tuples
     async fn traverse(
-
         &self,
         start_entity_id: &str,
         relationship_type: Option<&str>,
         max_depth: usize,
-
-        at: Option<DateTime<Utc>>,
-    ) -> Result<Vec<(Entity, usize)>> {
+        _at: Option<DateTime<Utc>>,
+    ) -> Result<Vec<(Entity, usize, String)>> {
         let conn =
             self.backend.get_connection().await.map_err(|e| {
                 anyhow::anyhow!(format!("Failed to get database connection: {}", e))
@@ -840,7 +845,8 @@ impl GraphBackend for SqliteGraphStorage {
                  AND r.tenant_id = ?2
                  AND r.valid_time_start <= ?3 AND r.valid_time_end > ?3
                  AND r.transaction_time_end = 9999999999
-        ");
+        ",
+        );
 
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![
             Box::new(start_entity_id.to_string()),
@@ -848,12 +854,12 @@ impl GraphBackend for SqliteGraphStorage {
             Box::new(now),
             Box::new(max_depth as i64),
         ];
-        let mut param_idx = 5;
+        let param_idx = 5;
 
         // Add relationship type filter if specified
         if let Some(ref rel_type) = relationship_type {
             sql.push_str(&format!(" AND r.relationship_type = ?{}", param_idx));
-            params.push(Box::new(rel_type.clone()));
+            params.push(Box::new(rel_type.to_string()));
             // param_idx += 1; // Not used afterwards but good practice
         }
 
@@ -862,8 +868,8 @@ impl GraphBackend for SqliteGraphStorage {
         //  omitting strict in-SQL cycle check for brevity/compatibility, handled by max_depth
         //  and could be enhanced with: AND instr(t.path, r.to_entity) = 0)
         // Adding basic text based cycle check if IDs are unique strings:
-        sql.push_str(" AND r.to_entity != t.entity_id"); 
-        
+        sql.push_str(" AND r.to_entity != t.entity_id");
+
         sql.push_str(
             "
              )
@@ -874,10 +880,12 @@ impl GraphBackend for SqliteGraphStorage {
              WHERE e.tenant_id = ?2
                AND e.valid_time_start <= ?3 AND e.valid_time_end > ?3
                AND e.transaction_time_end = 9999999999
-             ORDER BY t.depth ASC"
+             ORDER BY t.depth ASC",
         );
 
-        let mut stmt = conn.prepare(&sql).map_err(|e| anyhow::anyhow!(format!("Failed to prepare traversal query: {}", e)))?;
+        let mut stmt = conn
+            .prepare(&sql)
+            .map_err(|e| anyhow::anyhow!(format!("Failed to prepare traversal query: {}", e)))?;
         let mut rows = stmt
             .query(rusqlite::params_from_iter(params.iter()))
             .map_err(|e| anyhow::anyhow!(format!("Failed to execute traversal query: {}", e)))?;
@@ -922,9 +930,62 @@ impl GraphBackend for SqliteGraphStorage {
                 ingestion_time: Self::unix_to_datetime(transaction_time_start),
             };
 
-            results.push((entity, depth as usize));
+            results.push((entity, depth as usize, String::new()));
         }
 
         Ok(results)
+    }
+}
+
+#[async_trait]
+impl llmspell_core::traits::storage::KnowledgeGraph for SqliteGraphStorage {
+    async fn add_entity(&self, entity: Entity) -> Result<String> {
+        GraphBackend::add_entity(self, entity).await
+    }
+
+    async fn update_entity(
+        &self,
+        id: &str,
+        changes: HashMap<String, serde_json::Value>,
+    ) -> Result<()> {
+        GraphBackend::update_entity(self, id, changes).await
+    }
+
+    async fn get_entity(&self, id: &str) -> Result<Entity> {
+        GraphBackend::get_entity(self, id).await
+    }
+
+    async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Entity> {
+        GraphBackend::get_entity_at(self, id, event_time).await
+    }
+
+    async fn add_relationship(&self, relationship: Relationship) -> Result<String> {
+        GraphBackend::add_relationship(self, relationship).await
+    }
+
+    async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>> {
+        GraphBackend::get_related(self, entity_id, relationship_type).await
+    }
+
+    async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>> {
+        GraphBackend::get_relationships(self, entity_id).await
+    }
+
+    async fn query_temporal(&self, query: TemporalQuery) -> Result<Vec<Entity>> {
+        GraphBackend::query_temporal(self, query).await
+    }
+
+    async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize> {
+        GraphBackend::delete_before(self, timestamp).await
+    }
+
+    async fn traverse(
+        &self,
+        start_entity: &str,
+        relationship_type: Option<&str>,
+        max_depth: usize,
+        at_time: Option<DateTime<Utc>>,
+    ) -> Result<Vec<(Entity, usize, String)>> {
+        GraphBackend::traverse(self, start_entity, relationship_type, max_depth, at_time).await
     }
 }

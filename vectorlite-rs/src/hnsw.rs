@@ -107,9 +107,9 @@ impl HnswIndex {
         metric: DistanceMetric,
     ) -> SqliteResult<Self> {
         // Validate parameters
-        if !matches!(dimension, 384 | 768 | 1536 | 3072) {
+        if dimension == 0 {
             return Err(rusqlite::Error::ModuleError(format!(
-                "Invalid dimension {dimension}, must be 384/768/1536/3072"
+                "Invalid dimension {dimension}, must be > 0"
             )));
         }
 

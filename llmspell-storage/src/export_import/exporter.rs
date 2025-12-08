@@ -667,7 +667,10 @@ impl SqliteExporter {
         ])
     }
 
-    fn export_vector_embeddings(&self, conn: &rusqlite::Connection) -> Result<HashMap<usize, Vec<VectorEmbeddingExport>>> {
+    fn export_vector_embeddings(
+        &self,
+        conn: &rusqlite::Connection,
+    ) -> Result<HashMap<usize, Vec<VectorEmbeddingExport>>> {
         // SQLite stores vectors in vector_metadata table
         let mut stmt = conn
             .prepare("SELECT id, tenant_id, scope, dimension, metadata, created_at, updated_at FROM vector_metadata")?;
@@ -700,12 +703,11 @@ impl SqliteExporter {
 
     fn export_knowledge_graph(&self, conn: &rusqlite::Connection) -> Result<KnowledgeGraphExport> {
         // Export entities
-        let mut stmt = conn
-            .prepare(
-                "SELECT entity_id, tenant_id, entity_type, name, properties,
+        let mut stmt = conn.prepare(
+            "SELECT entity_id, tenant_id, entity_type, name, properties,
                      valid_time_start, valid_time_end, transaction_time_start,
                      transaction_time_end, created_at FROM entities",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut entities = Vec::new();
@@ -729,12 +731,11 @@ impl SqliteExporter {
         }
 
         // Export relationships
-        let mut stmt = conn
-            .prepare(
-                "SELECT relationship_id, tenant_id, from_entity, to_entity,
+        let mut stmt = conn.prepare(
+            "SELECT relationship_id, tenant_id, from_entity, to_entity,
                      relationship_type, properties, valid_time_start, valid_time_end,
                      transaction_time_start, transaction_time_end, created_at FROM relationships",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut relationships = Vec::new();
@@ -765,11 +766,10 @@ impl SqliteExporter {
     }
 
     fn export_procedural_memory(&self, conn: &rusqlite::Connection) -> Result<Vec<PatternExport>> {
-        let mut stmt = conn
-            .prepare(
-                "SELECT pattern_id, tenant_id, scope, key, value, frequency,
+        let mut stmt = conn.prepare(
+            "SELECT pattern_id, tenant_id, scope, key, value, frequency,
                      first_seen, last_seen, created_at, updated_at FROM procedural_patterns",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut patterns = Vec::new();
@@ -824,8 +824,9 @@ impl SqliteExporter {
     }
 
     fn export_kv_store(&self, conn: &rusqlite::Connection) -> Result<Vec<KVEntryExport>> {
-        let mut stmt = conn
-            .prepare("SELECT kv_id, tenant_id, key, value, metadata, created_at, updated_at FROM kv_store")?;
+        let mut stmt = conn.prepare(
+            "SELECT kv_id, tenant_id, key, value, metadata, created_at, updated_at FROM kv_store",
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut entries = Vec::new();
@@ -849,12 +850,14 @@ impl SqliteExporter {
         Ok(entries)
     }
 
-    fn export_workflow_states(&self, conn: &rusqlite::Connection) -> Result<Vec<WorkflowStateExport>> {
-        let mut stmt = conn
-            .prepare(
-                "SELECT tenant_id, workflow_id, workflow_name, state_data, current_step, status,
+    fn export_workflow_states(
+        &self,
+        conn: &rusqlite::Connection,
+    ) -> Result<Vec<WorkflowStateExport>> {
+        let mut stmt = conn.prepare(
+            "SELECT tenant_id, workflow_id, workflow_name, state_data, current_step, status,
                      started_at, completed_at, last_updated, created_at FROM workflow_states",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut states = Vec::new();
@@ -883,11 +886,10 @@ impl SqliteExporter {
     }
 
     fn export_sessions(&self, conn: &rusqlite::Connection) -> Result<Vec<SessionExport>> {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, tenant_id, session_id, session_data, status, created_at,
+        let mut stmt = conn.prepare(
+            "SELECT id, tenant_id, session_id, session_data, status, created_at,
                      last_accessed_at, expires_at, artifact_count, updated_at FROM sessions",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut sessions = Vec::new();
@@ -915,12 +917,11 @@ impl SqliteExporter {
 
     fn export_artifacts(&self, conn: &rusqlite::Connection) -> Result<ArtifactsExport> {
         // Export content
-        let mut stmt = conn
-            .prepare(
-                "SELECT tenant_id, content_hash, data, size_bytes, is_compressed,
+        let mut stmt = conn.prepare(
+            "SELECT tenant_id, content_hash, data, size_bytes, is_compressed,
                      original_size_bytes, reference_count, created_at, last_accessed_at
                      FROM artifact_content",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut content = Vec::new();
@@ -947,12 +948,11 @@ impl SqliteExporter {
         }
 
         // Export metadata
-        let mut stmt = conn
-            .prepare(
-                "SELECT tenant_id, artifact_id, session_id, sequence, content_hash, metadata,
+        let mut stmt = conn.prepare(
+            "SELECT tenant_id, artifact_id, session_id, sequence, content_hash, metadata,
                      name, artifact_type, mime_type, size_bytes, created_at, created_by, version,
                      parent_artifact_id, tags, stored_at, updated_at FROM artifacts",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut artifacts = Vec::new();
@@ -988,11 +988,10 @@ impl SqliteExporter {
     }
 
     fn export_event_log(&self, conn: &rusqlite::Connection) -> Result<Vec<EventExport>> {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, tenant_id, event_id, event_type, correlation_id,
+        let mut stmt = conn.prepare(
+            "SELECT id, tenant_id, event_id, event_type, correlation_id,
                      timestamp, sequence, language, payload FROM event_log",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut events = Vec::new();
@@ -1018,11 +1017,10 @@ impl SqliteExporter {
     }
 
     fn export_hook_history(&self, conn: &rusqlite::Connection) -> Result<Vec<HookExport>> {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, execution_id, tenant_id, hook_id, hook_type, correlation_id,
+        let mut stmt = conn.prepare(
+            "SELECT id, execution_id, tenant_id, hook_id, hook_type, correlation_id,
                      hook_context, result_data, timestamp, duration_ms FROM hook_history",
-            )?;
+        )?;
 
         let mut rows = stmt.query([])?;
         let mut hooks = Vec::new();

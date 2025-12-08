@@ -693,8 +693,7 @@ impl SqliteImporter {
         // We wrap in a closure to catch errors before commit.
         let import_result = (|| {
             // 1. Vector embeddings (no dependencies)
-            stats.vectors = self
-                .import_vector_embeddings(&tx, &export.data.vector_embeddings)?;
+            stats.vectors = self.import_vector_embeddings(&tx, &export.data.vector_embeddings)?;
 
             // 2. Knowledge graph entities (no dependencies)
             if let Some(kg) = &export.data.knowledge_graph {
@@ -703,27 +702,24 @@ impl SqliteImporter {
             }
 
             // 3. Procedural memory (no dependencies)
-            stats.patterns = self
-                .import_procedural_memory(&tx, &export.data.procedural_memory)?;
+            stats.patterns = self.import_procedural_memory(&tx, &export.data.procedural_memory)?;
 
             // 4. Agent state (no dependencies)
-            stats.agent_states = self
-                .import_agent_state(&tx, &export.data.agent_state)?;
+            stats.agent_states = self.import_agent_state(&tx, &export.data.agent_state)?;
 
             // 5. KV store (no dependencies)
             stats.kv_entries = self.import_kv_store(&tx, &export.data.kv_store)?;
 
             // 6. Workflow states (no dependencies)
-            stats.workflow_states = self
-                .import_workflow_states(&tx, &export.data.workflow_states)?;
+            stats.workflow_states =
+                self.import_workflow_states(&tx, &export.data.workflow_states)?;
 
             // 7. Sessions (no dependencies)
             stats.sessions = self.import_sessions(&tx, &export.data.sessions)?;
 
             // 8. Artifacts (depends on sessions for session_id FK)
             if let Some(artifacts) = &export.data.artifacts {
-                let (content_count, artifact_count) =
-                    self.import_artifacts(&tx, artifacts)?;
+                let (content_count, artifact_count) = self.import_artifacts(&tx, artifacts)?;
                 stats.artifact_content = content_count;
                 stats.artifacts = artifact_count;
             }
@@ -732,8 +728,7 @@ impl SqliteImporter {
             stats.events = self.import_event_log(&tx, &export.data.event_log)?;
 
             // 10. Hook history (no dependencies)
-            stats.hooks = self
-                .import_hook_history(&tx, &export.data.hook_history)?;
+            stats.hooks = self.import_hook_history(&tx, &export.data.hook_history)?;
 
             Ok::<(), anyhow::Error>(())
         })();

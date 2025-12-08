@@ -3,20 +3,39 @@
 
 use super::backend::SqliteBackend;
 use super::error::SqliteError;
-use anyhow::Context;
+
 use async_trait::async_trait;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use llmspell_core::traits::storage::StorageBackend;
-use llmspell_core::types::storage::{
-    HookExport, HookType, SerializedHookExecution, StorageBackendType, StorageCharacteristics,
-};
+use llmspell_core::types::storage::{StorageBackendType, StorageCharacteristics};
+use serde::{Deserialize, Serialize};
+
 use std::collections::HashMap;
-use std::io::Read;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::debug;
 use uuid::Uuid;
 
-/// SQLite-backed hook history storage
+/// Serialized hook execution for storage
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializedHookExecution {
+    pub execution_id: Uuid,
+    pub hook_id: String,
+    pub hook_type: String,
+    pub correlation_id: Uuid,
+    pub hook_context: Vec<u8>,          // Compressed serialized HookContext
+    pub result_data: serde_json::Value, // Serialized HookResult (JSONB)
+    pub timestamp: DateTime<Utc>,
+    pub duration_ms: i32,
+    pub triggering_component: String,
+    pub component_id: String,
+    pub modified_operation: bool,
+    pub tags: Vec<String>,
+    pub retention_priority: i32,
+    pub context_size: i32,
+    pub contains_sensitive_data: bool,
+    pub metadata: serde_json::Value,
+}
+
 ///
 /// Stores hook execution logs with:
 /// - Tenant isolation via application-level filtering
@@ -48,30 +67,20 @@ impl SqliteHookHistoryStorage {
     }
 
     /// Compress data using LZ4
-    fn compress_data(data: &[u8]) -> std::io::Result<Vec<u8>> {
-        let mut encoder = lz4::EncoderBuilder::new().level(4).build(Vec::new())?;
-        std::io::Write::write_all(&mut encoder, data)?;
-        let (result, result_io) = encoder.finish();
-        result_io.map(|_| result)
+    fn compress_data(data: &[u8]) -> anyhow::Result<Vec<u8>> {
+        Ok(lz4_flex::compress_prepend_size(data))
     }
 
     /// Decompress data using LZ4
-    fn decompress_data(data: &[u8]) -> std::io::Result<Vec<u8>> {
-        let mut decoder = lz4::Decoder::new(data)?;
-        let mut decompressed = Vec::new();
-        decoder.read_to_end(&mut decompressed)?;
-        Ok(decompressed)
+    fn decompress_data(data: &[u8]) -> anyhow::Result<Vec<u8>> {
+        lz4_flex::decompress_size_prepended(data)
+            .map_err(|e| SqliteError::Query(format!("Decompression failed: {}", e)).into())
     }
 
     /// Extract hook_id from storage key
     /// Format: "hook:<hook_id>"
     fn extract_hook_id(key: &str) -> Option<&str> {
         key.strip_prefix("hook:")
-    }
-
-    /// Build storage key from hook_id
-    fn build_key(hook_id: &str) -> String {
-        format!("hook:{}", hook_id)
     }
 
     /// Record hook execution (internal)
@@ -88,7 +97,10 @@ impl SqliteHookHistoryStorage {
 
         // Compress context
         let compressed_context = Self::compress_data(context).map_err(|e| {
-            SqliteError::Query(format!("Failed to compress context for hook {}: {}", hook_id, e))
+            SqliteError::Query(format!(
+                "Failed to compress context for hook {}: {}",
+                hook_id, e
+            ))
         })?;
 
         debug!(
@@ -130,7 +142,7 @@ impl SqliteHookHistoryStorage {
     /// Retrieve hook executions by type and date range
     pub async fn get_executions_by_type(
         &self,
-        hook_type: &HookType,
+        hook_type: &str,
         from_time: DateTime<Utc>,
         to_time: Option<DateTime<Utc>>,
         limit: Option<usize>,
@@ -159,7 +171,7 @@ impl SqliteHookHistoryStorage {
         let mut rows = stmt
             .query(rusqlite::params![
                 tenant_id,
-                hook_type.to_string(),
+                hook_type,
                 from_ts,
                 to_ts,
                 limit_val as i64
@@ -171,7 +183,7 @@ impl SqliteHookHistoryStorage {
             .next()
             .map_err(|e| SqliteError::Query(format!("Failed to fetch row: {}", e)))?
         {
-            executions.push(self.execution_from_row(&row)?);
+            executions.push(self.execution_from_row(row)?);
         }
 
         Ok(executions)
@@ -181,7 +193,7 @@ impl SqliteHookHistoryStorage {
     pub async fn archive_executions(
         &self,
         before: DateTime<Utc>,
-        min_retention_priority: u32,
+        _min_retention_priority: u32,
     ) -> anyhow::Result<u64> {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
@@ -228,18 +240,22 @@ impl SqliteHookHistoryStorage {
     }
 
     fn execution_from_row(&self, row: &rusqlite::Row) -> anyhow::Result<SerializedHookExecution> {
-        let id: String = row.get(0)?;
-        let execution_id_str: String = row.get(1)?;
-        let hook_id: String = row.get(2)?;
-        let hook_type_str: String = row.get(3)?;
-        let correlation_id: Option<String> = row.get(4)?;
-        let context_data: Vec<u8> = row.get(5)?;
-        let result_data_str: Option<String> = row.get(6)?;
-        let timestamp: i64 = row.get(7)?;
-        let duration_ms: Option<i64> = row.get(8)?;
+        let execution_id_str: String = row.get(0)?;
+        let hook_id: String = row.get(1)?;
+        let hook_type_str: String = row.get(2)?;
+        let correlation_id_str: Option<String> = row.get(3)?;
+        let context_data: Vec<u8> = row.get(4)?;
+        let result_data_str: Option<String> = row.get(5)?;
+        let timestamp_val: i64 = row.get(6)?;
+        let duration_ms_val: Option<i64> = row.get(7)?;
+
+        // Extra fields not in the query but needed for struct - using defaults for now as query doesn't select them
+        // TODO: Update query to select all fields if they exist in schema
 
         let execution_id = Uuid::parse_str(&execution_id_str).unwrap_or_default();
-        let hook_type = hook_type_str.parse().unwrap_or(HookType::PreFunction);
+        let correlation_id = correlation_id_str
+            .and_then(|s| Uuid::parse_str(&s).ok())
+            .unwrap_or_default();
 
         let hook_context = if context_data.is_empty() {
             Vec::new()
@@ -253,19 +269,25 @@ impl SqliteHookHistoryStorage {
             serde_json::Value::Null
         };
 
+        let timestamp = DateTime::<Utc>::from_timestamp(timestamp_val, 0).unwrap_or(Utc::now());
+
         Ok(SerializedHookExecution {
-            id,
             execution_id,
             hook_id,
-            hook_type,
+            hook_type: hook_type_str,
             correlation_id,
             hook_context,
             result_data,
             timestamp,
-            duration_ms: duration_ms.unwrap_or(0),
-            triggering_component: None, // Fields not in V8
-            component_id: None,
-            modified_operation: None,
+            duration_ms: duration_ms_val.unwrap_or(0) as i32,
+            triggering_component: String::new(), // Not in query
+            component_id: String::new(),         // Not in query
+            modified_operation: false,           // Not in query
+            tags: Vec::new(),                    // Not in query
+            retention_priority: 0,               // Not in query
+            context_size: 0,                     // Not in query
+            contains_sensitive_data: false,      // Not in query
+            metadata: serde_json::Value::Null,   // Not in query
         })
     }
 }
@@ -275,15 +297,16 @@ impl StorageBackend for SqliteHookHistoryStorage {
     async fn get(&self, key: &str) -> anyhow::Result<Option<Vec<u8>>> {
         // Limited impl for generic storage trait compatibility
         // Assuming key is hook_id
-        let hook_id = Self::extract_hook_id(key).unwrap_or(key);
+        let _hook_id = Self::extract_hook_id(key).unwrap_or(key);
         // ... (simplified get)
-        Ok(None) 
+        Ok(None)
     }
 
     async fn set(&self, key: &str, value: Vec<u8>) -> anyhow::Result<()> {
         let hook_id = Self::extract_hook_id(key).unwrap_or(key);
         // Simplified usage
-        self.record_hook_execution(&Uuid::new_v4(), hook_id, "generic", &value).await
+        self.record_hook_execution(&Uuid::new_v4(), hook_id, "generic", &value)
+            .await
     }
 
     async fn delete(&self, _key: &str) -> anyhow::Result<()> {

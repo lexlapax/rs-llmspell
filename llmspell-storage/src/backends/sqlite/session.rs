@@ -85,16 +85,15 @@ impl SessionStorage for SqliteSessionStorage {
         let expires_at = data.expires_at.map(|dt| dt.timestamp());
         let now = Utc::now().timestamp();
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "INSERT INTO sessions
                  (tenant_id, session_id, session_data, status, created_at, last_accessed_at, expires_at, artifact_count, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare create_session: {}", e)))?;
 
-        stmt.execute(libsql::params![
+        stmt.execute(rusqlite::params![
             tenant_id,
             session_id,
             session_data_json,
@@ -130,7 +129,7 @@ impl SessionStorage for SqliteSessionStorage {
         // Update if last access was >60 seconds ago
         let throttle_threshold = now - 60;
         stmt_update
-            .execute(params![
+            .execute(rusqlite::params![
                 now,
                 tenant_id,
                 session_id,
@@ -148,10 +147,13 @@ impl SessionStorage for SqliteSessionStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to prepare get_session: {}", e)))?;
 
         let mut rows = stmt
-            .query(params![tenant_id, session_id])
+            .query(rusqlite::params![tenant_id, session_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute get_session: {}", e)))?;
 
-        match rows.next().map_err(|e| SqliteError::Query(format!("Failed to fetch session row: {}", e)))? {
+        match rows
+            .next()
+            .map_err(|e| SqliteError::Query(format!("Failed to fetch session row: {}", e)))?
+        {
             Some(row) => {
                 let session_data_json: String = row
                     .get(0)
@@ -226,7 +228,7 @@ impl SessionStorage for SqliteSessionStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to prepare update_session: {}", e)))?;
 
         let rows_affected = stmt
-            .execute(params![
+            .execute(rusqlite::params![
                 session_data_json,
                 status,
                 expires_at,
@@ -252,7 +254,7 @@ impl SessionStorage for SqliteSessionStorage {
             .prepare("DELETE FROM sessions WHERE tenant_id = ?1 AND session_id = ?2")
             .map_err(|e| SqliteError::Query(format!("Failed to prepare delete_session: {}", e)))?;
 
-        stmt.execute(params![tenant_id, session_id])
+        stmt.execute(rusqlite::params![tenant_id, session_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute delete_session: {}", e)))?;
 
         Ok(())
@@ -272,7 +274,7 @@ impl SessionStorage for SqliteSessionStorage {
                 SqliteError::Query(format!("Failed to prepare list_active_sessions: {}", e))
             })?;
 
-        let mut rows = stmt.query(params![tenant_id]).map_err(|e| {
+        let mut rows = stmt.query(rusqlite::params![tenant_id]).map_err(|e| {
             SqliteError::Query(format!("Failed to execute list_active_sessions: {}", e))
         })?;
 
@@ -305,7 +307,7 @@ impl SessionStorage for SqliteSessionStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to prepare cleanup_expired: {}", e)))?;
 
         let rows_affected = stmt
-            .execute(params![tenant_id, now])
+            .execute(rusqlite::params![tenant_id, now])
             .map_err(|e| SqliteError::Query(format!("Failed to execute cleanup_expired: {}", e)))?;
 
         Ok(rows_affected)
@@ -491,10 +493,8 @@ mod tests {
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V1__initial_setup.sql"
         ))
-        .await
         .unwrap();
         conn.execute_batch(include_str!("../../../migrations/sqlite/V9__sessions.sql"))
-            .await
             .unwrap();
 
         let tenant1_id = "tenant-1".to_string();

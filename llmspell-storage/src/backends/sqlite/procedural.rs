@@ -1,4 +1,3 @@
-
 // ABOUTME: SQLite procedural pattern storage (Phase 13c.2.5)
 //! ABOUTME: Storage layer for state transition pattern tracking with tenant isolation
 
@@ -122,10 +121,7 @@ impl SqliteProceduralStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to prepare pattern insert: {}", e)))?;
 
         let frequency: u32 = stmt
-            .query_row(
-                params![tenant_id, scope, key, to_value],
-                |row| row.get(0),
-            )
+            .query_row(params![tenant_id, scope, key, to_value], |row| row.get(0))
             .map_err(|e| {
                 SqliteError::Query(format!("Failed to record pattern transition: {}", e))
             })?;
@@ -159,15 +155,15 @@ impl SqliteProceduralStorage {
             )
             .map_err(|e| SqliteError::Query(format!("Failed to prepare frequency query: {}", e)))?;
 
-        let result = stmt.query_row(
-            params![tenant_id, scope, key, value],
-            |row| row.get(0),
-        );
+        let result = stmt.query_row(params![tenant_id, scope, key, value], |row| row.get(0));
 
         match result {
             Ok(freq) => Ok(freq),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(0),
-            Err(e) => Err(SqliteError::Query(format!("Failed to query pattern frequency: {}", e))),
+            Err(e) => Err(SqliteError::Query(format!(
+                "Failed to query pattern frequency: {}",
+                e
+            ))),
         }
     }
 
@@ -708,11 +704,10 @@ mod tests {
         let config = SqliteConfig::new(db_path.to_str().unwrap()).with_max_connections(10);
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
 
-        .unwrap();
+        let conn = backend.get_connection().await.unwrap();
         conn.execute_batch(include_str!(
             "../../../migrations/sqlite/V5__procedural_memory.sql"
         ))
-        .await
         .unwrap();
 
         let tenant_id = format!("concurrent-{}", uuid::Uuid::new_v4());

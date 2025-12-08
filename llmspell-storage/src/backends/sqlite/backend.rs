@@ -3,15 +3,14 @@
 //! Main backend struct providing tenant-scoped database access
 //! with connection pooling and health monitoring.
 
+use super::pool::{SqliteConnectionManager, SqlitePool};
 use super::{
     config::SqliteConfig,
     error::{Result, SqliteError},
-    pool::SqlitePool,
+    // pool::SqlitePool, // Replaced by use super::pool::...
 };
 use dashmap::DashMap;
 use r2d2::PooledConnection;
-use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::Connection;
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -80,7 +79,7 @@ impl SqliteBackend {
         // Load vector search extension (vectorlite-rs)
         // Static linking registration
         let conn = pool.get_connection().await?;
-        
+
         #[cfg(feature = "sqlite")]
         {
             // Register vectorlite module
@@ -104,7 +103,9 @@ impl SqliteBackend {
 
         // Run migrations
         // TODO: Ensure run_migrations definition is compatible with async execution wrapping sync calls
-        backend.run_migrations().await
+        backend
+            .run_migrations()
+            .await
             .map_err(|e| SqliteError::Migration(format!("Failed to run migrations: {}", e)))?;
 
         info!("SQLite backend initialized with all necessary tables via migrations");
@@ -165,7 +166,8 @@ impl SqliteBackend {
 
         // Check WAL mode
         // synchronous
-        let journal_mode: String = conn.query_row("PRAGMA journal_mode", [], |row| row.get(0))
+        let journal_mode: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
             .map_err(|e| SqliteError::Query(format!("Failed to query journal_mode: {}", e)))?;
 
         // Get pool stats
@@ -217,11 +219,11 @@ mod tests {
     async fn test_backend_creation() {
         let config = SqliteConfig::in_memory();
         // new() might fail if backend.run_migrations() fails (not implemented/imported here?)
-        // Assuming run_migrations is available via trait/extension. 
+        // Assuming run_migrations is available via trait/extension.
         // We'll see if it compiles. If run_migrations is in separate file, it should work if we import that file in lib/mod.
         // But run_migrations logic needs updating too.
-        
-        let backend = SqliteBackend::new(config).await;
+
+        let _backend = SqliteBackend::new(config).await;
         // expect err if migrations refactor isn't done, but backend.rs itself is valid.
     }
 }

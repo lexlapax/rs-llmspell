@@ -2,7 +2,6 @@
 //! ABOUTME: Applies versioned SQL migrations from migrations/sqlite/ directory
 
 use super::SqliteBackend;
-use rusqlite::params;
 
 impl SqliteBackend {
     /// Run all database migrations
@@ -83,12 +82,9 @@ impl SqliteBackend {
 
         // Query _migrations table for highest version
         // Rusqlite sync call
-        let version: Option<i64> = conn.query_row(
-            "SELECT MAX(version) FROM _migrations",
-            [],
-            |row| row.get(0)
-        )
-        .map_err(|e| anyhow::anyhow!("Failed to query migration version: {}", e))?;
+        let version: Option<i64> = conn
+            .query_row("SELECT MAX(version) FROM _migrations", [], |row| row.get(0))
+            .map_err(|e| anyhow::anyhow!("Failed to query migration version: {}", e))?;
 
         Ok(version.unwrap_or(0) as usize)
     }
@@ -119,19 +115,23 @@ mod tests {
         let conn = backend.get_connection().await.unwrap();
 
         // Check kv_store table
-        let exists: bool = conn.query_row(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='kv_store'",
-            [],
-            |_| Ok(true)
-        ).unwrap_or(false);
+        let exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='kv_store'",
+                [],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
         assert!(exists, "kv_store table should exist");
 
         // Check agent_states table
-        let exists: bool = conn.query_row(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_states'",
-            [],
-            |_| Ok(true)
-        ).unwrap_or(false);
+        let exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_states'",
+                [],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
         assert!(exists, "agent_states table should exist");
     }
 
@@ -152,4 +152,3 @@ mod tests {
         assert_eq!(version, 13);
     }
 }
-

@@ -9,42 +9,41 @@ async fn test_vector_extension_loaded() -> Result<()> {
     let conn = backend.get_connection().await?;
 
     // 2. Verify module is loaded
-    let mut stmt = conn
-        .prepare("SELECT name FROM pragma_module_list WHERE name = 'vectorlite'")
-        .await?;
-    let mut rows = stmt.query(()).await?;
+    // Move connection usage to a blocking task or use it directly since tests can block?
+    // Actually, conn is MutexGuard or PooledConnection. rusqlite operations are blocking.
+    // In tokio test, we can just call them.
 
-    let mut found = false;
-    while let Some(row) = rows.next().await? {
-        let name: String = row.get(0)?;
-        if name == "vectorlite" {
-            found = true;
-        }
-    }
+    let found = conn
+        .query_row(
+            "SELECT name FROM pragma_module_list WHERE name = 'vectorlite'",
+            [],
+            |_| Ok(true),
+        )
+        .unwrap_or(false);
 
     assert!(found, "vectorlite module not found in pragma_module_list");
 
     // 3. Verify Basic Vector Operations
     // Create a virtual table using vectorlite
+    // Create a virtual table using vectorlite
     conn.execute(
-        "CREATE VIRTUAL TABLE v_test USING vectorlite(embedding float32[3], hnsw(max_elements=100))",
-        (),
-    ).await?;
+        "CREATE VIRTUAL TABLE v_test USING vectorlite(dimension=3, metric='l2', max_elements=100)",
+        [],
+    )?;
 
     // Insert a vector
     conn.execute(
         "INSERT INTO v_test(rowid, embedding) VALUES (1, '[1.0, 2.0, 3.0]')",
-        (),
-    )
-    .await?;
+        [],
+    )?;
 
     // Search
     let mut stmt = conn.prepare(
-        "SELECT rowid, distance FROM v_test WHERE knn_search(embedding, 3, '[1.0, 2.0, 3.0]') ORDER BY distance LIMIT 1"
-    ).await?;
+        "SELECT rowid, distance FROM v_test WHERE embedding MATCH '[1.0, 2.0, 3.0]' ORDER BY distance LIMIT 1"
+    )?;
 
-    let mut rows = stmt.query(()).await?;
-    if let Some(row) = rows.next().await? {
+    let mut rows = stmt.query([])?;
+    if let Some(row) = rows.next()? {
         let rowid: i64 = row.get(0)?;
         let distance: f64 = row.get(1)?;
         assert_eq!(rowid, 1);

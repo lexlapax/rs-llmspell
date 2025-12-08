@@ -63,7 +63,7 @@ mod sqlite_benchmarks {
                 "CREATE TABLE IF NOT EXISTS vec_embeddings_{} (rowid INTEGER PRIMARY KEY, embedding BLOB)",
                 dim
             );
-            conn.execute(&create_sql, ()).await.unwrap();
+            conn.execute(&create_sql, ()).unwrap();
         }
 
         // Create vector_metadata table
@@ -80,7 +80,6 @@ mod sqlite_benchmarks {
             )",
             (),
         )
-        .await
         .unwrap();
 
         // Create indices
@@ -88,21 +87,20 @@ mod sqlite_benchmarks {
             "CREATE INDEX IF NOT EXISTS idx_vector_metadata_tenant_scope ON vector_metadata(tenant_id, scope)",
             (),
         )
-        .await
+
         .unwrap();
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_vector_metadata_id ON vector_metadata(id)",
             (),
         )
-        .await
         .unwrap();
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_vector_metadata_dimension ON vector_metadata(dimension)",
             (),
         )
-        .await
+
         .unwrap();
 
         let storage = SqliteVectorStorage::new(backend, dimension).await.unwrap();

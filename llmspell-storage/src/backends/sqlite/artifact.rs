@@ -43,15 +43,17 @@ impl SqliteArtifactStorage {
     async fn increment_refcount(&self, content_hash: &str, content: &[u8]) -> Result<bool> {
         let conn = self.backend.get_connection().await?;
         let tenant_id = self.tenant_id.clone();
-        
+
         // Check if content exists
-        let exists: Option<i64> = conn.query_row(
-            "SELECT reference_count FROM artifact_content
+        let exists: Option<i64> = conn
+            .query_row(
+                "SELECT reference_count FROM artifact_content
              WHERE tenant_id = ?1 AND content_hash = ?2",
-            rusqlite::params![tenant_id, content_hash],
-            |row| row.get(0)
-        ).optional()
-         .map_err(|e| SqliteError::Query(format!("Failed to check content existence: {}", e)))?;
+                rusqlite::params![tenant_id, content_hash],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .map_err(|e| SqliteError::Query(format!("Failed to check content existence: {}", e)))?;
 
         if exists.is_some() {
             // Increment existing reference count
@@ -74,13 +76,7 @@ impl SqliteArtifactStorage {
                 "INSERT INTO artifact_content
                  (tenant_id, content_hash, data, size_bytes, is_compressed, reference_count)
                  VALUES (?1, ?2, ?3, ?4, ?5, 1)",
-                rusqlite::params![
-                    tenant_id,
-                    content_hash,
-                    content,
-                    size_bytes,
-                    is_compressed
-                ],
+                rusqlite::params![tenant_id, content_hash, content, size_bytes, is_compressed],
             )
             .map_err(|e| SqliteError::Query(format!("Failed to insert content: {}", e)))?;
 
@@ -97,12 +93,13 @@ impl SqliteArtifactStorage {
 
         // Delete content if refcount = 1 (it will become 0 after decrement)
         // This avoids violating the CHECK constraint (reference_count > 0)
-        let deleted = conn.execute(
-            "DELETE FROM artifact_content
+        let deleted = conn
+            .execute(
+                "DELETE FROM artifact_content
              WHERE tenant_id = ?1 AND content_hash = ?2 AND reference_count = 1",
-            rusqlite::params![tenant_id, content_hash],
-        )
-        .map_err(|e| SqliteError::Query(format!("Failed to delete content: {}", e)))?;
+                rusqlite::params![tenant_id, content_hash],
+            )
+            .map_err(|e| SqliteError::Query(format!("Failed to delete content: {}", e)))?;
 
         // If we didn't delete (refcount > 1), just decrement
         if deleted == 0 {
@@ -149,14 +146,15 @@ impl ArtifactStorage for SqliteArtifactStorage {
 
         // Generate artifact_id format: "{session_id}:{sequence}:{content_hash}"
         // Get next sequence number for session
-        let sequence: i64 = conn.query_row(
-            "SELECT COALESCE(MAX(sequence), -1) + 1
+        let sequence: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(sequence), -1) + 1
              FROM artifacts
              WHERE tenant_id = ?1 AND session_id = ?2",
-            rusqlite::params![tenant_id, artifact.artifact_id.session_id],
-            |row| row.get(0)
-        )
-        .map_err(|e| SqliteError::Query(format!("Failed to get next sequence: {}", e)))?;
+                rusqlite::params![tenant_id, artifact.artifact_id.session_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| SqliteError::Query(format!("Failed to get next sequence: {}", e)))?;
 
         let artifact_id = format!(
             "{}:{}:{}",
@@ -231,25 +229,27 @@ impl ArtifactStorage for SqliteArtifactStorage {
 
         // artifact_id.content_hash contains the database artifact_id: "{session_id}:{sequence}:{content_hash}"
         // Join artifacts + artifact_content to retrieve full artifact
-        let result = conn.query_row(
-            "SELECT a.artifact_type, a.metadata, a.size_bytes, a.created_at, c.data
+        let result = conn
+            .query_row(
+                "SELECT a.artifact_type, a.metadata, a.size_bytes, a.created_at, c.data
              FROM artifacts a
              INNER JOIN artifact_content c ON
                  a.tenant_id = c.tenant_id AND a.content_hash = c.content_hash
              WHERE a.tenant_id = ?1
                AND a.artifact_id = ?2",
-            rusqlite::params![tenant_id, artifact_id.content_hash],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, i64>(2)?,
-                    row.get::<_, i64>(3)?,
-                    row.get::<_, Vec<u8>>(4)?
-                ))
-            }
-        ).optional()
-         .map_err(|e| SqliteError::Query(format!("Failed to get artifact: {}", e)))?;
+                rusqlite::params![tenant_id, artifact_id.content_hash],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, Vec<u8>>(4)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(|e| SqliteError::Query(format!("Failed to get artifact: {}", e)))?;
 
         let (artifact_type_str, metadata_json, size_bytes, created_at_ts, content) = match result {
             Some(v) => v,
@@ -259,7 +259,7 @@ impl ArtifactStorage for SqliteArtifactStorage {
         let artifact_type = Self::parse_artifact_type(&artifact_type_str)?;
         let metadata: serde_json::Value =
             serde_json::from_str(&metadata_json).context("failed to deserialize metadata")?;
-        
+
         // This cast is safe for reasonable sizes
         let size_bytes_usize = size_bytes as usize;
 
@@ -293,26 +293,30 @@ impl ArtifactStorage for SqliteArtifactStorage {
         let tenant_id = self.tenant_id.clone();
 
         // First, get the content_hash before deletion
-        let content_hash: Option<String> = conn.query_row(
-            "SELECT content_hash FROM artifacts
+        let content_hash: Option<String> = conn
+            .query_row(
+                "SELECT content_hash FROM artifacts
              WHERE tenant_id = ?1 AND artifact_id = ?2",
-            rusqlite::params![tenant_id, artifact_id.content_hash],
-            |row| row.get(0)
-        ).optional()
-         .map_err(|e| SqliteError::Query(format!("Failed to get content_hash: {}", e)))?;
+                rusqlite::params![tenant_id, artifact_id.content_hash],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|e| SqliteError::Query(format!("Failed to get content_hash: {}", e)))?;
 
-        let content_hash = match content_hash {
-            Some(h) => h,
+        let content_hash_val: Option<String> = match content_hash {
+            Some(h) => Some(h),
             None => return Ok(false),
         };
+        let content_hash_str = content_hash_val.unwrap();
 
         // Delete artifact metadata using artifact_id (unique identifier)
-        let rows_affected = conn.execute(
-            "DELETE FROM artifacts
+        let rows_affected = conn
+            .execute(
+                "DELETE FROM artifacts
              WHERE tenant_id = ?1 AND artifact_id = ?2",
-            rusqlite::params![tenant_id, artifact_id.content_hash],
-        )
-        .map_err(|e| SqliteError::Query(format!("Failed to delete artifact: {}", e)))?;
+                rusqlite::params![tenant_id, artifact_id.content_hash],
+            )
+            .map_err(|e| SqliteError::Query(format!("Failed to delete artifact: {}", e)))?;
 
         if rows_affected == 0 {
             return Ok(false);
@@ -336,7 +340,7 @@ impl ArtifactStorage for SqliteArtifactStorage {
         drop(conn);
 
         // Only decrement refcount if we actually deleted an artifact
-        self.decrement_refcount(&content_hash)
+        self.decrement_refcount(&content_hash_str)
             .await
             .context("failed to decrement refcount")?;
 
@@ -347,26 +351,31 @@ impl ArtifactStorage for SqliteArtifactStorage {
         let conn = self.backend.get_connection().await?;
         let tenant_id = self.tenant_id.clone();
 
-        let mut stmt = conn.prepare(
-            "SELECT artifact_id, session_id
+        let mut stmt = conn
+            .prepare(
+                "SELECT artifact_id, session_id
              FROM artifacts
              WHERE tenant_id = ?1 AND session_id = ?2
              ORDER BY stored_at DESC",
-        ).map_err(|e| SqliteError::Query(format!("Failed to prepare list artifacts: {}", e)))?;
-        
-        let artifact_iter = stmt.query_map(
-            rusqlite::params![tenant_id, session_id],
-            |row| {
+            )
+            .map_err(|e| SqliteError::Query(format!("Failed to prepare list artifacts: {}", e)))?;
+
+        let artifact_iter = stmt
+            .query_map(rusqlite::params![tenant_id, session_id], |row| {
                 Ok(ArtifactId::new(
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                 ))
-            }
-        ).map_err(|e| SqliteError::Query(format!("Failed to list artifacts: {}", e)))?;
+            })
+            .map_err(|e| SqliteError::Query(format!("Failed to list artifacts: {}", e)))?;
 
         let mut artifacts = Vec::new();
         for artifact in artifact_iter {
-            artifacts.push(artifact.map_err(|e| SqliteError::Query(format!("Failed to read artifact row: {}", e)))?);
+            artifacts.push(
+                artifact.map_err(|e| {
+                    SqliteError::Query(format!("Failed to read artifact row: {}", e))
+                })?,
+            );
         }
 
         Ok(artifacts)
@@ -376,14 +385,15 @@ impl ArtifactStorage for SqliteArtifactStorage {
         let conn = self.backend.get_connection().await?;
         let tenant_id = self.tenant_id.clone();
 
-        let (count, total_size): (i64, i64) = conn.query_row(
-            "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0)
+        let (count, total_size): (i64, i64) = conn
+            .query_row(
+                "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0)
              FROM artifacts
              WHERE tenant_id = ?1 AND session_id = ?2",
-            rusqlite::params![tenant_id, session_id],
-            |row| Ok((row.get(0)?, row.get(1)?))
-        )
-        .map_err(|e| SqliteError::Query(format!("Failed to get storage stats: {}", e)))?;
+                rusqlite::params![tenant_id, session_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|e| SqliteError::Query(format!("Failed to get storage stats: {}", e)))?;
 
         Ok(SessionStorageStats {
             artifact_count: count as usize,
@@ -396,17 +406,21 @@ impl ArtifactStorage for SqliteArtifactStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::backends::sqlite::{SqliteConfig, SqliteBackend};
+    use crate::backends::sqlite::{SqliteBackend, SqliteConfig};
     use llmspell_core::types::storage::ArtifactType;
 
     // Helper to run migrations for tests
     fn run_migrations(conn: &rusqlite::Connection) {
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V1__initial_setup.sql"))
-            .unwrap();
+        conn.execute_batch(include_str!(
+            "../../../migrations/sqlite/V1__initial_setup.sql"
+        ))
+        .unwrap();
         conn.execute_batch(include_str!("../../../migrations/sqlite/V9__sessions.sql"))
             .unwrap();
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V10__artifacts.sql"))
-            .unwrap();
+        conn.execute_batch(include_str!(
+            "../../../migrations/sqlite/V10__artifacts.sql"
+        ))
+        .unwrap();
     }
 
     async fn create_test_storage() -> (tempfile::TempDir, Arc<SqliteBackend>, SqliteArtifactStorage)
@@ -605,12 +619,14 @@ mod tests {
         // Check reference count = 2
         {
             let conn = backend.get_connection().await.unwrap();
-            let refcount: i64 = conn.query_row(
-                "SELECT reference_count FROM artifact_content
+            let refcount: i64 = conn
+                .query_row(
+                    "SELECT reference_count FROM artifact_content
                  WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
-                rusqlite::params![content_hash],
-                |row| row.get(0)
-            ).unwrap();
+                    rusqlite::params![content_hash],
+                    |row| row.get(0),
+                )
+                .unwrap();
             assert_eq!(refcount, 2);
         }
 
@@ -620,12 +636,14 @@ mod tests {
         // Refcount should be 1
         {
             let conn = backend.get_connection().await.unwrap();
-            let refcount: i64 = conn.query_row(
-                "SELECT reference_count FROM artifact_content
+            let refcount: i64 = conn
+                .query_row(
+                    "SELECT reference_count FROM artifact_content
                  WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
-                rusqlite::params![content_hash],
-                |row| row.get(0)
-            ).unwrap();
+                    rusqlite::params![content_hash],
+                    |row| row.get(0),
+                )
+                .unwrap();
             assert_eq!(refcount, 1);
         }
 
@@ -635,12 +653,15 @@ mod tests {
         // Content should be deleted
         {
             let conn = backend.get_connection().await.unwrap();
-            let exists: Option<i64> = conn.query_row(
-                "SELECT 1 FROM artifact_content
+            let exists: Option<i64> = conn
+                .query_row(
+                    "SELECT 1 FROM artifact_content
                  WHERE tenant_id = 'test-tenant' AND content_hash = ?1",
-                rusqlite::params![content_hash],
-                |row| row.get(0)
-            ).optional().unwrap();
+                    rusqlite::params![content_hash],
+                    |row| row.get(0),
+                )
+                .optional()
+                .unwrap();
             assert!(exists.is_none());
         }
     }

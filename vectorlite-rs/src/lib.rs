@@ -1,46 +1,10 @@
-//! vectorlite-rs: Pure Rust HNSW vector search extension for SQLite
-//!
-//! # Architecture
-//!
-//! - **Virtual Table API**: Implements rusqlite VTab + VTabCursor traits
-//! - **HNSW Indexing**: Uses hnsw_rs for approximate nearest neighbor search
-//! - **Distance Metrics**: L2 (Euclidean), Cosine, Inner Product
-//! - **Multi-Dimension Support**: 384, 768, 1536, 3072 dimensions
-//! - **Performance Target**: 3-100x faster than sqlite-vec brute-force
-//!
-//! # Usage
-//!
-//! ```sql
-//! -- Load extension
-//! SELECT load_extension('./extensions/vectorlite.dylib');
-//!
-//! -- Create vector table with HNSW index
-//! CREATE VIRTUAL TABLE vec_embeddings_768 USING vectorlite(
-//!     dimension=768,
-//!     metric='cosine',
-//!     max_elements=100000,
-//!     ef_construction=200,
-//!     m=16
-//! );
-//!
-//! -- Insert vectors
-//! INSERT INTO vec_embeddings_768(rowid, embedding) VALUES (1, ?);
-//!
-//! -- K-NN search
-//! SELECT rowid, distance
-//! FROM vec_embeddings_768
-//! WHERE embedding MATCH ?
-//! ORDER BY distance
-//! LIMIT 10;
-//! ```
-
-use rusqlite::vtab::{
-    eponymous_only_module, sqlite3_vtab, sqlite3_vtab_cursor, Context, IndexInfo, VTab,
-    VTabConnection, VTabCursor,
-};
+use rusqlite::ffi;
 use rusqlite::{Connection, Result as SqliteResult};
-use std::marker::PhantomData;
-use std::os::raw::c_int;
+use std::ffi::{CStr, CString};
+use std::mem;
+use std::os::raw::{c_char, c_int, c_void};
+use std::ptr;
+use std::slice;
 
 mod distance;
 mod error;
@@ -52,191 +16,347 @@ pub use error::{Error, Result};
 pub use hnsw::HnswIndex;
 
 /// Programmatic entry point for static linking.
-///
-/// Registers the `vectorlite` module with the given connection.
-/// This should be called by the host application (llmspell-storage) during initialization.
 pub fn register_vectorlite(conn: &Connection) -> SqliteResult<()> {
-    conn.create_module("vectorlite", eponymous_only_module::<VectorLiteTab>(), None)
+    static MODULE: ffi::sqlite3_module = ffi::sqlite3_module {
+        iVersion: 0,
+        xCreate: Some(x_create),
+        xConnect: Some(x_connect),
+        xBestIndex: Some(x_best_index),
+        xDisconnect: Some(x_disconnect),
+        xDestroy: Some(x_destroy),
+        xOpen: Some(x_open),
+        xClose: Some(x_close),
+        xFilter: Some(x_filter),
+        xNext: Some(x_next),
+        xEof: Some(x_eof),
+        xColumn: Some(x_column),
+        xRowid: Some(x_rowid),
+        xUpdate: Some(x_update),
+        xBegin: None,
+        xSync: None,
+        xCommit: None,
+        xRollback: None,
+        xFindFunction: None,
+        xRename: None,
+        xSavepoint: None,
+        xRelease: None,
+        xRollbackTo: None,
+        xShadowName: None,
+        xIntegrity: None, // Added for newer SQLite versions supported by rusqlite 0.32
+    };
+
+    unsafe {
+        let db = conn.handle();
+        let c_name = CString::new("vectorlite").unwrap();
+        let rc = ffi::sqlite3_create_module_v2(db, c_name.as_ptr(), &MODULE, ptr::null_mut(), None);
+        if rc != ffi::SQLITE_OK {
+            return Err(rusqlite::Error::SqliteFailure(
+                ffi::Error {
+                    code: ffi::ErrorCode::Unknown,
+                    extended_code: rc,
+                },
+                Some("Failed to create module vectorlite".to_string()),
+            ));
+        }
+    }
+    Ok(())
 }
 
-// REMOVED: C-ABI entry points (sqlite3_vectorlite_init, sqlite3_vectorlite_init_win32)
-// REMOVED: SQLITE3_API global hack
-// We are now a standard Rust library linked statically.
-
-/// VectorLite virtual table implementation
-///
-/// Each table instance maintains an HNSW index for fast approximate nearest neighbor search.
-/// The table stores vectors as BLOBs and builds an in-memory HNSW index for efficient queries.
+/// VectorLite virtual table structure (C compatible)
 #[repr(C)]
 pub struct VectorLiteTab {
-    /// Base class. Must be first member
-    base: sqlite3_vtab,
-    /// HNSW index for vector search
+    base: ffi::sqlite3_vtab,
     index: Option<HnswIndex>,
-    /// Vector dimension (384, 768, 1536, 3072)
     dimension: usize,
-    /// Distance metric (L2, cosine, inner product)
     metric: DistanceMetric,
 }
 
-impl VectorLiteTab {
-    /// Create new virtual table instance
-    fn new(dimension: usize, metric: DistanceMetric) -> Self {
-        Self {
-            base: unsafe { std::mem::zeroed() },
-            index: None,
-            dimension,
-            metric,
-        }
-    }
-}
-
-unsafe impl<'vtab> VTab<'vtab> for VectorLiteTab {
-    type Aux = ();
-    type Cursor = VectorLiteCursor<'vtab>;
-
-    fn connect(
-        _db: &mut VTabConnection,
-        _aux: Option<&Self::Aux>,
-        args: &[&[u8]],
-    ) -> SqliteResult<(String, Self)> {
-        // Parse CREATE VIRTUAL TABLE arguments
-        // args[0] = module name ("vectorlite")
-        // args[1] = database name
-        // args[2] = table name
-        // args[3..] = parameters (dimension, metric, etc.)
-
-        let dimension = vtab::parse_dimension(args)?;
-        let metric = vtab::parse_metric(args)?;
-
-        let schema = "CREATE TABLE x(rowid INTEGER PRIMARY KEY, embedding BLOB, distance HIDDEN)"
-            .to_string();
-
-        let mut vtab = Self::new(dimension, metric);
-
-        // Initialize HNSW index
-        // Parameters from args or defaults:
-        // - max_elements: 100000
-        // - ef_construction: 200
-        // - m: 16
-        let max_elements = vtab::parse_max_elements(args).unwrap_or(100_000);
-        let ef_construction = vtab::parse_ef_construction(args).unwrap_or(200);
-        let m = vtab::parse_m(args).unwrap_or(16);
-
-        vtab.index = Some(HnswIndex::new(
-            dimension,
-            max_elements,
-            m,
-            ef_construction,
-            metric,
-        )?);
-
-        Ok((schema, vtab))
-    }
-
-    fn best_index(&self, info: &mut IndexInfo) -> SqliteResult<()> {
-        // Query optimization: Check for MATCH operator (vector search)
-        vtab::best_index(info)
-    }
-
-    fn open(&mut self) -> SqliteResult<Self::Cursor> {
-        Ok(VectorLiteCursor::new())
-    }
-}
-
-/// Cursor for iterating over query results
+/// VectorLite cursor structure (C compatible)
 #[repr(C)]
-pub struct VectorLiteCursor<'vtab> {
-    /// Base class. Must be first member
-    base: sqlite3_vtab_cursor,
-    /// Current result set (rowid, distance pairs)
+pub struct VectorLiteCursor {
+    base: ffi::sqlite3_vtab_cursor,
     results: Vec<(i64, f32)>,
-    /// Current position in results
     position: usize,
-    /// Phantom data to tie lifetime to VTab
-    phantom: PhantomData<&'vtab VectorLiteTab>,
 }
 
-impl<'vtab> VectorLiteCursor<'vtab> {
-    fn new() -> Self {
-        Self {
-            base: unsafe { std::mem::zeroed() },
-            results: Vec::new(),
-            position: 0,
-            phantom: PhantomData,
+// --- C Callbacks ---
+
+unsafe extern "C" fn x_connect(
+    db: *mut ffi::sqlite3,
+    _aux: *mut c_void,
+    argc: c_int,
+    argv: *const *const c_char,
+    pp_vtab: *mut *mut ffi::sqlite3_vtab,
+    _pz_err: *mut *mut c_char,
+) -> c_int {
+    // Parse args
+    let args_slice = slice::from_raw_parts(argv, argc as usize);
+    let mut args_bytes = Vec::with_capacity(argc as usize);
+    for &arg in args_slice {
+        args_bytes.push(CStr::from_ptr(arg).to_bytes());
+    }
+
+    // Call parsing logic (reuse vtab helpers)
+    let dimension_res = vtab::parse_dimension(&args_bytes);
+    let metric_res = vtab::parse_metric(&args_bytes);
+
+    let dimension = match dimension_res {
+        Ok(d) => d,
+        Err(_) => return ffi::SQLITE_ERROR,
+    };
+    let metric = match metric_res {
+        Ok(m) => m,
+        Err(_) => return ffi::SQLITE_ERROR,
+    };
+
+    // Declare table
+    // Removed explicit rowid column - it's implicit in virtual tables
+    let schema = CString::new("CREATE TABLE x(embedding BLOB, distance HIDDEN)").unwrap();
+    if ffi::sqlite3_declare_vtab(db, schema.as_ptr()) != ffi::SQLITE_OK {
+        return ffi::SQLITE_ERROR;
+    }
+
+    // Create struct
+    let vtab = Box::new(VectorLiteTab {
+        base: mem::zeroed(),
+        index: None,
+        dimension,
+        metric,
+    });
+
+    // Initialize index
+    let max_elements = vtab::parse_max_elements(&args_bytes).unwrap_or(100_000);
+    let ef_construction = vtab::parse_ef_construction(&args_bytes).unwrap_or(200);
+    let m = vtab::parse_m(&args_bytes).unwrap_or(16);
+
+    // Initialize HNSW
+    // We modify the box before leaking
+    let vtab_ptr = Box::into_raw(vtab);
+    let vtab = &mut *vtab_ptr;
+
+    match HnswIndex::new(dimension, max_elements, m, ef_construction, metric) {
+        Ok(idx) => vtab.index = Some(idx),
+        Err(_) => {
+            let _ = Box::from_raw(vtab_ptr); // free
+            return ffi::SQLITE_ERROR;
         }
     }
+
+    *pp_vtab = &mut vtab.base;
+    ffi::SQLITE_OK
 }
 
-unsafe impl VTabCursor for VectorLiteCursor<'_> {
-    fn filter(
-        &mut self,
-        _idx_num: c_int,
-        _idx_str: Option<&str>,
-        _args: &rusqlite::vtab::Values<'_>,
-    ) -> SqliteResult<()> {
-        // Execute K-NN search
-        // This will be implemented in vtab module
-        self.position = 0;
-        Ok(())
-    }
+unsafe extern "C" fn x_create(
+    db: *mut ffi::sqlite3,
+    aux: *mut c_void,
+    argc: c_int,
+    argv: *const *const c_char,
+    pp_vtab: *mut *mut ffi::sqlite3_vtab,
+    pz_err: *mut *mut c_char,
+) -> c_int {
+    x_connect(db, aux, argc, argv, pp_vtab, pz_err)
+}
 
-    fn next(&mut self) -> SqliteResult<()> {
-        self.position += 1;
-        Ok(())
-    }
+unsafe extern "C" fn x_disconnect(vtab: *mut ffi::sqlite3_vtab) -> c_int {
+    // Reconstruct Box and drop
+    let vtab = Box::from_raw(vtab as *mut VectorLiteTab);
+    drop(vtab);
+    ffi::SQLITE_OK
+}
 
-    fn eof(&self) -> bool {
-        self.position >= self.results.len()
-    }
+unsafe extern "C" fn x_destroy(vtab: *mut ffi::sqlite3_vtab) -> c_int {
+    x_disconnect(vtab)
+}
 
-    fn column(&self, ctx: &mut Context, col: c_int) -> SqliteResult<()> {
-        if self.position >= self.results.len() {
-            return Ok(());
+unsafe extern "C" fn x_best_index(
+    _vtab: *mut ffi::sqlite3_vtab,
+    info: *mut ffi::sqlite3_index_info,
+) -> c_int {
+    let info = &mut *info;
+
+    let constraints = slice::from_raw_parts(info.aConstraint, info.nConstraint as usize);
+    let usage = slice::from_raw_parts_mut(info.aConstraintUsage, info.nConstraint as usize);
+
+    let mut has_match = false;
+    for (i, c) in constraints.iter().enumerate() {
+        // embedding is column 0
+        if c.iColumn == 0 && c.op == (ffi::SQLITE_INDEX_CONSTRAINT_MATCH as u8) && c.usable != 0 {
+            usage[i].argvIndex = 1;
+            usage[i].omit = 1;
+            has_match = true;
         }
-
-        let (rowid, distance) = self.results[self.position];
-
-        match col {
-            0 => ctx.set_result(&rowid),     // rowid column
-            1 => ctx.set_result(&vec![0u8]), // embedding column (placeholder)
-            2 => ctx.set_result(&distance),  // distance column (HIDDEN)
-            _ => Ok(()),
-        }
     }
 
-    fn rowid(&self) -> SqliteResult<i64> {
-        if self.position < self.results.len() {
-            Ok(self.results[self.position].0)
+    if has_match {
+        info.estimatedCost = 1000.0;
+        info.estimatedRows = 100;
+        info.idxNum = 1;
+    } else {
+        info.estimatedCost = 1_000_000.0;
+        info.estimatedRows = 100_000;
+        info.idxNum = 0;
+    }
+
+    ffi::SQLITE_OK
+}
+
+unsafe extern "C" fn x_open(
+    _vtab: *mut ffi::sqlite3_vtab,
+    pp_cursor: *mut *mut ffi::sqlite3_vtab_cursor,
+) -> c_int {
+    let cursor = Box::new(VectorLiteCursor {
+        base: mem::zeroed(),
+        results: Vec::new(),
+        position: 0,
+    });
+    *pp_cursor = &mut (*Box::into_raw(cursor)).base;
+    ffi::SQLITE_OK
+}
+
+unsafe extern "C" fn x_close(cursor: *mut ffi::sqlite3_vtab_cursor) -> c_int {
+    let cursor = Box::from_raw(cursor as *mut VectorLiteCursor);
+    drop(cursor);
+    ffi::SQLITE_OK
+}
+
+unsafe extern "C" fn x_filter(
+    cursor: *mut ffi::sqlite3_vtab_cursor,
+    idx_num: c_int,
+    _idx_str: *const c_char,
+    argc: c_int,
+    argv: *mut *mut ffi::sqlite3_value,
+) -> c_int {
+    let cursor = &mut *(cursor as *mut VectorLiteCursor);
+    let vtab = &*(cursor.base.pVtab as *mut VectorLiteTab);
+
+    cursor.results.clear();
+    cursor.position = 0;
+
+    if idx_num == 1 && argc >= 1 {
+        // Search
+        let args = slice::from_raw_parts(argv, argc as usize);
+        let query_val = args[0];
+
+        let type_code = ffi::sqlite3_value_type(query_val);
+
+        let blob = ffi::sqlite3_value_blob(query_val);
+        let text = ffi::sqlite3_value_text(query_val);
+
+        let query_vec: Option<Vec<f32>> = if !blob.is_null() && type_code == ffi::SQLITE_BLOB {
+            None
+        } else if !text.is_null() {
+            let s = CStr::from_ptr(text as *const c_char).to_string_lossy();
+            serde_json::from_str(&s).ok()
         } else {
-            Ok(0)
+            None
+        };
+
+        if let Some(q) = query_vec {
+            if let Some(index) = &vtab.index {
+                if let Ok(results) = index.search(&q, 10, 100) {
+                    cursor.results = results;
+                }
+            }
         }
+    }
+    ffi::SQLITE_OK
+}
+
+unsafe extern "C" fn x_next(cursor: *mut ffi::sqlite3_vtab_cursor) -> c_int {
+    let cursor = &mut *(cursor as *mut VectorLiteCursor);
+    cursor.position += 1;
+    ffi::SQLITE_OK
+}
+
+unsafe extern "C" fn x_eof(cursor: *mut ffi::sqlite3_vtab_cursor) -> c_int {
+    let cursor = &mut *(cursor as *mut VectorLiteCursor);
+    if cursor.position >= cursor.results.len() {
+        1
+    } else {
+        0
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+unsafe extern "C" fn x_column(
+    cursor: *mut ffi::sqlite3_vtab_cursor,
+    ctx: *mut ffi::sqlite3_context,
+    i: c_int,
+) -> c_int {
+    let cursor = &mut *(cursor as *mut VectorLiteCursor);
+    if cursor.position < cursor.results.len() {
+        let (_rowid, distance) = cursor.results[cursor.position];
+        match i {
+            0 => ffi::sqlite3_result_null(ctx), // embedding
+            1 => ffi::sqlite3_result_double(ctx, distance as f64), // distance
+            _ => ffi::sqlite3_result_null(ctx),
+        }
+    }
+    ffi::SQLITE_OK
+}
 
-    #[test]
-    fn test_distance_metrics() {
-        let a = vec![1.0, 0.0, 0.0];
-        let b = vec![0.0, 1.0, 0.0];
+unsafe extern "C" fn x_rowid(
+    cursor: *mut ffi::sqlite3_vtab_cursor,
+    p_rowid: *mut ffi::sqlite3_int64,
+) -> c_int {
+    let cursor = &mut *(cursor as *mut VectorLiteCursor);
+    if cursor.position < cursor.results.len() {
+        *p_rowid = cursor.results[cursor.position].0;
+    }
+    ffi::SQLITE_OK
+}
 
-        let l2 = distance_l2(&a, &b);
-        assert!((l2 - 1.414).abs() < 0.01);
+unsafe extern "C" fn x_update(
+    vtab: *mut ffi::sqlite3_vtab,
+    argc: c_int,
+    argv: *mut *mut ffi::sqlite3_value,
+    p_rowid: *mut ffi::sqlite3_int64,
+) -> c_int {
+    let vtab = &mut *(vtab as *mut VectorLiteTab);
 
-        let cosine = distance_cosine(&a, &b);
-        assert!((cosine - 1.0).abs() < 0.01);
+    if argc == 1 {
+        // DELETE
+        return ffi::SQLITE_ERROR;
     }
 
-    #[test]
-    fn test_supported_dimensions() {
-        // Test that the supported dimensions are recognized
-        assert!(matches!(384, 384 | 768 | 1536 | 3072));
-        assert!(matches!(768, 384 | 768 | 1536 | 3072));
-        assert!(matches!(1536, 384 | 768 | 1536 | 3072));
-        assert!(matches!(3072, 384 | 768 | 1536 | 3072));
-        assert!(!matches!(512, 384 | 768 | 1536 | 3072));
+    // INSERT/UPDATE
+    // argv[0] = old rowid
+    // argv[1] = new rowid (value)
+    // argv[2] = list of columns... embedding is col 0 in table def (rowid is special)
+    // So argv[2] is embedding.
+
+    let args = slice::from_raw_parts(argv, argc as usize);
+    let new_rowid_ptr = args[1];
+    let embedding_ptr = args[2]; // column 0
+
+    let rowid_type = ffi::sqlite3_value_type(new_rowid_ptr);
+    let rowid = if rowid_type == ffi::SQLITE_INTEGER {
+        ffi::sqlite3_value_int64(new_rowid_ptr)
+    } else {
+        return ffi::SQLITE_ERROR;
+    };
+
+    let embed_type = ffi::sqlite3_value_type(embedding_ptr);
+    let vector: Option<Vec<f32>> = if embed_type == ffi::SQLITE_TEXT {
+        let text = ffi::sqlite3_value_text(embedding_ptr);
+        let s = CStr::from_ptr(text as *const c_char).to_string_lossy();
+        serde_json::from_str(&s).ok()
+    } else {
+        None
+    };
+
+    if let Some(v) = vector {
+        if let Some(index) = &vtab.index {
+            match index.insert(rowid, v) {
+                Ok(_) => {
+                    *p_rowid = rowid;
+                    ffi::SQLITE_OK
+                }
+                Err(_) => ffi::SQLITE_ERROR,
+            }
+        } else {
+            ffi::SQLITE_ERROR
+        }
+    } else {
+        ffi::SQLITE_ERROR
     }
 }

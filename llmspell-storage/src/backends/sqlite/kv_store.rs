@@ -259,12 +259,12 @@ mod tests {
         // Run migrations manually (V1, V7 for kv_store tests)
         // Using synchronous migration
         backend.run_migrations().await.unwrap();
-        
+
         // Load V7 specifically? run_migrations runs all.
         // But for test setup we might want to be explicit if run_migrations logic was partial?
         // backend.run_migrations() handles checking/running all pending.
-        
-        // But the original code manually ran V1 and V7. 
+
+        // But the original code manually ran V1 and V7.
         // run_migrations should be enough if it includes all.
         // Let's rely on run_migrations() which uses embedded migrations.
 

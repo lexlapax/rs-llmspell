@@ -209,12 +209,7 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to prepare status update: {}", e)))?;
 
         let rows_affected = stmt
-            .execute(params![
-                status.to_string(),
-                now,
-                tenant_id,
-                workflow_id
-            ])
+            .execute(params![status.to_string(), now, tenant_id, workflow_id])
             .map_err(|e| SqliteError::Query(format!("Failed to update workflow status: {}", e)))?;
 
         if rows_affected == 0 {
@@ -234,13 +229,14 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
         // Building query dynamically
         // Use rusqlite::params_from_iter to handle dynamic params
         let mut query = "SELECT workflow_id FROM workflow_states WHERE tenant_id = ?1".to_string();
-        let mut params: Vec<Box<dyn rusqlite::ToSql + Send + Sync>> = vec![Box::new(tenant_id.to_string())];
+        let mut params: Vec<Box<dyn rusqlite::ToSql + Send + Sync>> =
+            vec![Box::new(tenant_id.to_string())];
 
         if let Some(status) = status_filter {
             query.push_str(" AND status = ?2");
             params.push(Box::new(status.to_string()));
         }
-        
+
         query.push_str(" ORDER BY created_at DESC");
 
         let mut stmt = conn
@@ -301,7 +297,7 @@ mod tests {
         // Run migrations manually (V1, V8 for workflow_state tests)
         // using NEW synchronous implementation
         backend.run_migrations().await.unwrap();
-        
+
         // Create unique tenant ID
         let tenant_id = format!("test-tenant-{}", uuid::Uuid::new_v4());
 

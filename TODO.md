@@ -1225,7 +1225,7 @@
 
 ### Task 14.5.1h: SQLite dynamic loading of vectorsql - research and fix
 **Priority**: CRITICAL
-**Status**: IN PROGRESS
+**Status**: COMPLETED ✅
 **Description**: Resolve segmentation faults and SIGKILL errors when loading `vectorlite-rs` extension dynamically on Linux/macOS.
 
 **The Problem**:
@@ -1247,8 +1247,8 @@ To achieve 100% stability, we are pivoting from **Dynamic Loading** to **Static 
 - [x] **llmspell-storage**: Replace `libsql` with `rusqlite` in `Cargo.toml`.
 - [x] **llmspell-storage**: Refactor `SqliteBackend` to use `rusqlite::Connection` and call `register_vectorlite`.
 - [x] **llmspell-storage**: Refactor Exporter/Importer to match `rusqlite` API.
-- [ ] **llmspell-storage**: Refactor remaining storage modules (`agent_state`, `graph`, `hook_history`, `session`) to use synchronous `rusqlite`.
-- [ ] **Verification**: Pass `sqlite_vector_verify` test.
+- [x] **llmspell-storage**: Refactor remaining storage modules (`agent_state`, `graph`, `hook_history`, `session`) to use synchronous `rusqlite`.
+- [x] **Verification**: Pass `sqlite_vector_verify` test.
 
 
 ### Task 14.5.1i: Provider Management & Discovery

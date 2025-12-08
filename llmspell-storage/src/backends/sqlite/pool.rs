@@ -11,8 +11,12 @@ use r2d2::{ManageConnection, Pool};
 use rusqlite::{Connection, OpenFlags};
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tracing::warn;
+#[cfg(feature = "sqlite")]
+use vectorlite_rs;
+
+/// Type alias for connection initialization closure
+type ConnectionInit = Box<dyn Fn(&mut Connection) -> rusqlite::Result<()> + Send + Sync + 'static>;
 
 /// Custom R2D2 connection manager for Rusqlite
 ///
@@ -20,7 +24,7 @@ use tracing::warn;
 pub struct SqliteConnectionManager {
     path: PathBuf,
     flags: OpenFlags,
-    init: Option<Box<dyn Fn(&mut Connection) -> rusqlite::Result<()> + Send + Sync + 'static>>,
+    init: Option<ConnectionInit>,
 }
 
 impl SqliteConnectionManager {
@@ -63,7 +67,7 @@ impl ManageConnection for SqliteConnectionManager {
     }
 
     fn is_valid(&self, conn: &mut Connection) -> std::result::Result<(), rusqlite::Error> {
-        conn.execute_batch("").map_err(Into::into)
+        conn.execute_batch("")
     }
 
     fn has_broken(&self, _conn: &mut Connection) -> bool {
@@ -74,6 +78,7 @@ impl ManageConnection for SqliteConnectionManager {
 /// SQLite connection pool
 ///
 /// Wraps r2d2::Pool with SqliteConnectionManager.
+#[derive(Debug)]
 pub struct SqlitePool {
     pool: Pool<SqliteConnectionManager>,
     config: SqliteConfig,
@@ -92,21 +97,31 @@ impl SqlitePool {
 
         // Create manager with init hook
         let config_clone = config.clone();
-        let manager = SqliteConnectionManager::file(db_path)
-            .with_init(move |conn| {
-                // Apply PRAGMAs synchronously
-                conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")?;
-                
-                // Set synchronous mode
-                let sync_pragma = format!("PRAGMA synchronous = {}", config_clone.synchronous);
-                conn.execute(&sync_pragma, [])?;
+        let manager = SqliteConnectionManager::file(db_path).with_init(move |conn| {
+            // Register vectorlite module
+            #[cfg(feature = "sqlite")]
+            {
+                if let Err(e) = vectorlite_rs::register_vectorlite(conn) {
+                    warn!(
+                        "Failed to register vectorlite-rs module in pool init: {}",
+                        e
+                    );
+                }
+            }
 
-                // Set busy timeout
-                let timeout_pragma = format!("PRAGMA busy_timeout = {}", config_clone.busy_timeout);
-                conn.execute(&timeout_pragma, [])?;
+            // Apply PRAGMAs
+            // Use execute_batch for multiple statements, it ignores results.
+            conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")?;
 
-                Ok(())
-            });
+            // Set synchronous mode safely
+            // PRAGMA synchronous usually doesn't return data on set, but let's be safe.
+            conn.pragma_update(None, "synchronous", &config_clone.synchronous)?;
+
+            // Set busy timeout safely
+            conn.pragma_update(None, "busy_timeout", config_clone.busy_timeout)?;
+
+            Ok(())
+        });
 
         let pool = Pool::builder()
             .max_size(config.max_connections)
@@ -122,8 +137,10 @@ impl SqlitePool {
         // Or if we can block...
         // r2d2 get() blocks.
         // Ideally should be wrapped in spawn_blocking if used in async context extensively.
-        // But for now, direct call. 
-        self.pool.get().map_err(|e| SqliteError::Connection(e.to_string()))
+        // But for now, direct call.
+        self.pool
+            .get()
+            .map_err(|e| SqliteError::Connection(e.to_string()))
     }
 
     /// Test connection health
@@ -137,9 +154,10 @@ impl SqlitePool {
     /// Get database statistics
     pub async fn get_stats(&self) -> Result<PoolStats> {
         let conn = self.get_connection().await?;
-        
+
         // Query cache statistics
-        let cache_size: i32 = conn.query_row("PRAGMA cache_size", [], |row| row.get(0))
+        let cache_size: i32 = conn
+            .query_row("PRAGMA cache_size", [], |row| row.get(0))
             .map_err(|e| SqliteError::Query(format!("Failed to query cache_size: {}", e)))?;
 
         Ok(PoolStats {

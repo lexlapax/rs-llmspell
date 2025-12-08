@@ -76,7 +76,7 @@ impl SqliteEventLogStorage {
         let mut stmt = conn
             .prepare("SELECT COALESCE(MAX(sequence), -1) + 1 FROM event_log WHERE tenant_id = ?1")
             .map_err(|e| SqliteError::Query(format!("Failed to prepare sequence query: {}", e)))?;
-        
+
         let sequence: i64 = stmt
             .query_row(rusqlite::params![tenant_id], |row| row.get(0))
             .map_err(|e| SqliteError::Query(format!("Failed to get next sequence: {}", e)))?;
@@ -152,11 +152,15 @@ impl SqliteEventLogStorage {
                  WHERE tenant_id = ?1 AND timestamp >= ?2 AND timestamp <= ?3
                  ORDER BY timestamp DESC",
             )
-            .map_err(|e| SqliteError::Query(format!("Failed to prepare time range query: {}", e)))?;
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to prepare time range query: {}", e))
+            })?;
 
         let mut rows = stmt
             .query(rusqlite::params![tenant_id, start_ts, end_ts])
-            .map_err(|e| SqliteError::Query(format!("Failed to execute time range query: {}", e)))?;
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to execute time range query: {}", e))
+            })?;
 
         let mut events = Vec::new();
         while let Some(row) = rows.next()? {
@@ -184,11 +188,15 @@ impl SqliteEventLogStorage {
                  WHERE tenant_id = ?1 AND correlation_id = ?2
                  ORDER BY timestamp DESC",
             )
-            .map_err(|e| SqliteError::Query(format!("Failed to prepare correlation query: {}", e)))?;
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to prepare correlation query: {}", e))
+            })?;
 
         let mut rows = stmt
             .query(rusqlite::params![tenant_id, correlation_id_str])
-            .map_err(|e| SqliteError::Query(format!("Failed to execute correlation query: {}", e)))?;
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to execute correlation query: {}", e))
+            })?;
 
         let mut events = Vec::new();
         while let Some(row) = rows.next()? {
@@ -237,10 +245,10 @@ impl SqliteEventLogStorage {
                 let count: i64 = row.get(0).unwrap_or(0);
                 let oldest: Option<i64> = row.get(1).ok();
                 let newest: Option<i64> = row.get(2).ok();
-                
+
                 let oldest_event = oldest.and_then(|ts| DateTime::from_timestamp(ts, 0));
                 let newest_event = newest.and_then(|ts| DateTime::from_timestamp(ts, 0));
-                
+
                 Ok((count as u64, oldest_event, newest_event))
             })
             .map_err(|e| SqliteError::Query(format!("Failed to fetch stats: {}", e)))?;
@@ -252,11 +260,13 @@ impl SqliteEventLogStorage {
                  WHERE tenant_id = ?1
                  GROUP BY event_type",
             )
-            .map_err(|e| SqliteError::Query(format!("Failed to prepare type stats query: {}", e)))?;
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to prepare type stats query: {}", e))
+            })?;
 
-        let mut rows = stmt
-            .query(rusqlite::params![tenant_id])
-            .map_err(|e| SqliteError::Query(format!("Failed to execute type stats query: {}", e)))?;
+        let mut rows = stmt.query(rusqlite::params![tenant_id]).map_err(|e| {
+            SqliteError::Query(format!("Failed to execute type stats query: {}", e))
+        })?;
 
         let mut events_by_type = HashMap::new();
         while let Some(row) = rows.next()? {
