@@ -1903,6 +1903,24 @@ llmspell web open --port 8080
    - Added 2 new modules (~350 lines total)
    - Net: Slightly more code, but much more maintainable
 
+6. **User Experience Improvements**:
+   - Documentation is critical for discoverability
+   - Production presets (gemini-prod, openai-prod, claude-prod) needed prominent highlighting
+   - Users need to know these three are identical in capabilities
+   - `config list-profiles` should be the authoritative reference, not just help text
+
+7. **CLI Help Text Formatting**:
+   - Clap strips newlines by default (for word wrapping)
+   - `verbatim_doc_comment` attribute preserves exact formatting
+   - Essential for structured lists and examples in help text
+   - Trade-off: No automatic word wrapping, but better readability
+
+8. **Category Display Bug**:
+   - Hardcoded category list missed "Development" and "Production" categories
+   - Result: Only 9 of 19 profiles were visible in text output
+   - JSON output was correct (showed all 19)
+   - Lesson: Dynamic category collection would prevent this, but ordered display is valuable
+
 **Files Created**:
 - ✅ `llmspell-config/src/layer_metadata.rs` (140 lines)
 - ✅ `llmspell-config/src/preset_metadata.rs` (210 lines)
