@@ -14,13 +14,13 @@ enum ProviderState {
     /// Waiting for initialization
     Uninitialized(LazyMemoryInitializer),
     /// Currently initializing (to handle re-entrancy/race)
-    /// Note: We use RwLock so we can upgrade, but for simple lazy init we just need to ensure one init happens.
+    /// Note: We use `RwLock` so we can upgrade, but for simple lazy init we just need to ensure one init happens.
     /// Using a simple internal option/state is enough.
     #[allow(dead_code)]
     Initializing,
 }
 
-/// Thread-safe provider for MemoryManager that supports lazy initialization
+/// Thread-safe provider for `MemoryManager` that supports lazy initialization
 #[derive(Clone)]
 pub struct MemoryProvider {
     state: Arc<RwLock<ProviderState>>,
@@ -35,6 +35,7 @@ impl MemoryProvider {
     }
 
     /// Create a new lazy provider
+    #[must_use]
     pub fn new_lazy(initializer: LazyMemoryInitializer) -> Self {
         Self {
             state: Arc::new(RwLock::new(ProviderState::Uninitialized(initializer))),
@@ -42,6 +43,10 @@ impl MemoryProvider {
     }
 
     /// Get the memory manager, initializing it if necessary
+    ///
+    /// # Errors
+    ///
+    /// Returns `LazyInitializationError::InitializationFailed` if the initializer returns `None`
     pub async fn get(&self) -> Result<Arc<dyn MemoryManager>, LazyInitializationError> {
         // Fast path: check if initialized
         {
@@ -75,8 +80,10 @@ impl MemoryProvider {
 
         if let Some(manager) = manager_opt {
             *guard = ProviderState::Initialized(manager.clone());
+            drop(guard);
             Ok(manager)
         } else {
+            drop(guard);
             Err(LazyInitializationError::InitializationFailed)
         }
     }

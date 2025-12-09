@@ -251,6 +251,7 @@ async fn list_profiles(detailed: bool, output_format: OutputFormat) -> Result<()
                         "name": p.name,
                         "category": p.category,
                         "description": p.description,
+                        "layers": p.layers,
                         "use_cases": p.use_cases,
                         "features": p.features,
                     })
@@ -266,7 +267,7 @@ async fn list_profiles(detailed: bool, output_format: OutputFormat) -> Result<()
             > = std::collections::HashMap::new();
             for profile in &profiles {
                 by_category
-                    .entry(profile.category)
+                    .entry(profile.category.as_str())
                     .or_default()
                     .push(profile);
             }
@@ -282,6 +283,10 @@ async fn list_profiles(detailed: bool, output_format: OutputFormat) -> Result<()
                         println!("  {} - {}", profile.name, profile.description);
 
                         if detailed {
+                            // Show layer composition
+                            if !profile.layers.is_empty() {
+                                println!("    Layers: {}", profile.layers.join(", "));
+                            }
                             println!("    Use Cases:");
                             for use_case in &profile.use_cases {
                                 println!("      • {}", use_case);

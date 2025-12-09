@@ -1,6 +1,20 @@
 # State Persistence Feature Layer
 # Enable state persistence with SQLite backend
 
+[metadata]
+name = "state"
+category = "feature"
+description = "State persistence"
+use_cases = [
+    "Stateful workflows",
+    "Data persistence",
+    "Session management",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "State Persistence Features"
 description = "SQLite state persistence with migrations and backups"

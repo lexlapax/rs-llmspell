@@ -1,6 +1,20 @@
 # LLM Feature Layer
 # Cloud LLM providers (OpenAI, Anthropic, Gemini)
 
+[metadata]
+name = "llm"
+category = "feature"
+description = "Cloud LLM providers"
+use_cases = [
+    "OpenAI GPT models",
+    "Anthropic Claude",
+    "Google Gemini",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Cloud LLM Features"
 description = "OpenAI, Anthropic, and Gemini cloud provider support"

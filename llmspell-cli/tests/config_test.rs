@@ -34,7 +34,7 @@ async fn test_default_config() {
 async fn test_create_config_file() {
     // Clean env vars to ensure default values
     clean_env_vars();
-    
+
     let dir = tempdir().unwrap();
     let config_path = dir.path().join("test.toml");
 

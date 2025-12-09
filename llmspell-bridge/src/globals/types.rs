@@ -113,6 +113,11 @@ pub trait GlobalObject: Send + Sync {
     #[cfg(feature = "javascript")]
     fn inject_javascript(&self, ctx: &mut Context, context: &GlobalContext) -> Result<()>;
 
+    /// Cleanup resources used by this bridge
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cleanup fails
     fn cleanup(&self) -> Result<()> {
         Ok(())
     }

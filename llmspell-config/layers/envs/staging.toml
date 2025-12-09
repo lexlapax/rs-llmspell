@@ -1,6 +1,20 @@
 # Staging Environment Layer
 # Info logging, near-production configuration for testing
 
+[metadata]
+name = "staging"
+category = "env"
+description = "Staging environment"
+use_cases = [
+    "Pre-production testing",
+    "Integration validation",
+    "Performance testing",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Staging Environment"
 description = "Production-like configuration for pre-release testing"

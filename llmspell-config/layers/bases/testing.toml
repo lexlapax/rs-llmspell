@@ -1,6 +1,20 @@
 # Testing Base Layer
 # Reproducible test execution with deterministic behavior
 
+[metadata]
+name = "testing"
+category = "base"
+description = "Testing environment mode"
+use_cases = [
+    "Unit testing",
+    "Integration testing",
+    "Test automation",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Testing Base"
 description = "Deterministic testing mode with minimal side effects"

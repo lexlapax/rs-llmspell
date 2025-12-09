@@ -1,6 +1,20 @@
 # Minimal Feature Layer
 # Basic tools and agents only - no LLM providers, no persistence
 
+[metadata]
+name = "minimal"
+category = "feature"
+description = "Tools only, no LLM"
+use_cases = [
+    "Learning LLMSpell basics",
+    "Tool-only workflows",
+    "Fast startup",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Minimal Features"
 description = "Core tools and agents without external dependencies"

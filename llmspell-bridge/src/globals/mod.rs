@@ -132,19 +132,20 @@ fn register_bridges(builder: &mut GlobalRegistryBuilder, provider: MemoryProvide
 }
 
 /// Register Memory and Context globals (always available with in-memory fallback)
-async fn register_memory_context_globals(
+fn register_memory_context_globals(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
 ) {
     // Try to get memory_manager from context, or create lazy fallback
     let memory_manager_from_context = extract_memory_manager(context);
 
-    let provider = if let Some(manager) = memory_manager_from_context {
-        MemoryProvider::new_eager(manager)
-    } else {
-        // Use lazy provider for fallback to avoid 400ms init cost when not used
-        MemoryProvider::new_lazy(Box::new(|| Box::pin(create_fallback_memory_manager())))
-    };
+    let provider = memory_manager_from_context.map_or_else(
+        || {
+            // Use lazy provider for fallback to avoid 400ms init cost when not used
+            MemoryProvider::new_lazy(Box::new(|| Box::pin(create_fallback_memory_manager())))
+        },
+        MemoryProvider::new_eager,
+    );
 
     register_bridges(builder, provider);
 }
@@ -431,7 +432,7 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     let session_manager_opt = register_session_artifacts(&mut builder, &context);
 
     // Register Memory and Context globals (always available with in-memory fallback)
-    register_memory_context_globals(&mut builder, &context).await;
+    register_memory_context_globals(&mut builder, &context);
 
     // Register RAG global if dependencies available
     register_rag_global(&mut builder, &context, session_manager_opt).await;

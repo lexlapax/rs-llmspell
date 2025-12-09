@@ -255,8 +255,7 @@ async fn test_toml_config_with_custom_provider() {
     // Verify consolidation provider is NOT configured in base memory profile
     // (It can be set via env vars or custom config, but not in the base profile)
     assert_eq!(
-        config.runtime.memory.consolidation.provider_name,
-        None,
+        config.runtime.memory.consolidation.provider_name, None,
         "Memory profile does not set a specific consolidation provider by default"
     );
 

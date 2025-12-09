@@ -1,6 +1,23 @@
 # CLI Base Layer
 # One-shot script execution for interactive command-line usage
 
+[metadata]
+name = "cli"
+category = "base"
+description = "CLI deployment mode"
+use_cases = [
+    "Interactive command-line usage",
+    "Script execution and testing",
+    "Development workflows",
+    "Quick prototyping"
+]
+features = [
+    "Fast startup",
+    "Minimal overhead",
+    "Direct stdout output",
+    "Single-session execution"
+]
+
 [profile]
 name = "CLI Base"
 description = "Interactive command-line execution with minimal overhead"

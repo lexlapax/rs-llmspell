@@ -1,6 +1,20 @@
 # Local LLM Feature Layer
 # Local LLM providers (Ollama, Candle)
 
+[metadata]
+name = "llm-local"
+category = "feature"
+description = "Local LLM (Ollama/Candle)"
+use_cases = [
+    "Offline LLM inference",
+    "Privacy-focused workflows",
+    "Zero API costs",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Local LLM Features"
 description = "Ollama and Candle local provider support"

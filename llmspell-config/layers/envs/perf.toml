@@ -1,6 +1,20 @@
 # Performance Environment Layer
 # Error-only logging, maximum throughput, large caches
 
+[metadata]
+name = "perf"
+category = "env"
+description = "Performance tuned"
+use_cases = [
+    "Performance benchmarking",
+    "High-throughput",
+    "Optimization testing",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Performance Environment"
 description = "Maximum throughput configuration for performance testing"

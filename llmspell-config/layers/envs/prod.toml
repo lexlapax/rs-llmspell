@@ -1,6 +1,20 @@
 # Production Environment Layer
 # Warn logging, optimized performance, minimal overhead
 
+[metadata]
+name = "prod"
+category = "env"
+description = "Production environment"
+use_cases = [
+    "Production deployments",
+    "High availability",
+    "Performance optimization",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Production Environment"
 description = "Optimized configuration for production deployment"

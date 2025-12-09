@@ -1,6 +1,20 @@
 # PostgreSQL Backend Layer
 # Production-grade PostgreSQL with RLS, VectorChord, and bi-temporal support
 
+[metadata]
+name = "postgres"
+category = "backend"
+description = "PostgreSQL storage"
+use_cases = [
+    "Multi-instance deployment",
+    "Shared state",
+    "Enterprise production",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "PostgreSQL Backend"
 description = "Enterprise PostgreSQL with advanced features"

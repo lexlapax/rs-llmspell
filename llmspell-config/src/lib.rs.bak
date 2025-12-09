@@ -1179,24 +1179,329 @@ impl LLMSpellConfig {
 
     /// Get metadata for a specific builtin profile
     ///
-    /// Returns metadata dynamically composed from the profile's layer configuration.
-    /// This ensures metadata always matches the actual layer composition.
+    /// Returns structured information about a profile including category,
+    /// description, use cases, and key features.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use llmspell_config::LLMSpellConfig;
     ///
-    /// let metadata = LLMSpellConfig::get_profile_metadata("rag-dev");
-    /// assert!(metadata.is_some());
-    /// let meta = metadata.unwrap();
-    /// assert_eq!(meta.name, "rag-dev");
-    /// assert_eq!(meta.category, "RAG");
-    /// assert!(!meta.layers.is_empty());
+    /// // TODO(13c.4): Profile system rearchitecture in progress
+    /// let metadata = LLMSpellConfig::get_profile_metadata("providers");
+    /// assert!(metadata.is_none()); // Temporarily None during rearchitecture
     /// ```
     #[must_use]
     pub fn get_profile_metadata(name: &str) -> Option<ProfileMetadata> {
-        crate::preset_metadata::compose_preset_metadata(name).ok()
+        match name {
+            // Core profiles
+            "minimal" => Some(ProfileMetadata {
+                name: "minimal",
+                category: "Core",
+                description: "Tools only, no LLM features",
+                use_cases: vec![
+                    "Learning LLMSpell basics",
+                    "Tool-only workflows",
+                    "Fast startup for testing",
+                ],
+                features: vec![
+                    "40+ tools available",
+                    "No LLM provider dependencies",
+                    "Minimal memory footprint",
+                ],
+            }),
+            "development" => Some(ProfileMetadata {
+                name: "development",
+                category: "Core",
+                description: "Dev environment with cloud LLM providers",
+                use_cases: vec![
+                    "Development and prototyping",
+                    "Cloud LLM experimentation",
+                    "Quick iteration cycles",
+                ],
+                features: vec![
+                    "OpenAI, Anthropic, Gemini providers",
+                    "Trace logging enabled",
+                    "Development-friendly defaults",
+                ],
+            }),
+            "providers" => Some(ProfileMetadata {
+                name: "providers",
+                category: "Core",
+                description: "All LLM providers (OpenAI, Anthropic, Gemini, Ollama, Candle)",
+                use_cases: vec![
+                    "Multi-provider workflows",
+                    "Provider comparison",
+                    "Maximum flexibility",
+                ],
+                features: vec![
+                    "All cloud providers",
+                    "Local LLM support (Ollama + Candle)",
+                    "Provider fallback strategies",
+                ],
+            }),
+            "state" => Some(ProfileMetadata {
+                name: "state",
+                category: "Core",
+                description: "State persistence + sessions",
+                use_cases: vec![
+                    "Stateful workflows",
+                    "Data persistence across runs",
+                    "Session management",
+                ],
+                features: vec![
+                    "SQLite state backend",
+                    "Session management enabled",
+                    "Automatic state persistence",
+                ],
+            }),
+            "sessions" => Some(ProfileMetadata {
+                name: "sessions",
+                category: "Core",
+                description: "Session management with artifacts",
+                use_cases: vec![
+                    "Conversation tracking",
+                    "Artifact storage",
+                    "Session replay",
+                ],
+                features: vec![
+                    "Session lifecycle management",
+                    "Artifact compression",
+                    "Session history",
+                ],
+            }),
+            "default" => Some(ProfileMetadata {
+                name: "default",
+                category: "Core",
+                description: "Minimal CLI setup",
+                use_cases: vec!["Default configuration", "Basic CLI usage", "Simple scripts"],
+                features: vec![
+                    "Extends minimal profile",
+                    "CLI-optimized settings",
+                    "Fast startup",
+                ],
+            }),
+
+            // Local LLM profiles
+            "ollama" => Some(ProfileMetadata {
+                name: "ollama",
+                category: "Local LLM",
+                description: "Local Ollama models",
+                use_cases: vec![
+                    "Offline LLM inference",
+                    "Privacy-focused workflows",
+                    "Zero API costs",
+                ],
+                features: vec![
+                    "100+ Ollama models",
+                    "GPU acceleration (Metal/CUDA)",
+                    "No cloud dependencies",
+                ],
+            }),
+            "candle" => Some(ProfileMetadata {
+                name: "candle",
+                category: "Local LLM",
+                description: "Local Candle ML models",
+                use_cases: vec![
+                    "Embedded ML inference",
+                    "Rust-native models",
+                    "Custom model deployment",
+                ],
+                features: vec![
+                    "GGUF model support",
+                    "Rust-native inference",
+                    "Low memory footprint",
+                ],
+            }),
+            "full-local-ollama" => Some(ProfileMetadata {
+                name: "full-local-ollama",
+                category: "Local LLM",
+                description: "Complete local stack (Ollama + SQLite)",
+                use_cases: vec![
+                    "Fully offline operation",
+                    "Air-gapped environments",
+                    "Complete privacy",
+                ],
+                features: vec![
+                    "Ollama LLM backend",
+                    "SQLite storage",
+                    "No external dependencies",
+                ],
+            }),
+
+            // RAG profiles
+            "memory" => Some(ProfileMetadata {
+                name: "memory",
+                category: "RAG",
+                description: "Adaptive memory system",
+                use_cases: vec![
+                    "Conversation memory",
+                    "Knowledge accumulation",
+                    "Context-aware responses",
+                ],
+                features: vec![
+                    "3-tier memory (episodic/semantic/procedural)",
+                    "Automatic consolidation",
+                    "HNSW vector search",
+                ],
+            }),
+            "rag-dev" => Some(ProfileMetadata {
+                name: "rag-dev",
+                category: "RAG",
+                description: "RAG development with trace logging",
+                use_cases: vec![
+                    "RAG development",
+                    "Debugging retrieval",
+                    "Performance tuning",
+                ],
+                features: vec![
+                    "Trace-level logging",
+                    "SQLite vector storage",
+                    "Development-friendly defaults",
+                ],
+            }),
+            "rag-prod" => Some(ProfileMetadata {
+                name: "rag-prod",
+                category: "RAG",
+                description: "RAG production with SQLite",
+                use_cases: vec![
+                    "Production RAG workflows",
+                    "Single-machine deployment",
+                    "Reliable vector search",
+                ],
+                features: vec![
+                    "Optimized HNSW settings",
+                    "SQLite persistence",
+                    "Production logging",
+                ],
+            }),
+            "rag-perf" => Some(ProfileMetadata {
+                name: "rag-perf",
+                category: "RAG",
+                description: "RAG performance tuned",
+                use_cases: vec![
+                    "High-throughput RAG",
+                    "Performance benchmarking",
+                    "Large-scale retrieval",
+                ],
+                features: vec![
+                    "Aggressive caching",
+                    "Optimized vector parameters",
+                    "Minimal overhead",
+                ],
+            }),
+
+            // Production profiles
+            "postgres-prod" => Some(ProfileMetadata {
+                name: "postgres-prod",
+                category: "Production",
+                description: "Production PostgreSQL backend",
+                use_cases: vec![
+                    "Multi-instance deployment",
+                    "Shared state across services",
+                    "Enterprise production",
+                ],
+                features: vec![
+                    "PostgreSQL storage",
+                    "Row-level security",
+                    "Multi-tenancy support",
+                ],
+            }),
+            "daemon-prod" => Some(ProfileMetadata {
+                name: "daemon-prod",
+                category: "Production",
+                description: "Daemon mode production",
+                use_cases: vec![
+                    "Background service",
+                    "Long-running processes",
+                    "Production daemon",
+                ],
+                features: vec![
+                    "Daemon mode enabled",
+                    "Production logging",
+                    "Automatic restart",
+                ],
+            }),
+            "gemini-prod" => Some(ProfileMetadata {
+                name: "gemini-prod",
+                category: "Production",
+                description: "Full Phase 13 stack + Gemini",
+                use_cases: vec![
+                    "Google Gemini workflows",
+                    "Full-featured production",
+                    "Enterprise deployment",
+                ],
+                features: vec![
+                    "Gemini provider",
+                    "Memory + RAG enabled",
+                    "PostgreSQL backend",
+                ],
+            }),
+            "openai-prod" => Some(ProfileMetadata {
+                name: "openai-prod",
+                category: "Production",
+                description: "Full Phase 13 stack + OpenAI",
+                use_cases: vec![
+                    "OpenAI GPT workflows",
+                    "Full-featured production",
+                    "Enterprise deployment",
+                ],
+                features: vec![
+                    "OpenAI provider",
+                    "Memory + RAG enabled",
+                    "PostgreSQL backend",
+                ],
+            }),
+            "claude-prod" => Some(ProfileMetadata {
+                name: "claude-prod",
+                category: "Production",
+                description: "Full Phase 13 stack + Claude/Anthropic",
+                use_cases: vec![
+                    "Anthropic Claude workflows",
+                    "Full-featured production",
+                    "Enterprise deployment",
+                ],
+                features: vec![
+                    "Anthropic provider",
+                    "Memory + RAG enabled",
+                    "PostgreSQL backend",
+                ],
+            }),
+
+            // Development profiles
+            "daemon-dev" => Some(ProfileMetadata {
+                name: "daemon-dev",
+                category: "Development",
+                description: "Daemon mode development",
+                use_cases: vec![
+                    "Daemon development",
+                    "Service testing",
+                    "Background process debugging",
+                ],
+                features: vec![
+                    "Daemon mode enabled",
+                    "Debug logging",
+                    "Development defaults",
+                ],
+            }),
+            "research" => Some(ProfileMetadata {
+                name: "research",
+                category: "Development",
+                description: "Full features + trace logging",
+                use_cases: vec![
+                    "Research workflows",
+                    "Feature exploration",
+                    "Comprehensive logging",
+                ],
+                features: vec![
+                    "All features enabled",
+                    "Trace-level logging",
+                    "Maximum observability",
+                ],
+            }),
+
+            _ => None,
+        }
     }
 
     /// List metadata for all builtin profiles

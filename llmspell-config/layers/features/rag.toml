@@ -1,6 +1,23 @@
 # RAG Feature Layer
 # Vector storage + HNSW search for retrieval-augmented generation
 
+[metadata]
+name = "rag"
+category = "feature"
+description = "RAG with vector search"
+use_cases = [
+    "Retrieval-augmented generation",
+    "Semantic search over documents",
+    "Knowledge base querying",
+    "Context-aware responses"
+]
+features = [
+    "HNSW vector indexing",
+    "Semantic chunking",
+    "Embedding caching",
+    "Multi-tenant support"
+]
+
 [profile]
 name = "RAG Features"
 description = "Vector search capabilities with HNSW indexing"
