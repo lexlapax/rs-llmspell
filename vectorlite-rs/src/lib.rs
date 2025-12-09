@@ -42,7 +42,7 @@ pub fn register_vectorlite(conn: &Connection) -> SqliteResult<()> {
         xRelease: None,
         xRollbackTo: None,
         xShadowName: None,
-        xIntegrity: None, // Added for newer SQLite versions supported by rusqlite 0.32
+        xIntegrity: None,
     };
 
     unsafe {

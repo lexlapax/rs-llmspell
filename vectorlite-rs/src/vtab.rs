@@ -128,7 +128,8 @@ mod tests {
         let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table", b"dimension=1536"];
         assert_eq!(parse_dimension(args).unwrap(), 1536);
 
-        let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table", b"dimension=512"];
+        // Test dimension=0 (should fail)
+        let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table", b"dimension=0"];
         assert!(parse_dimension(args).is_err());
 
         let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table"];

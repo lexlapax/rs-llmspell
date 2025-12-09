@@ -142,7 +142,6 @@ impl WebServer {
         use crate::middleware::auth::auth_middleware;
 
         let api_routes = Router::new()
-            .route("/openapi.json", get(serve_openapi))
             .route("/scripts/execute", post(handlers::scripts::execute_script))
             .route("/sessions", get(handlers::sessions::list_sessions))
             .route("/sessions/:id", get(handlers::sessions::get_session))
@@ -201,10 +200,6 @@ impl WebServer {
             )
             .fallback(handlers::assets::static_handler)
     }
-}
-
-async fn serve_openapi() -> impl axum::response::IntoResponse {
-    axum::Json(crate::api_docs::ApiDoc::openapi())
 }
 
 async fn shutdown_signal() {

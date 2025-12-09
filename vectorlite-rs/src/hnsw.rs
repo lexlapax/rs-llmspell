@@ -405,7 +405,8 @@ mod tests {
 
     #[test]
     fn test_hnsw_invalid_dimension() {
-        let index = HnswIndex::new(512, 1000, 16, 200, DistanceMetric::Cosine);
+        // Test dimension=0 (should fail)
+        let index = HnswIndex::new(0, 1000, 16, 200, DistanceMetric::Cosine);
         assert!(index.is_err());
     }
 

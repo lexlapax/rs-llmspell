@@ -1338,11 +1338,14 @@ The "bunch of numbers" observed in stdout is specifically caused by `rig-core`'s
 - ✅ **Performance Verified**: `test_api_injection_overhead` now passes with margin to spare (<70ms), restoring fast script startup times.
 - ✅ **Test Concurrency Resolution**: Addressed "Too many open files" (OS error 24) in full workspace tests by recommending `--test-threads=1` or reduced concurrency (e.g., 4) when running tests that spawn many SQLite instances (like `llmspell-bridge`).
 - ✅ **Validation Strategy**: Verified `llmspell-bridge` and `llmspell-templates` with strict single-threaded execution to confirm logic correctness independent of OS resource limits.
-- ✅ **Test Fixes**: Fixed four additional test failures discovered during verification:
+- ✅ **Test Fixes**: Fixed seven additional test failures discovered during verification:
   - `llmspell-memory/tests/consolidation_test.rs`: Removed flaky timing assertion (operations complete in <1ms on fast machines).
   - `llmspell-bridge/tests/debug_integration_tests.rs`: Adjusted log count expectation from 5 to 4 (TRACE level not captured by default).
   - `llmspell-memory/tests/provider_integration_test.rs`: Updated test expectations to match actual TOML configuration (no `consolidation-llm` provider exists).
-  - `llmspell-storage/tests/postgres_api_keys_migration_tests.rs`: Improved test setup to automatically drop/recreate schema before migrations, handling migration checksum mismatches during development.
+  - `llmspell-storage/tests/postgres_api_keys_migration_tests.rs`: Improved test setup to automatically drop/recreate schema before migrations, handling migration checksum mismatches during development. Added `ALTER DATABASE SET search_path TO llmspell, public` for pgcrypto function access.
+  - `llmspell-web/tests/api_integration.rs`: Removed duplicate OpenAPI route registration (SwaggerUI already registers `/api/openapi.json`).
+  - `vectorlite-rs` unit tests: Updated dimension validation tests for static linking (dimension=0 instead of dimension=512 which is now valid). Fixed `sqlite3_module` struct to always include `xShadowName` and `xIntegrity` fields required by rusqlite 0.32.
+  - `llmspell-cli/tests/config_test.rs`: Added `#[serial]` attribute and `clean_env_vars()` call to `test_create_config_file` to prevent environment variable interference with default config generation.
 - ✅ **Documentation Updates**: Updated `GEMINI.md`, `CLAUDE.md`, and `docs/developer-guide/02-development-workflow.md` with guidance on using `--test-threads=1` for resource-intensive tests.
 
 **Action Plan**:
@@ -1389,26 +1392,310 @@ The "bunch of numbers" observed in stdout is specifically caused by `rig-core`'s
 
 ### Task 14.5.4: Documentation & Polish
 **Priority**: HIGH
-**Estimated Time**: 8 hours
+**Estimated Time**: 16 hours
 **Assignee**: Tech Writer
 
-**Description**: Create user guides and API docs.
+**Description**: Create comprehensive documentation for Phase 14 Web Interface, including user guides, API documentation, CLI updates, and developer guides.
 
 **Acceptance Criteria**:
-- [ ] `docs/user-guide/web-interface.md`
-- [ ] CLI help text updated
+- [ ] User Guide: `docs/user-guide/12-web-interface.md` (NEW)
+- [ ] Developer Guide: `docs/developer-guide/09-web-architecture.md` (NEW)
+- [ ] Technical Doc: `docs/technical/web-api-reference.md` (NEW)
+- [ ] CLI Reference: Update `docs/user-guide/05-cli-reference.md` with `web` subcommand
+- [ ] Main README: Update with web interface quickstart
+- [ ] OpenAPI Documentation: Verify Swagger UI accessibility
 - [ ] Functional tests pass
 - [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
-- `docs/user-guide/web-interface.md` (NEW)
+- `docs/user-guide/12-web-interface.md` (NEW) - Complete user guide for web interface
+- `docs/developer-guide/09-web-architecture.md` (NEW) - Architecture and extension guide
+- `docs/technical/web-api-reference.md` (NEW) - HTTP API and WebSocket protocol reference
+- `docs/user-guide/05-cli-reference.md` (MODIFY) - Add `web` subcommand documentation
+- `docs/user-guide/01-getting-started.md` (MODIFY) - Add web interface quickstart
+- `README.md` (MODIFY) - Add web interface overview and quickstart
+- `llmspell-web/README.md` (NEW) - Crate-specific documentation
 
 **Implementation Steps**:
-1.  Write User Guide.
-2.  Update READMEs.
+
+#### 1. User Guide: Web Interface (`docs/user-guide/12-web-interface.md`)
+**Sections to Include**:
+- **Overview**: What is the web interface, when to use it vs CLI
+- **Getting Started**: 
+  - Starting the web server (`llmspell web start`)
+  - Accessing the interface (http://localhost:3000)
+  - First-time setup and configuration
+- **Dashboard**: Overview of the main dashboard, system status, quick actions
+- **Script Editor**:
+  - Creating and editing scripts (Lua/JavaScript/Python)
+  - Syntax highlighting and auto-completion
+  - Running scripts and viewing output
+  - Console integration (stdout/stderr/logs)
+- **Sessions Management**:
+  - Creating and managing sessions
+  - Viewing session history
+  - Session artifacts and outputs
+  - Filtering and search
+- **Memory & Knowledge Base**:
+  - Episodic memory browser
+  - Semantic knowledge graph visualization
+  - RAG document management
+  - Vector search interface
+- **Agents & Workflows**:
+  - Viewing active agent instances
+  - Agent lifecycle management (start/stop/restart)
+  - Workflow execution and monitoring
+  - Agent-to-session linking
+- **Tools & Providers**:
+  - Available tools catalog
+  - Tool execution interface
+  - Provider configuration and status
+  - API key management
+- **Template Library**:
+  - Browsing available templates
+  - Template parameter configuration
+  - Launching template workflows
+  - Template execution monitoring
+- **Configuration**:
+  - Profile management
+  - Static configuration editing
+  - Runtime configuration updates
+  - Server restart for config changes
+- **WebSocket Streaming**:
+  - Real-time event streaming
+  - Event filtering and monitoring
+  - Connection management
+- **Troubleshooting**:
+  - Common issues and solutions
+  - Browser compatibility
+  - Network configuration
+  - CORS and security settings
+
+#### 2. Developer Guide: Web Architecture (`docs/developer-guide/09-web-architecture.md`)
+**Sections to Include**:
+- **Architecture Overview**:
+  - llmspell-web crate structure
+  - Axum-based HTTP server
+  - React + TypeScript frontend
+  - WebSocket event streaming
+  - Single-binary deployment with rust-embed
+- **Backend Components**:
+  - `WebServer` initialization and lifecycle
+  - Handler modules (scripts, sessions, memory, agents, tools, templates, config)
+  - `AppState` and dependency injection
+  - Error handling and response formatting
+  - OpenAPI integration (utoipa)
+- **Frontend Architecture**:
+  - React component hierarchy
+  - API client (`src/api/client.ts`)
+  - Type definitions (`src/api/types.ts`)
+  - State management patterns
+  - Routing and navigation
+- **API Design Patterns**:
+  - RESTful endpoint conventions
+  - Request/response schemas
+  - Error response format
+  - Pagination and filtering
+  - WebSocket message protocol
+- **Adding New Features**:
+  - Creating new API endpoints
+  - Adding frontend pages
+  - Integrating with kernel
+  - Testing strategies
+- **Security Considerations**:
+  - CORS configuration
+  - API key handling
+  - Session management
+  - Input validation
+- **Build and Deployment**:
+  - Frontend build process (Vite)
+  - Asset embedding (rust-embed)
+  - Single-binary distribution
+  - Docker deployment
+  - Reverse proxy configuration
+
+#### 3. Technical Reference: Web API (`docs/technical/web-api-reference.md`)
+**Sections to Include**:
+- **HTTP API Endpoints**:
+  - **Scripts**: `POST /api/scripts/execute`, `GET /api/scripts/history`
+  - **Sessions**: `GET /api/sessions`, `GET /api/sessions/:id`, `POST /api/sessions`, `DELETE /api/sessions/:id`
+  - **Memory**: `GET /api/memory/search`, `POST /api/memory/add`, `GET /api/memory/stats`
+  - **Agents**: `GET /api/agents`, `GET /api/agents/:id`, `POST /api/agents/:id/stop`
+  - **Tools**: `GET /api/tools`, `POST /api/tools/:name/execute`
+  - **Templates**: `GET /api/templates`, `GET /api/templates/:id`, `POST /api/templates/:id/launch`
+  - **Configuration**: `GET /api/config/profiles`, `GET /api/config/static`, `PUT /api/config/static`, `POST /api/config/restart`
+  - **Providers**: `GET /api/providers/status`
+- **Request/Response Schemas**: JSON schemas for all endpoints
+- **WebSocket Protocol**:
+  - Connection endpoint: `ws://localhost:3000/ws/stream`
+  - Message format (JSON event serialization)
+  - Event types (script execution, session updates, memory changes, agent lifecycle)
+  - Connection lifecycle (connect, subscribe, unsubscribe, disconnect)
+  - Error handling
+- **OpenAPI Specification**:
+  - Accessing Swagger UI: `http://localhost:3000/swagger-ui/`
+  - Downloading OpenAPI JSON: `http://localhost:3000/api/openapi.json`
+  - API versioning strategy
+- **Error Codes and Handling**:
+  - Standard HTTP status codes
+  - Error response format
+  - Common error scenarios
+- **Rate Limiting and Quotas**: (if implemented)
+- **Authentication and Authorization**: (if implemented)
+
+#### 4. CLI Reference Update (`docs/user-guide/05-cli-reference.md`)
+**Add Section**: Web Server Management
+
+```markdown
+## Web Server Management
+
+### web
+
+Manage the web interface server for browser-based interaction.
+
+**Usage**:
+```bash
+llmspell web <SUBCOMMAND>
+```
+
+**Subcommands**:
+- `start` - Start the web server
+- `stop` - Stop the web server
+- `status` - Show server status
+- `open` - Open web interface in browser
+
+#### START - Start web server
+
+```bash
+llmspell web start [OPTIONS]
+```
+
+**Options**:
+- `--host <HOST>` - Bind address [default: 127.0.0.1]
+- `--port <PORT>` - Port number [default: 3000]
+- `--daemon` - Run as background daemon
+- `--log-level <LEVEL>` - Logging level (error, warn, info, debug, trace)
+
+**Examples**:
+```bash
+# Start server on default port
+llmspell web start
+
+# Start on custom port
+llmspell web start --port 8080
+
+# Start as daemon
+llmspell web start --daemon
+
+# Start with debug logging
+llmspell web start --log-level debug
+
+# Start with specific profile
+llmspell -p rag-prod web start
+```
+
+#### STOP - Stop web server
+
+```bash
+llmspell web stop
+```
+
+**Examples**:
+```bash
+# Stop running server
+llmspell web stop
+```
+
+#### STATUS - Show server status
+
+```bash
+llmspell web status
+```
+
+**Output**:
+- Server running status
+- Bind address and port
+- Uptime
+- Active connections
+- Process ID (if daemon)
+
+**Examples**:
+```bash
+# Check server status
+llmspell web status
+
+# JSON output
+llmspell --output json web status
+```
+
+#### OPEN - Open web interface
+
+```bash
+llmspell web open
+```
+
+**Description**: Opens the web interface in the default browser. Starts the server if not already running.
+
+**Examples**:
+```bash
+# Open web interface
+llmspell web open
+
+# Open on custom port
+llmspell web open --port 8080
+```
+
+**Use Cases**:
+- Browser-based script development
+- Visual session management
+- Interactive debugging
+- Team collaboration
+- Remote access (with proper network config)
+```
+
+#### 5. Getting Started Update (`docs/user-guide/01-getting-started.md`)
+**Add Section**: Web Interface Quickstart
+- Installation verification
+- Starting the web server
+- Accessing the dashboard
+- Running your first script via web UI
+- Viewing session history
+- Next steps and learning resources
+
+#### 6. Main README Update (`README.md`)
+**Add Sections**:
+- **Web Interface** feature highlight in overview
+- **Quickstart** with web interface option
+- **Screenshots** or **Demo** section showing web UI
+- **Documentation** links to web interface guide
+
+#### 7. Crate Documentation (`llmspell-web/README.md`)
+**Sections**:
+- **Overview**: Purpose and architecture
+- **Features**: HTTP API, WebSocket, Frontend, OpenAPI
+- **Building**: Frontend build, Rust compilation, feature flags
+- **Configuration**: Server options, CORS, logging
+- **Development**: Running locally, hot reload, testing
+- **Deployment**: Single binary, Docker, reverse proxy
+- **API Documentation**: Link to OpenAPI/Swagger UI
 
 **Definition of Done**:
-- [ ] Docs complete and reviewed
+- [ ] All documentation files created and comprehensive
+- [ ] CLI help text includes `web` subcommand with examples
+- [ ] README.md updated with web interface quickstart
+- [ ] OpenAPI/Swagger UI verified accessible
+- [ ] Documentation reviewed for accuracy and completeness
+- [ ] All links and cross-references working
+- [ ] Screenshots/diagrams added where helpful
 - [ ] Functional tests pass
 - [ ] Zero clippy warnings
+
+**Documentation Quality Standards**:
+- Clear, concise language
+- Practical examples for all features
+- Troubleshooting sections for common issues
+- Cross-references between related docs
+- Consistent formatting and structure
+- Up-to-date with current implementation
+- Accessible to both beginners and advanced users
 
