@@ -2,4 +2,4 @@
 [profile]
 name = "Default"
 description = "Default configuration (minimal)"
-extends = ["minimal"]
+extends = ["bases/cli", "features/minimal", "envs/dev", "backends/memory"]

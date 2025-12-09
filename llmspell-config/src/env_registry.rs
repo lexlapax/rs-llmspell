@@ -268,6 +268,56 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
             .build(),
     )?;
 
+    // Google Gemini API key
+    registry.register_var(
+        EnvVarDefBuilder::new("GEMINI_API_KEY")
+            .description("Google Gemini API key")
+            .category(EnvCategory::Provider)
+            .config_path("providers.gemini.api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // OpenRouter API key
+    registry.register_var(
+        EnvVarDefBuilder::new("OPENROUTER_API_KEY")
+            .description("OpenRouter API key")
+            .category(EnvCategory::Provider)
+            .config_path("providers.openrouter.api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // Groq API key
+    registry.register_var(
+        EnvVarDefBuilder::new("GROQ_API_KEY")
+            .description("Groq API key")
+            .category(EnvCategory::Provider)
+            .config_path("providers.groq.api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // xAI API key
+    registry.register_var(
+        EnvVarDefBuilder::new("XAI_API_KEY")
+            .description("xAI API key")
+            .category(EnvCategory::Provider)
+            .config_path("providers.xai.api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // HuggingFace API key
+    registry.register_var(
+        EnvVarDefBuilder::new("HFHUB_API_KEY")
+            .description("HuggingFace Hub API token")
+            .category(EnvCategory::Provider)
+            .config_path("providers.huggingface.api_key")
+            .sensitive()
+            .build(),
+    )?;
+
     // LLMSpell-specific provider format
     registry.register_var(
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_OPENAI_API_KEY")
@@ -283,6 +333,16 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
             .description("Anthropic API key (LLMSpell format)")
             .category(EnvCategory::Provider)
             .config_path("providers.anthropic.api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_PROVIDER_GEMINI_API_KEY")
+            .description("Google Gemini API key (LLMSpell format)")
+            .category(EnvCategory::Provider)
+            .config_path("providers.gemini.api_key")
             .sensitive()
             .build(),
     )?;
@@ -743,6 +803,96 @@ fn register_tool_vars(registry: &EnvRegistry) -> Result<(), String> {
             .description("API key for citation services")
             .category(EnvCategory::Tool)
             .config_path("tools.academic.citation_api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // Weather API key
+    registry.register_var(
+        EnvVarDefBuilder::new("WEATHER_API_KEY")
+            .description("Weather API key")
+            .category(EnvCategory::Tool)
+            .config_path("tools.weather.api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // Brave Search API key
+    registry.register_var(
+        EnvVarDefBuilder::new("BRAVE_API_KEY")
+            .description("Brave Search API key")
+            .category(EnvCategory::Tool)
+            .config_path("tools.search.brave_api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // Tavily API key
+    registry.register_var(
+        EnvVarDefBuilder::new("TAVILY_API_KEY")
+            .description("Tavily Search API key")
+            .category(EnvCategory::Tool)
+            .config_path("tools.search.tavily_api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // SerpApi key
+    registry.register_var(
+        EnvVarDefBuilder::new("SERPAPI_API_KEY")
+            .description("SerpApi key")
+            .category(EnvCategory::Tool)
+            .config_path("tools.search.serpapi_api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // SerperDev key
+    registry.register_var(
+        EnvVarDefBuilder::new("SERPERDEV_API_KEY")
+            .description("Serper.dev API key")
+            .category(EnvCategory::Tool)
+            .config_path("tools.search.serper_api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // GitHub API key
+    registry.register_var(
+        EnvVarDefBuilder::new("GITHUB_API_KEY")
+            .description("GitHub API Token")
+            .category(EnvCategory::Tool)
+            .config_path("tools.github.api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // PubMed API key
+    registry.register_var(
+        EnvVarDefBuilder::new("PUBMED_API_KEY")
+            .description("PubMed API key")
+            .category(EnvCategory::Tool)
+            .config_path("tools.academic.pubmed_api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // CORE API key
+    registry.register_var(
+        EnvVarDefBuilder::new("COREAC_API_KEY")
+            .description("CORE Academic Search API key")
+            .category(EnvCategory::Tool)
+            .config_path("tools.academic.core_api_key")
+            .sensitive()
+            .build(),
+    )?;
+
+    // NewsAPI key
+    registry.register_var(
+        EnvVarDefBuilder::new("NEWSAPI_API_KEY")
+            .description("NewsAPI key")
+            .category(EnvCategory::Tool)
+            .config_path("tools.news.api_key")
             .sensitive()
             .build(),
     )?;
