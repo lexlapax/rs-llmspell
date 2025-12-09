@@ -43,6 +43,13 @@ impl WebServer {
         // Initialize Shared Runtime Config
         let runtime_config = llmspell_config::env::EnvRegistry::new();
 
+        if config.dev_mode {
+            warn!("⚠️  DEVELOPMENT MODE ENABLED - Authentication is bypassed!");
+            warn!("   Set LLMSPELL_WEB_DEV_MODE=false to enable authentication");
+        } else {
+            info!("Production mode - Authentication required");
+        }
+
         // Register known variables for Web UI Management (Task 14.5.1e)
         use llmspell_config::env::{EnvCategory, EnvVarDefBuilder};
         let _ = runtime_config.register_var(

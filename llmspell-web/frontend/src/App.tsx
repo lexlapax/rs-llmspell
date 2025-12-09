@@ -14,11 +14,22 @@ import Providers from './pages/Providers';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 
+import { AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+
 const queryClient = new QueryClient();
 
 function App() {
+  const [devMode] = useState(true); // Default to true in Phase 1
+
   return (
     <QueryClientProvider client={queryClient}>
+      {devMode && (
+        <div className="dev-mode-banner">
+          <AlertTriangle className="w-4 h-4" />
+          <span>Development Mode - Authentication Disabled</span>
+        </div>
+      )}
       <Router>
         <Routes>
           <Route path="/" element={<Layout />}>

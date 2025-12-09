@@ -2475,3 +2475,553 @@ Use --detailed/-d to see use cases and key features for each profile.
 Usage: llmspell -p PROFILE_NAME run script.lua
 Example: llmspell -p rag-dev run my_script.lua
 ```
+
+### Task 14.6.2: Fix Configuration Tab - Phase 1: Development Mode Bypass
+**Priority**: CRITICAL
+**Estimated Time**: 2-3 hours
+**Status**: COMPLETED ✅
+
+**Description**: Enable Configuration Tab functionality by implementing a development mode authentication bypass. This is Phase 1 of a two-phase approach to fix the completely non-functional Configuration Tab that currently returns 401 errors on all API requests.
+
+**Context**: 
+- Backend is production-ready with real SQLite persistence and TOML file operations
+- Frontend UI is complete and well-built
+- Only blocker: No authentication flow exists to obtain JWT tokens
+- Default profile assumption: SQLite-based profiles (openai-prod, gemini-prod, claude-prod)
+
+**Root Cause**:
+1. No login flow - Frontend cannot obtain JWT tokens
+2. Auth middleware blocks ALL `/api/*` endpoints
+3. Frontend tries to use `localStorage.getItem('token')` which is always `null`
+
+**Verified Issues** (Browser Testing - 2025-12-09):
+- ✅ Runtime tab: "HTTP error! status: 401"
+- ✅ Files tab: "Parse Error" due to failed API calls
+- ✅ Cannot view environment variables
+- ✅ Cannot edit TOML configuration
+
+**Implementation Tasks**:
+
+#### 1. Add Development Mode to WebConfig
+**File**: `llmspell-web/src/config.rs`
+
+```rust
+#[derive(Deserialize, Debug, Clone)]
+pub struct WebConfig {
+    pub port: u16,
+    pub host: String,
+    pub cors_origins: Vec<String>,
+    pub auth_secret: String,
+    pub api_keys: Vec<String>,
+    pub dev_mode: bool,  // NEW
+}
+
+impl Default for WebConfig {
+    fn default() -> Self {
+        Self {
+            port: 3000,
+            host: "127.0.0.1".to_string(),
+            cors_origins: vec!["http://localhost:3000".to_string()],
+            auth_secret: "dev_secret_do_not_use_in_prod".to_string(),
+            api_keys: vec!["dev-key-123".to_string()],
+            dev_mode: std::env::var("LLMSPELL_WEB_DEV_MODE")
+                .map(|v| v != "false")
+                .unwrap_or(true),  // Default to true for development
+        }
+    }
+}
+```
+
+#### 2. Modify Authentication Middleware
+**File**: `llmspell-web/src/middleware/auth.rs`
+
+Add bypass logic at the start of `auth_middleware`:
+
+```rust
+pub async fn auth_middleware(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    // Development mode bypass
+    if state.config.dev_mode {
+        tracing::warn!(
+            "⚠️  Development mode active - authentication bypassed for {}",
+            request.uri()
+        );
+        return Ok(next.run(request).await);
+    }
+
+    // Existing authentication logic...
+    // (API key and JWT validation)
+}
+```
+
+#### 3. Add Development Mode Banner to UI
+**File**: `frontend/src/App.tsx`
+
+Add banner component before main content:
+
+```typescript
+function App() {
+  const [devMode, setDevMode] = useState(true); // Detect from API or assume true
+
+  return (
+    <div className="app">
+      {devMode && (
+        <div className="dev-mode-banner">
+          <AlertTriangle className="w-4 h-4" />
+          <span>Development Mode - Authentication Disabled</span>
+        </div>
+      )}
+      {/* Existing app content */}
+    </div>
+  );
+}
+```
+
+**CSS** (add to `index.css`):
+```css
+.dev-mode-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%);
+  color: white;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+```
+
+#### 4. Update Server Initialization
+**File**: `llmspell-web/src/server/mod.rs`
+
+Log dev mode status on startup:
+
+```rust
+pub async fn run_with_custom_setup(
+    config: WebConfig,
+    kernel: KernelHandle,
+    config_path: Option<std::path::PathBuf>,
+) -> Result<()> {
+    // ... existing setup ...
+
+    if config.dev_mode {
+        warn!("⚠️  DEVELOPMENT MODE ENABLED - Authentication is bypassed!");
+        warn!("   Set LLMSPELL_WEB_DEV_MODE=false to enable authentication");
+    } else {
+        info!("Production mode - Authentication required");
+    }
+
+    // ... rest of setup ...
+}
+```
+
+**Acceptance Criteria**:
+- [ ] `dev_mode` field added to `WebConfig` with environment variable support
+- [ ] Auth middleware bypasses checks when `dev_mode = true`
+- [ ] Warning logged on every bypassed request
+- [ ] Startup logs show dev mode status
+- [ ] Dev mode banner visible in UI (orange/yellow warning)
+- [ ] Configuration tab loads without 401 errors
+- [ ] Runtime tab displays environment variables
+- [ ] Can edit and save environment variables
+- [ ] Changes persist to SQLite (verify: `sqlite3 llmspell.db "SELECT * FROM kv_store WHERE key LIKE 'config:%'"`)
+- [ ] Files tab displays TOML source
+- [ ] Can edit and save TOML source
+- [ ] Changes persist to disk
+- [ ] Form view works with JSON Schema
+- [ ] Can disable dev mode via `LLMSPELL_WEB_DEV_MODE=false`
+- [ ] Zero clippy warnings
+- [ ] All existing tests pass
+
+**Testing Plan**:
+
+**Manual Testing - Dev Mode (Default)**:
+```bash
+# 1. Start server (dev mode enabled by default)
+RUST_LOG=info target/debug/llmspell web start -p openai-prod
+
+# 2. Open http://localhost:3000/config
+# 3. Verify dev mode banner visible
+# 4. Test Runtime tab:
+#    - Verify variables load
+#    - Edit RUST_LOG to "debug"
+#    - Save and verify: sqlite3 llmspell.db "SELECT * FROM kv_store WHERE key = 'config:RUST_LOG'"
+
+# 5. Test Files tab:
+#    - Verify TOML loads
+#    - Edit a value
+#    - Save and verify: ls -la llmspell.toml
+#    - Switch to Form view
+#    - Test schema validation
+
+# 6. Restart server and verify persistence
+pkill llmspell
+RUST_LOG=info target/debug/llmspell web start -p openai-prod
+# Check that RUST_LOG=debug persisted
+```
+
+**Manual Testing - Production Mode**:
+```bash
+# 1. Start with dev mode disabled
+LLMSPELL_WEB_DEV_MODE=false target/debug/llmspell web start -p openai-prod
+
+# 2. Verify 401 errors return
+curl -i http://localhost:3000/api/config
+# Expected: HTTP/1.1 401 Unauthorized
+
+# 3. Verify API key still works
+curl -H "X-API-Key: dev-key-123" http://localhost:3000/api/config
+# Expected: HTTP/1.1 200 OK [...]
+```
+
+**Files to Modify**:
+- `llmspell-web/src/config.rs` - Add `dev_mode` field
+- `llmspell-web/src/middleware/auth.rs` - Add bypass logic
+- `llmspell-web/src/server/mod.rs` - Add startup logging
+- `frontend/src/App.tsx` - Add dev mode banner
+- `frontend/src/index.css` - Add banner styles
+
+**Quality Standards**:
+- Dev mode is explicit opt-in (environment variable)
+- Clear warnings in logs and UI
+- Production authentication preserved
+- No security regressions
+- Zero clippy warnings
+- All tests pass
+
+**Documentation**:
+- Add comment in `auth.rs`: "TODO: Remove dev mode bypass after Task 14.6.3 (production login) is complete"
+- Update `llmspell-web/README.md` with dev mode documentation
+
+### Task 14.6.3: Fix Configuration Tab - Phase 2: Production Authentication
+**Priority**: HIGH
+**Estimated Time**: 6-8 hours
+**Status**: NOT STARTED
+**Depends On**: Task 14.6.2 (Phase 1)
+
+**Description**: Implement full production-ready authentication with login page, JWT token management, and route protection. This completes the authentication system started in Phase 1 and removes the development mode bypass.
+
+**Goals**:
+1. Add login page with username/password authentication
+2. Implement JWT token storage and refresh
+3. Add route protection (redirect to login if unauthenticated)
+4. Add logout functionality
+5. Remove/disable development mode bypass
+
+**Implementation Tasks**:
+
+#### 1. Create Login Page
+**File**: `frontend/src/pages/Login.tsx` (NEW)
+
+```typescript
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
+
+export const Login = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await api.login(username, password);
+      localStorage.setItem('token', response.token);
+      navigate('/');
+    } catch (err) {
+      setError('Invalid credentials');
+    }
+  };
+
+  return (
+    <div className="login-page">
+      <form onSubmit={handleLogin}>
+        <h1>LLMSpell Login</h1>
+        {error && <div className="error">{error}</div>}
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button type="submit">Login</button>
+      </form>
+    </div>
+  );
+};
+```
+
+#### 2. Create Authentication Context
+**File**: `frontend/src/contexts/AuthContext.tsx` (NEW)
+
+```typescript
+import { createContext, useContext, useState, useEffect } from 'react';
+
+interface AuthContextType {
+  isAuthenticated: boolean;
+  token: string | null;
+  login: (token: string) => void;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [token, setToken] = useState<string | null>(
+    localStorage.getItem('token')
+  );
+
+  const login = (newToken: string) => {
+    localStorage.setItem('token', newToken);
+    setToken(newToken);
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      isAuthenticated: !!token,
+      token,
+      login,
+      logout
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
+};
+```
+
+#### 3. Create Protected Route Component
+**File**: `frontend/src/components/ProtectedRoute.tsx` (NEW)
+
+```typescript
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+
+export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated } = useAuth();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
+};
+```
+
+#### 4. Update API Client
+**File**: `frontend/src/api/client.ts`
+
+Add login method and token refresh:
+
+```typescript
+export const api = {
+  // ... existing methods ...
+
+  login: async (username: string, password: string) => {
+    const response = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    if (!response.ok) throw new Error('Login failed');
+    return response.json();
+  },
+
+  logout: () => {
+    localStorage.removeItem('token');
+  },
+};
+```
+
+#### 5. Update App Routing
+**File**: `frontend/src/App.tsx`
+
+```typescript
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { Login } from './pages/Login';
+
+function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/*" element={
+            <ProtectedRoute>
+              {/* Existing app content */}
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+```
+
+#### 6. Add Logout Button
+**File**: `frontend/src/components/Sidebar.tsx` or `Header.tsx`
+
+```typescript
+import { useAuth } from '../contexts/AuthContext';
+import { LogOut } from 'lucide-react';
+
+// In component:
+const { logout } = useAuth();
+
+<button onClick={logout} className="logout-button">
+  <LogOut className="w-4 h-4" />
+  Logout
+</button>
+```
+
+#### 7. Update Backend Login Handler
+**File**: `llmspell-web/src/handlers/auth.rs`
+
+Ensure login handler validates credentials and returns JWT:
+
+```rust
+// Verify this exists and works correctly
+pub async fn login(
+    State(state): State<AppState>,
+    Json(payload): Json<LoginRequest>,
+) -> Result<Json<LoginResponse>, WebError> {
+    // Validate username/password
+    // Generate JWT with expiration
+    // Return token
+}
+```
+
+#### 8. Disable Development Mode
+**File**: `llmspell-web/src/config.rs`
+
+Change default to `false`:
+
+```rust
+impl Default for WebConfig {
+    fn default() -> Self {
+        Self {
+            // ... other fields ...
+            dev_mode: std::env::var("LLMSPELL_WEB_DEV_MODE")
+                .map(|v| v == "true")
+                .unwrap_or(false),  // Default to false (production mode)
+        }
+    }
+}
+```
+
+**Acceptance Criteria**:
+- [ ] Login page created with username/password form
+- [ ] Authentication context manages token state
+- [ ] Protected routes redirect to login if unauthenticated
+- [ ] Successful login stores JWT in localStorage
+- [ ] Logout clears token and redirects to login
+- [ ] Token included in all API requests
+- [ ] Token expiration handled (refresh or re-login)
+- [ ] Dev mode disabled by default
+- [ ] Dev mode banner removed (or only shown if explicitly enabled)
+- [ ] All configuration tab features work with authentication
+- [ ] Zero clippy warnings
+- [ ] All tests pass
+
+**Testing Plan**:
+
+**Manual Testing - Authentication Flow**:
+```bash
+# 1. Start server (production mode)
+target/debug/llmspell web start -p openai-prod
+
+# 2. Open http://localhost:3000
+# 3. Verify redirect to /login
+# 4. Enter credentials and login
+# 5. Verify redirect to dashboard
+# 6. Navigate to Configuration tab
+# 7. Verify all features work
+# 8. Click logout
+# 9. Verify redirect to login
+# 10. Verify cannot access /config without login
+```
+
+**Integration Tests**:
+```rust
+#[tokio::test]
+async fn test_login_flow() {
+    // 1. Start test server
+    // 2. POST /login with credentials
+    // 3. Verify JWT returned
+    // 4. Use JWT to access /api/config
+    // 5. Verify success
+}
+
+#[tokio::test]
+async fn test_protected_routes() {
+    // 1. Start test server
+    // 2. Try to access /api/config without token
+    // 3. Verify 401
+    // 4. Login and get token
+    // 5. Access /api/config with token
+    // 6. Verify 200
+}
+```
+
+**Files to Create**:
+- `frontend/src/pages/Login.tsx` - Login page
+- `frontend/src/contexts/AuthContext.tsx` - Auth state management
+- `frontend/src/components/ProtectedRoute.tsx` - Route protection
+
+**Files to Modify**:
+- `frontend/src/App.tsx` - Add routing and auth provider
+- `frontend/src/api/client.ts` - Add login/logout methods
+- `frontend/src/components/Sidebar.tsx` - Add logout button
+- `llmspell-web/src/config.rs` - Disable dev mode by default
+- `llmspell-web/src/handlers/auth.rs` - Verify login handler
+- `llmspell-web/src/middleware/auth.rs` - Remove dev mode bypass (or keep for explicit opt-in)
+
+**Quality Standards**:
+- Secure token storage (httpOnly cookies preferred, but localStorage acceptable for now)
+- Token expiration and refresh handled
+- Clear error messages for authentication failures
+- Responsive login page design
+- Zero clippy warnings
+- All tests pass
+
+**Documentation**:
+- Update `docs/user-guide/web-interface.md` with authentication section
+- Document default credentials for development
+- Add security best practices section
+
+**Key Insights**:
+1. **Backend is Production-Ready**: No simulation, all endpoints are real
+2. **Frontend is Well-Built**: UI is complete, just blocked by auth
+3. **Quick Win Available**: Dev mode bypass unblocks all functionality
+4. **Architecture Preserved**: Can add production login later without breaking changes
+

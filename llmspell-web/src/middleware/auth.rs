@@ -22,6 +22,15 @@ pub async fn auth_middleware(
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
+    // Development mode bypass
+    if state.config.dev_mode {
+        tracing::warn!(
+            "⚠️  Development mode active - authentication bypassed for {}",
+            request.uri()
+        );
+        return Ok(next.run(request).await);
+    }
+
     // 1. Check API Key
     if let Some(key_header) = headers.get("X-API-Key") {
         if let Ok(key_str) = key_header.to_str() {
