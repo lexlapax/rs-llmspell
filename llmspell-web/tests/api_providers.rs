@@ -126,6 +126,7 @@ async fn test_list_providers_api() -> Result<()> {
         auth_secret: "secret".to_string(),
         api_keys: vec!["test-key".to_string()],
         cors_origins: vec![],
+        dev_mode: true,
     };
 
     // 2. Start Web Server

@@ -181,6 +181,7 @@ async fn test_authenticated_template_launch_persistence() -> Result<()> {
         auth_secret: "secret".to_string(),
         api_keys: vec!["test-key".to_string()],
         cors_origins: vec![],
+        dev_mode: true,
     };
 
     // Construct App

@@ -32,6 +32,7 @@ async fn main() -> Result<()> {
         cors_origins: vec!["http://localhost:5173".to_string()],
         auth_secret: "dev_secret_do_not_use_in_prod".to_string(),
         api_keys: vec!["dev-key-123".to_string()],
+        dev_mode: true,
     };
 
     println!(

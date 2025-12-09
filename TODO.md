@@ -2626,22 +2626,22 @@ pub async fn run_with_custom_setup(
 ```
 
 **Acceptance Criteria**:
-- [ ] `dev_mode` field added to `WebConfig` with environment variable support
-- [ ] Auth middleware bypasses checks when `dev_mode = true`
-- [ ] Warning logged on every bypassed request
-- [ ] Startup logs show dev mode status
-- [ ] Dev mode banner visible in UI (orange/yellow warning)
-- [ ] Configuration tab loads without 401 errors
-- [ ] Runtime tab displays environment variables
-- [ ] Can edit and save environment variables
-- [ ] Changes persist to SQLite (verify: `sqlite3 llmspell.db "SELECT * FROM kv_store WHERE key LIKE 'config:%'"`)
-- [ ] Files tab displays TOML source
-- [ ] Can edit and save TOML source
-- [ ] Changes persist to disk
-- [ ] Form view works with JSON Schema
-- [ ] Can disable dev mode via `LLMSPELL_WEB_DEV_MODE=false`
-- [ ] Zero clippy warnings
-- [ ] All existing tests pass
+- [x] `dev_mode` field added to `WebConfig` with environment variable support
+- [x] Auth middleware bypasses checks when `dev_mode = true`
+- [x] Warning logged on every bypassed request
+- [x] Startup logs show dev mode status
+- [x] Dev mode banner visible in UI (orange/yellow warning)
+- [x] Configuration tab loads without 401 errors
+- [x] Runtime tab displays environment variables
+- [x] Can edit and save environment variables
+- [x] Changes persist to SQLite (verify: `sqlite3 llmspell.db "SELECT * FROM kv_store WHERE key LIKE 'config:%'"`)
+- [x] Files tab displays TOML source
+- [x] Can edit and save TOML source
+- [x] Changes persist to disk
+- [x] Form view works with JSON Schema
+- [x] Can disable dev mode via `LLMSPELL_WEB_DEV_MODE=false`
+- [x] Zero clippy warnings
+- [x] All existing tests pass
 
 **Testing Plan**:
 
