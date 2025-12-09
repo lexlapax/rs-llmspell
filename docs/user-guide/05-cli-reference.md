@@ -1035,6 +1035,128 @@ llmspell context analyze "memory systems" --format json
 - Token budget management
 - Strategy comparison
 
+## Web Server Management (Phase 14)
+
+The `llmspell web` subcommand manages the web interface server for browser-based AI workflow development.
+
+### web start
+
+Start the web server.
+
+**Usage**:
+```bash
+llmspell web start [OPTIONS]
+```
+
+**Options**:
+- `--port <PORT>`: Port to bind to (default: 3000)
+- `--host <HOST>`: Host address to bind to (default: 127.0.0.1)
+- `--daemon`: Run as background daemon
+- `--log-level <LEVEL>`: Logging level (error, warn, info, debug, trace)
+
+**Examples**:
+```bash
+# Start on default port (3000)
+llmspell web start
+
+# Start on custom port
+llmspell web start --port 8080
+
+# Start as background daemon
+llmspell web start --daemon
+
+# Start with debug logging
+llmspell web start --log-level debug
+
+# Start with specific profile
+llmspell -p rag-prod web start
+```
+
+**Output**:
+```
+Starting LLMSpell web server...
+Server listening on http://127.0.0.1:3000
+OpenAPI documentation: http://127.0.0.1:3000/swagger-ui/
+Press Ctrl+C to stop
+```
+
+### web stop
+
+Stop the running web server.
+
+**Usage**:
+```bash
+llmspell web stop
+```
+
+**Examples**:
+```bash
+# Stop the web server
+llmspell web stop
+```
+
+**Output**:
+```
+Stopping LLMSpell web server...
+Server stopped successfully
+```
+
+### web status
+
+Check web server status.
+
+**Usage**:
+```bash
+llmspell web status
+```
+
+**Examples**:
+```bash
+# Check server status
+llmspell web status
+```
+
+**Output** (running):
+```
+Web server is running
+URL: http://127.0.0.1:3000
+PID: 12345
+Uptime: 2h 15m
+```
+
+**Output** (stopped):
+```
+Web server is not running
+```
+
+### web open
+
+Open the web interface in default browser.
+
+**Usage**:
+```bash
+llmspell web open
+```
+
+**Examples**:
+```bash
+# Open web interface
+llmspell web open
+
+# Open specific page
+llmspell web open --page /library
+```
+
+**Behavior**:
+- Opens default browser to http://localhost:3000
+- Starts server automatically if not running
+- Falls back to displaying URL if browser cannot be opened
+
+**See Also**:
+- [Web Interface Guide](12-web-interface.md) - Complete web interface documentation
+- [Web Architecture](../developer-guide/09-web-architecture.md) - Developer guide
+- [Web API Reference](../technical/web-api-reference.md) - HTTP API and WebSocket protocol
+
 ## See Also
 
 - [Configuration Guide](configuration.md) - Detailed configuration options

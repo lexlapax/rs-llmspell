@@ -117,6 +117,21 @@ Although experimental, rs-llmspell is built with production-grade engineering:
 - **RAGPipelineBuilder**: Fluent API for custom pipelines
 - **Embedding Providers**: OpenAI, Cohere, HuggingFace, local models
 
+### 🌐 Web Interface (Phase 14)
+**Browser-based AI workflow development and monitoring**
+- **Script Editor**: Write and execute scripts with syntax highlighting and auto-completion
+- **Session Management**: Visual session browser with history and artifacts
+- **Template Library**: Browse and launch templates with interactive parameter forms
+- **Memory Browser**: Explore episodic memory and knowledge graph visualization
+- **Agent Monitor**: Real-time agent lifecycle and workflow execution tracking
+- **Tool Catalog**: Interactive tool execution with parameter forms
+- **Configuration UI**: Edit configuration, manage profiles, and restart server
+- **WebSocket Streaming**: Real-time event updates for script execution and system changes
+- **OpenAPI Documentation**: Interactive Swagger UI at `/swagger-ui/`
+- **Single Binary**: Frontend assets embedded, no separate web server needed
+- **Quick Start**: `llmspell web start` → http://localhost:3000
+- **See**: [Web Interface Guide](docs/user-guide/12-web-interface.md)
+
 ### 🛠️ 40+ Experimental Tools
 **Modular tools for rapid prototyping**
 - **Core**: File ops, web search, calculator, HTTP client
