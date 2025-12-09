@@ -389,6 +389,10 @@ export OPENAI_API_KEY="sk-..."  # or ANTHROPIC_API_KEY
 - `providers` - OpenAI/Anthropic providers (requires API keys)
 - `state` - State persistence enabled
 - `memory` - Phase 13 memory system + RAG
+- **Production presets** (full features: Graph + RAG + Memory + Context + SQLite):
+  - `gemini-prod` - Google Gemini (requires `GEMINI_API_KEY`)
+  - `openai-prod` - OpenAI GPT (requires `OPENAI_API_KEY`)
+  - `claude-prod` - Anthropic Claude (requires `ANTHROPIC_API_KEY`)
 - See all 21 profiles: [Profile Guide](profile-layers-guide.md)
 
 ## Quick Examples

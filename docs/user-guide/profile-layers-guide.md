@@ -78,6 +78,20 @@ llmspell -p presets/minimal run script.lua
 
 Available presets combine layers for common use cases. See [Preset Catalog](#preset-catalog) for the full list of 21 presets.
 
+> **🚀 Quick Tip: Production-Ready Presets**
+>
+> For production use with full features (Graph + RAG + Memory + Context + SQLite), use one of these three presets based on your preferred LLM:
+> - `gemini-prod` - Google Gemini (requires `GEMINI_API_KEY`)
+> - `openai-prod` - OpenAI GPT (requires `OPENAI_API_KEY`)
+> - `claude-prod` - Anthropic Claude (requires `ANTHROPIC_API_KEY`)
+>
+> All three are identical except for the default LLM provider!
+>
+> ```bash
+> export GEMINI_API_KEY="your-key"
+> llmspell -p gemini-prod run your-app.lua
+> ```
+
 ### Using Multi-Layer Composition
 
 For custom configurations, compose layers explicitly:
@@ -817,6 +831,52 @@ llmspell -p openai-prod run openai-app.lua
 export ANTHROPIC_API_KEY="sk-ant-..."
 llmspell -p claude-prod run claude-app.lua
 ```
+
+> **💡 Production Preset Comparison**
+>
+> The three production presets (`gemini-prod`, `openai-prod`, `claude-prod`) are **identical in structure** and differ only in the default LLM provider:
+>
+> | Preset | Default Provider | API Key Required |
+> |--------|-----------------|------------------|
+> | `gemini-prod` | Google Gemini | `GEMINI_API_KEY` |
+> | `openai-prod` | OpenAI GPT | `OPENAI_API_KEY` |
+> | `claude-prod` | Anthropic Claude | `ANTHROPIC_API_KEY` |
+>
+> **All three include**:
+> - ✅ **Full Phase 13 features**: Graph + RAG + Memory + Context
+> - ✅ **SQLite persistence**: Local database storage
+> - ✅ **Production tuning**: Optimized logging and performance
+> - ✅ **CLI deployment**: Interactive command-line mode
+>
+> **Choose based on your preferred LLM provider** - the capabilities are identical!
+>
+> **Layer composition** (all three):
+> ```
+> bases/cli + features/full + envs/prod + backends/sqlite
+> ```
+>
+> **What's included in `features/full`**:
+> - **Temporal Knowledge Graph**: Bi-temporal versioning, relationship tracking
+> - **RAG System**: Vector storage with HNSW indexing, semantic search
+> - **Adaptive Memory**: 3-tier memory (working/episodic/semantic)
+> - **Context Engineering**: Context window management, prompt optimization
+> - **All LLM Providers**: OpenAI, Anthropic, Gemini, Ollama, Candle
+> - **State Management**: Persistent state, sessions, hooks, events
+>
+> **Example usage**:
+> ```bash
+> # Use Gemini
+> export GEMINI_API_KEY="your-key"
+> llmspell -p gemini-prod run app.lua
+>
+> # Use OpenAI
+> export OPENAI_API_KEY="sk-..."
+> llmspell -p openai-prod run app.lua
+>
+> # Use Claude
+> export ANTHROPIC_API_KEY="sk-ant-..."
+> llmspell -p claude-prod run app.lua
+> ```
 
 #### `full-local-ollama`
 
