@@ -1909,10 +1909,48 @@ llmspell web open --port 8080
 
 **Files Modified**:
 - ✅ `llmspell-config/src/lib.rs` - ProfileMetadata struct, get_profile_metadata(), module exports (-309 lines, +25 lines)
-- ✅ `llmspell-cli/src/commands/config.rs` - Added layers to output (+5 lines)
+- ✅ `llmspell-cli/src/commands/config.rs` - Added layers to output, enhanced list-profiles (+30 lines)
+- ✅ `llmspell-cli/src/cli.rs` - Fixed help text formatting with verbatim_doc_comment
 - ✅ `llmspell-config/layers/bases/cli.toml` - Added metadata section
 - ✅ `llmspell-config/layers/bases/daemon.toml` - Added metadata section
 - ✅ `llmspell-config/layers/features/rag.toml` - Added metadata section
+- ✅ `llmspell-bridge/src/globals/types.rs` - Fixed clippy warnings (missing docs)
+- ✅ `llmspell-bridge/src/memory_provider.rs` - Fixed clippy warnings (doc_markdown, must_use, significant_drop)
+- ✅ `llmspell-bridge/src/globals/mod.rs` - Fixed clippy warnings (unused async, option_if_let_else)
+
+**Documentation Updates**:
+- ✅ `docs/user-guide/profile-layers-guide.md` - Added production preset comparison section (+60 lines)
+- ✅ `docs/user-guide/01-getting-started.md` - Added production presets to quick reference (+4 lines)
+
+**Follow-Up Improvements** (same session):
+
+1. **Fixed All Clippy Warnings** (9 warnings in llmspell-bridge):
+   - Added missing `# Errors` documentation
+   - Added backticks to doc comments (`RwLock`, `MemoryManager`)
+   - Added `#[must_use]` attribute to `new_lazy()`
+   - Removed unused `async` from `register_memory_context_globals()`
+   - Replaced `if let/else` with `map_or_else` for cleaner code
+   - Fixed significant_drop_tightening with explicit `drop(guard)`
+   - Result: Zero clippy warnings across entire workspace
+
+2. **Enhanced User Documentation**:
+   - Added prominent callout in profile-layers-guide.md comparing the three production presets
+   - Highlighted that gemini-prod, openai-prod, claude-prod are identical except for LLM provider
+   - Added production preset section to getting-started.md quick reference
+   - Clarified what's included in `features/full` (Graph + RAG + Memory + Context)
+
+3. **Fixed CLI Help Text Formatting**:
+   - Added `verbatim_doc_comment` attribute to preserve newlines in `--profile` help
+   - Help text now displays properly formatted with line breaks instead of running together
+
+4. **Enhanced `config list-profiles` Output**:
+   - Fixed category display to show all 5 categories (was only showing 4)
+   - Now shows all 19 profiles (was only showing 9)
+   - Added comprehensive header with syntax examples
+   - Added footer with production preset highlights
+   - Added multi-layer composition guide
+   - Added two usage examples (simple + multi-layer)
+   - Result: `config list-profiles` is now MORE comprehensive than help text (as it should be!)
 
 
 **Implementation Plan**:

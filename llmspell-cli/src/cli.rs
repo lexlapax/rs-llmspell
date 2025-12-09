@@ -148,7 +148,7 @@ pub struct Cli {
     /// Use 'llmspell config list-profiles' for detailed information.
     ///
     /// Precedence: --profile > -c > discovery > default
-    #[arg(short = 'p', long, global = true)]
+    #[arg(short = 'p', long, global = true, verbatim_doc_comment)]
     pub profile: Option<String>,
 
     /// Trace level (replaces --debug/--verbose)
