@@ -2960,6 +2960,7 @@ impl Default for WebConfig {
         - [x] Input: `{ code: String, engine: String, input: Option<Value> }`.
         - [x] Logic: Use `Kernel` or `ScriptEngine` to execute code.
         - [x] Output: `{ stdout: String, stderr: String, result: Value }` (or stream).
+            - [x] Fixed critical output buffering bug: `print()` now streams immediately via `IntegratedKernel` callback.
     - [x] Ensure `POST /api/tools/{id}/execute` is reachable and working (already exists).
 - [x] **Frontend**:
     - [x] Refactor `Tools.tsx` to use Tabs component (Scripts | Tools).
@@ -3050,6 +3051,43 @@ async fn test_protected_routes() {
 3. **Quick Win Available**: Dev mode bypass unblocks all functionality
 4. **Architecture Preserved**: Can add production login later without breaking changes
 
-#### 14.6.4.1: Tools Execution Tab
+#### 14.6.4.1: Fix Web Output Display (Tools Tab)
 
-**Tasks and subtasks to fill out
+**Objective**: Ensure Lua `print("...")` and `io.write("...")` output appears in real-time in the web UI console.
+
+**Strategies Executed**:
+1.  **Buffering Fix**:
+    -   *Problem*: `ConsoleCapture` was buffering output locally but not flushing until the script finished or buffer filled.
+    -   *Strategy*: Added logic to force flush or callback invocation on every newline.
+    -   *Result*: Partial fix. Output capture was verified via logs, but strictly buffered lines might still delay.
+
+2.  **Compilation Fix**:
+    -   *Problem*: `E0046` error "not all trait items implemented" for `JSEngine` after introducing `set_output_callback` to `ScriptEngineBridge`.
+    -   *Strategy*: Implemented no-op wrapper in `JSEngine` to satisfy trait bounds.
+    -   *Result*: Compilation succeeded.
+
+3.  **Callback Wiring Verification**:
+    -   *Problem*: Unsure if `LuaEngine` was correctly passing the callback to `ConsoleCapture`.
+    -   *Strategy*: Added `eprintln!` debug logging in `ConsoleCapture::add_line`, `ConsoleCapture::set_output_callback`, and `LuaEngine` initialization.
+    -   *Result*: Confirmed via server logs that `[DEBUG] ConsoleCapture: invoking callback` appears, proving the engine-side capture is working.
+
+4.  **Verification Scripts**:
+    -   *Problem*: Browser manual testing is flaky and slow.
+    -   *Strategy*: Created `verify_stream_node.js` (Node) and `verify_stream.py` (Python) to programmatically connect to WebSocket and trigger execution.
+    -   *Result*: Node script connects and triggers execution (200 OK), but times out waiting for stream messages. This isolated the fault to the **delivery mechanism** (WebSocket/EventBus) rather than the capture mechanism.
+
+5.  **Architecture Investigation (Root Cause Discovery)**:
+    -   *Problem*: Why is the captured output (verified in logs) not reaching the WebSocket?
+    -   *Root Cause*: `IntegratedKernel` creates its *own* private `EventBus` and `KernelEventCorrelator`. The WebSocket handler (`llmspell-web/src/handlers/websocket.rs`) subscribes to the *Global* Application `EventBus`. There was no bridge between them.
+    -   *Strategy*: Refactor `IntegratedKernel` to accept an optional `EventBus` in its constructor, allowing `api.rs` to inject the global bus.
+
+**Remaining/Current Work**:
+- [x] **Fix Breaking Build**: Recent change to `IntegratedKernelParams` broke `llmspell-templates` and other call sites.
+    -   *Immediate Action*: Patched all call sites with `event_bus: None` to restore compilation.
+- [x] **Implement Event Bridge**:
+    -   *Solution*: Instead of injecting a global bus, `IntegratedKernel` was updated to clone the `EventBus` from its `SessionManager` (shared state) if no explicit bus is provided.
+    -   *Implementation*: Required implementing `Clone` for `EventBus` (handle behavior) and using a double-dereference `(**session_manager.event_bus()).clone()` to resolve Arc types.
+- [x] **Verify End-to-End**: Re-ran `verify_stream_node.js`.
+    -   *Result*: **Passed**. Script received `kernel.iopub.stream` messages with "TEST_VERIFICATION_OUTPUT" immediately.
+
+**Status**: ✅ Complete. Real-time output streaming is fully functional.

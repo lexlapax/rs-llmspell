@@ -48,7 +48,7 @@ impl EventPattern {
 }
 
 /// Pattern matcher for efficient event routing
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PatternMatcher {
     // For future optimization - could add compiled patterns, etc.
 }

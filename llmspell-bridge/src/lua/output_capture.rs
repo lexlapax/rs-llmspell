@@ -69,18 +69,23 @@ impl ConsoleCapture {
 
     /// Add a line to the capture
     fn add_line(&self, line: String) {
+        // [DEBUG] Log to stderr to verify capture is working
+        eprintln!("[DEBUG] ConsoleCapture::add_line: '{}'", line);
+
         // Route to debug system if available
         if let Some(bridge) = &self.debug_bridge {
             bridge.log("info", &line, Some("lua.print"));
         }
 
         // Also capture locally
-        // Also capture locally
         self.lines.lock().push(line.clone());
 
         // Stream via callback if configured
         if let Some(callback) = self.output_callback.read().as_ref() {
+            eprintln!("[DEBUG] ConsoleCapture: invoking callback");
             callback(&line);
+        } else {
+            eprintln!("[DEBUG] ConsoleCapture: no callback configured");
         }
     }
 }

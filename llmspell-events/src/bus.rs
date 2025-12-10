@@ -14,7 +14,7 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 /// Event bus for publishing and subscribing to events
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EventBus {
     /// Pattern-based subscriptions
     subscriptions: Arc<DashMap<String, Vec<Subscription>>>,

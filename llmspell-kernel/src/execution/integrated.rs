@@ -101,6 +101,8 @@ impl Default for ExecutionConfig {
     }
 }
 
+use llmspell_events::EventBus;
+
 /// Parameters for creating an `IntegratedKernel`
 pub struct IntegratedKernelParams<P: Protocol> {
     pub protocol: P,
@@ -111,6 +113,7 @@ pub struct IntegratedKernelParams<P: Protocol> {
     pub session_manager: Arc<SessionManager>,
     pub memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
     pub hook_system: Option<Arc<crate::hooks::KernelHookSystem>>,
+    pub event_bus: Option<EventBus>,
 }
 
 /// Integrated kernel that runs `ScriptRuntime` without spawning
@@ -202,16 +205,22 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             session_manager,
             memory_manager,
             hook_system,
+            event_bus,
         } = params;
         info!("Creating IntegratedKernel for session {}", session_id);
 
         // Create message router
         let message_router = Arc::new(MessageRouter::new(config.max_history));
 
+        // Use provided event bus or fallback to SessionManager's bus (Phase 14.6 fix)
+        // This ensures WebSocket subscribers (who use SessionManager bus) receive events
+        let effective_event_bus = event_bus.unwrap_or_else(|| (**session_manager.event_bus()).clone());
+
         // Create event correlator
         let event_correlator = Arc::new(KernelEventCorrelator::new(
             message_router.clone(),
             session_id.clone(),
+            Some(effective_event_bus),
         ));
 
         // Create I/O manager

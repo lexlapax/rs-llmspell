@@ -134,4 +134,8 @@ impl ScriptEngineBridge for JSEngine {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn set_output_callback(&self, _callback: Box<dyn Fn(&str) + Send + Sync>) {
+        // TODO: Implement output callback for JavaScript
+    }
 }

@@ -434,9 +434,13 @@ pub struct KernelEventCorrelator {
 
 impl KernelEventCorrelator {
     /// Create new kernel event correlator
-    pub fn new(message_router: Arc<MessageRouter>, default_session: String) -> Self {
+    pub fn new(
+        message_router: Arc<MessageRouter>,
+        default_session: String,
+        event_bus: Option<EventBus>,
+    ) -> Self {
         let correlation_tracker = EventCorrelationTracker::with_default_config();
-        let event_bus = EventBus::new();
+        let event_bus = event_bus.unwrap_or_else(EventBus::new);
         let broadcaster = EventBroadcaster::new(message_router, default_session);
 
         Self {
@@ -595,7 +599,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_correlator() {
         let router = Arc::new(MessageRouter::new(100));
-        let correlator = KernelEventCorrelator::new(router, "test-session".to_string());
+        let correlator = KernelEventCorrelator::new(router, "test-session".to_string(), None);
 
         // Start execution context
         correlator
