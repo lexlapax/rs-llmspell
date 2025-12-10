@@ -12,6 +12,7 @@ export interface ConfigItem {
     default: string | null;
     is_sensitive: boolean;
     is_overridden: boolean;
+    config_path?: string;
 }
 
 export interface UpdateConfigResponse {

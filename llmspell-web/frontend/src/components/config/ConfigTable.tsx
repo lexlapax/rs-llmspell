@@ -14,6 +14,7 @@ export const ConfigTable: React.FC<ConfigTableProps> = ({ items, onEdit }) => {
 
     const filteredItems = items.filter(item =>
         item.name.toLowerCase().includes(search.toLowerCase()) ||
+        (item.config_path && item.config_path.toLowerCase().includes(search.toLowerCase())) ||
         item.description.toLowerCase().includes(search.toLowerCase()) ||
         item.category.toLowerCase().includes(search.toLowerCase())
     );
@@ -39,7 +40,8 @@ export const ConfigTable: React.FC<ConfigTableProps> = ({ items, onEdit }) => {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-gray-800 text-gray-400">
                         <tr>
-                            <th className="px-4 py-3 font-medium w-1/4">Name</th>
+                            <th className="px-4 py-3 font-medium w-1/4">Env Variable</th>
+                            <th className="px-4 py-3 font-medium w-1/4">Config Key</th>
                             <th className="px-4 py-3 font-medium w-1/4">Value</th>
                             <th className="px-4 py-3 font-medium w-1/3">Description</th>
                             <th className="px-4 py-3 font-medium w-1/12 text-center">Category</th>
@@ -56,6 +58,9 @@ export const ConfigTable: React.FC<ConfigTableProps> = ({ items, onEdit }) => {
                                             MODIFIED
                                         </span>
                                     )}
+                                </td>
+                                <td className="px-4 py-3 font-mono text-gray-400 text-xs">
+                                    {item.config_path || '-'}
                                 </td>
                                 <td className="px-4 py-3">
                                     <span className={clsx(

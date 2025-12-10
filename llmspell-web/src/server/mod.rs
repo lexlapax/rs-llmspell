@@ -43,6 +43,11 @@ impl WebServer {
         // Initialize Shared Runtime Config
         let runtime_config = llmspell_config::env::EnvRegistry::new();
 
+        // Register standard LLMSpell variables
+        if let Err(e) = llmspell_config::env_registry::register_standard_vars(&runtime_config) {
+            warn!("Failed to register standard environment variables: {}", e);
+        }
+
         if config.dev_mode {
             warn!("⚠️  DEVELOPMENT MODE ENABLED - Authentication is bypassed!");
             warn!("   Set LLMSPELL_WEB_DEV_MODE=false to enable authentication");

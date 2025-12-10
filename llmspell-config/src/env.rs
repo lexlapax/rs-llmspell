@@ -209,7 +209,7 @@ impl EnvRegistry {
     }
 
     /// List all registered variables
-    pub fn list_vars(&self) -> Result<Vec<(String, String, EnvCategory, bool)>, String> {
+    pub fn list_vars(&self) -> Result<Vec<(String, String, EnvCategory, bool, Option<String>)>, String> {
         let defs = self.definitions.read().map_err(|e| e.to_string())?;
         let mut vars: Vec<_> = defs
             .values()
@@ -219,6 +219,7 @@ impl EnvRegistry {
                     def.description.clone(),
                     def.category.clone(),
                     def.sensitive,
+                    def.config_path.clone(),
                 )
             })
             .collect();

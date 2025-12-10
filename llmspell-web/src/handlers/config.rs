@@ -14,6 +14,7 @@ pub struct ConfigItem {
     pub default: Option<String>, // Kept for future use
     pub is_sensitive: bool,
     pub is_overridden: bool,
+    pub config_path: Option<String>,
 }
 
 /// Get current configuration
@@ -32,7 +33,7 @@ pub async fn get_config(State(state): State<AppState>) -> Result<Json<Vec<Config
     let mut items = Vec::new();
 
     if let Ok(vars) = registry.list_vars() {
-        for (name, description, category, sensitive) in vars {
+        for (name, description, category, sensitive, config_path) in vars {
             let value = registry.get(&name);
 
             items.push(ConfigItem {
@@ -47,6 +48,7 @@ pub async fn get_config(State(state): State<AppState>) -> Result<Json<Vec<Config
                 default: None,
                 is_sensitive: sensitive,
                 is_overridden: false,
+                config_path,
             });
         }
     }

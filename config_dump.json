@@ -1,0 +1,1152 @@
+[
+   {
+      "category" : "Provider",
+      "config_path" : "providers.anthropic.api_key",
+      "default" : null,
+      "description" : "Anthropic API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "ANTHROPIC_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.search.brave_api_key",
+      "default" : null,
+      "description" : "Brave Search API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "BRAVE_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.academic.core_api_key",
+      "default" : null,
+      "description" : "CORE Academic Search API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "COREAC_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.gemini.api_key",
+      "default" : null,
+      "description" : "Google Gemini API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "GEMINI_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.github.api_key",
+      "default" : null,
+      "description" : "GitHub API Token",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "GITHUB_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.groq.api_key",
+      "default" : null,
+      "description" : "Groq API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "GROQ_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.huggingface.api_key",
+      "default" : null,
+      "description" : "HuggingFace Hub API token",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "HFHUB_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Path",
+      "config_path" : null,
+      "default" : null,
+      "description" : "User home directory (system)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "HOME",
+      "value" : "/Users/spuri"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.security.allow_file_access",
+      "default" : null,
+      "description" : "Allow file system access in scripts",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_ALLOW_FILE_ACCESS",
+      "value" : "false"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.security.allow_network_access",
+      "default" : null,
+      "description" : "Allow network access in scripts",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_ALLOW_NETWORK_ACCESS",
+      "value" : "true"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.security.allow_process_spawn",
+      "default" : null,
+      "description" : "Allow process spawning in scripts",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_ALLOW_PROCESS_SPAWN",
+      "value" : "false"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "default_engine",
+      "default" : null,
+      "description" : "Default script engine (lua, javascript)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_DEFAULT_ENGINE",
+      "value" : "lua"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.buffer_size",
+      "default" : null,
+      "description" : "Event bus buffer size for queuing events",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_BUFFER_SIZE",
+      "value" : "10000"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.emit_debug_events",
+      "default" : null,
+      "description" : "Enable debug-level events",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_EMIT_DEBUG_EVENTS",
+      "value" : "false"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.emit_state_events",
+      "default" : null,
+      "description" : "Enable state change events",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_EMIT_STATE_EVENTS",
+      "value" : "false"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.emit_timing_events",
+      "default" : null,
+      "description" : "Enable timing/performance events",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_EMIT_TIMING_EVENTS",
+      "value" : "true"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.enabled",
+      "default" : null,
+      "description" : "Enable event system globally",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_ENABLED",
+      "value" : "true"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.export.file",
+      "default" : null,
+      "description" : "Export events to file (path)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_EXPORT_FILE",
+      "value" : null
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.export.pretty_json",
+      "default" : null,
+      "description" : "Pretty-print JSON output",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_EXPORT_PRETTY_JSON",
+      "value" : "false"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.export.stdout",
+      "default" : null,
+      "description" : "Export events to stdout (for debugging)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_EXPORT_STDOUT",
+      "value" : "false"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.export.webhook",
+      "default" : null,
+      "description" : "Export events to webhook (URL)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_EXPORT_WEBHOOK",
+      "value" : null
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.filtering.exclude_components",
+      "default" : null,
+      "description" : "Component IDs to exclude (comma-separated glob patterns)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_FILTERING_EXCLUDE_COMPONENTS",
+      "value" : null
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.filtering.exclude_types",
+      "default" : null,
+      "description" : "Event types to exclude (comma-separated glob patterns)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_FILTERING_EXCLUDE_TYPES",
+      "value" : null
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.filtering.include_components",
+      "default" : null,
+      "description" : "Component IDs to include (comma-separated glob patterns)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_FILTERING_INCLUDE_COMPONENTS",
+      "value" : "*"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.filtering.include_types",
+      "default" : null,
+      "description" : "Event types to include (comma-separated glob patterns)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_FILTERING_INCLUDE_TYPES",
+      "value" : "*"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "events.max_events_per_second",
+      "default" : null,
+      "description" : "Maximum events per second (rate limiting)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_EVENTS_MAX_EVENTS_PER_SECOND",
+      "value" : null
+   },
+   {
+      "category" : "Hook",
+      "config_path" : "hooks.enabled",
+      "default" : null,
+      "description" : "Enable hook system",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_HOOKS_ENABLED",
+      "value" : "false"
+   },
+   {
+      "category" : "Hook",
+      "config_path" : "hooks.rate_limit_per_minute",
+      "default" : null,
+      "description" : "Hook rate limiting (executions per minute)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_HOOKS_RATE_LIMIT",
+      "value" : "100"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.max_concurrent_scripts",
+      "default" : null,
+      "description" : "Maximum number of concurrent scripts",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MAX_CONCURRENT_SCRIPTS",
+      "value" : "10"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.security.max_execution_time_ms",
+      "default" : null,
+      "description" : "Maximum execution time in milliseconds",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MAX_EXECUTION_TIME_MS",
+      "value" : "300000"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.security.max_memory_bytes",
+      "default" : null,
+      "description" : "Maximum memory usage in bytes",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MAX_MEMORY_BYTES",
+      "value" : "50000000"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.consolidation.active_session_threshold_secs",
+      "default" : null,
+      "description" : "Active session threshold in seconds",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_CONSOLIDATION_ACTIVE_SESSION_THRESHOLD_SECS",
+      "value" : "300"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.consolidation.batch_size",
+      "default" : null,
+      "description" : "Number of episodes to consolidate in one batch",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_CONSOLIDATION_BATCH_SIZE",
+      "value" : "10"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.consolidation.max_concurrent",
+      "default" : null,
+      "description" : "Maximum concurrent consolidation operations",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_CONSOLIDATION_MAX_CONCURRENT",
+      "value" : "3"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.consolidation.provider_name",
+      "default" : null,
+      "description" : "Provider name for memory consolidation LLM",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME",
+      "value" : null
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.daemon.enabled",
+      "default" : null,
+      "description" : "Enable background consolidation daemon",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_DAEMON_ENABLED",
+      "value" : "true"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.daemon.fast_interval_secs",
+      "default" : null,
+      "description" : "Fast consolidation interval in seconds",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_DAEMON_FAST_INTERVAL_SECS",
+      "value" : "30"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.daemon.normal_interval_secs",
+      "default" : null,
+      "description" : "Normal consolidation interval in seconds",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_DAEMON_NORMAL_INTERVAL_SECS",
+      "value" : "300"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.daemon.queue_threshold_fast",
+      "default" : null,
+      "description" : "Queue size threshold for fast interval",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_DAEMON_QUEUE_THRESHOLD_FAST",
+      "value" : "10"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.daemon.queue_threshold_slow",
+      "default" : null,
+      "description" : "Queue size threshold for slow interval",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_DAEMON_QUEUE_THRESHOLD_SLOW",
+      "value" : "3"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.daemon.slow_interval_secs",
+      "default" : null,
+      "description" : "Slow consolidation interval in seconds",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_DAEMON_SLOW_INTERVAL_SECS",
+      "value" : "600"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.memory.enabled",
+      "default" : null,
+      "description" : "Enable memory system functionality",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_MEMORY_ENABLED",
+      "value" : "false"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.anthropic.api_key",
+      "default" : null,
+      "description" : "Anthropic API key (LLMSpell format)",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "LLMSPELL_PROVIDER_ANTHROPIC_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.anthropic.base_url",
+      "default" : null,
+      "description" : "Anthropic API base URL",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_PROVIDER_ANTHROPIC_BASE_URL",
+      "value" : "https://api.anthropic.com"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.anthropic.max_retries",
+      "default" : null,
+      "description" : "Anthropic maximum retry count",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_PROVIDER_ANTHROPIC_MAX_RETRIES",
+      "value" : "3"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.anthropic.default_model",
+      "default" : null,
+      "description" : "Default Anthropic model",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_PROVIDER_ANTHROPIC_MODEL",
+      "value" : "claude-3-5-haiku-latest"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.anthropic.timeout_seconds",
+      "default" : null,
+      "description" : "Anthropic request timeout (seconds)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_PROVIDER_ANTHROPIC_TIMEOUT",
+      "value" : "30"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.gemini.api_key",
+      "default" : null,
+      "description" : "Google Gemini API key (LLMSpell format)",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "LLMSPELL_PROVIDER_GEMINI_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.openai.api_key",
+      "default" : null,
+      "description" : "OpenAI API key (LLMSpell format)",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "LLMSPELL_PROVIDER_OPENAI_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.openai.base_url",
+      "default" : null,
+      "description" : "OpenAI API base URL",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_PROVIDER_OPENAI_BASE_URL",
+      "value" : "https://api.openai.com/v1"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.openai.max_retries",
+      "default" : null,
+      "description" : "OpenAI maximum retry count",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_PROVIDER_OPENAI_MAX_RETRIES",
+      "value" : "3"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.openai.default_model",
+      "default" : null,
+      "description" : "Default OpenAI model",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_PROVIDER_OPENAI_MODEL",
+      "value" : "gpt-3.5-turbo"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.openai.timeout_seconds",
+      "default" : null,
+      "description" : "OpenAI request timeout (seconds)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_PROVIDER_OPENAI_TIMEOUT",
+      "value" : "30"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : "runtime.script_timeout_seconds",
+      "default" : null,
+      "description" : "Script execution timeout in seconds",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_SCRIPT_TIMEOUT_SECONDS",
+      "value" : "300"
+   },
+   {
+      "category" : "Session",
+      "config_path" : "runtime.sessions.storage_backend",
+      "default" : null,
+      "description" : "Session storage backend (memory, sqlite, postgres)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_SESSIONS_BACKEND",
+      "value" : "memory"
+   },
+   {
+      "category" : "Session",
+      "config_path" : "runtime.sessions.enabled",
+      "default" : null,
+      "description" : "Enable session management",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_SESSIONS_ENABLED",
+      "value" : "false"
+   },
+   {
+      "category" : "Session",
+      "config_path" : "runtime.sessions.max_sessions",
+      "default" : null,
+      "description" : "Maximum number of concurrent sessions",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_SESSIONS_MAX",
+      "value" : "100"
+   },
+   {
+      "category" : "Session",
+      "config_path" : "runtime.sessions.max_artifacts_per_session",
+      "default" : null,
+      "description" : "Maximum artifacts per session",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_SESSIONS_MAX_ARTIFACTS",
+      "value" : "1000"
+   },
+   {
+      "category" : "Session",
+      "config_path" : "runtime.sessions.session_timeout_seconds",
+      "default" : null,
+      "description" : "Session timeout in seconds",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_SESSIONS_TIMEOUT_SECONDS",
+      "value" : "3600"
+   },
+   {
+      "category" : "State",
+      "config_path" : "runtime.state_persistence.backend_type",
+      "default" : null,
+      "description" : "State persistence backend (memory, sqlite, postgres)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_STATE_BACKEND",
+      "value" : "memory"
+   },
+   {
+      "category" : "State",
+      "config_path" : "runtime.state_persistence.backup.backup_dir",
+      "default" : null,
+      "description" : "Directory for state backups",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_STATE_BACKUP_DIR",
+      "value" : "./backups"
+   },
+   {
+      "category" : "State",
+      "config_path" : "runtime.state_persistence.backup_enabled",
+      "default" : null,
+      "description" : "Enable state backup functionality",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_STATE_BACKUP_ENABLED",
+      "value" : "false"
+   },
+   {
+      "category" : "State",
+      "config_path" : "runtime.state_persistence.backup_on_migration",
+      "default" : null,
+      "description" : "Automatic backup on migration",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_STATE_BACKUP_ON_MIGRATION",
+      "value" : "true"
+   },
+   {
+      "category" : "State",
+      "config_path" : "runtime.state_persistence.enabled",
+      "default" : null,
+      "description" : "Enable state persistence",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_STATE_ENABLED",
+      "value" : "true"
+   },
+   {
+      "category" : "State",
+      "config_path" : "runtime.state_persistence.max_state_size_bytes",
+      "default" : null,
+      "description" : "Maximum state size per key in bytes",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_STATE_MAX_SIZE_BYTES",
+      "value" : "10000000"
+   },
+   {
+      "category" : "State",
+      "config_path" : "runtime.state_persistence.migration_enabled",
+      "default" : null,
+      "description" : "Enable state migration functionality",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_STATE_MIGRATION_ENABLED",
+      "value" : "false"
+   },
+   {
+      "category" : "State",
+      "config_path" : "runtime.state_persistence.schema_directory",
+      "default" : null,
+      "description" : "Storage path for file-based state backends",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_STATE_PATH",
+      "value" : null
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.academic.citation_api_key",
+      "default" : null,
+      "description" : "API key for citation services",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "LLMSPELL_TOOLS_ACADEMIC_CITATION_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.academic.max_references",
+      "default" : null,
+      "description" : "Maximum references to process",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_ACADEMIC_MAX_REFERENCES",
+      "value" : "1000"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.file_operations.allowed_paths",
+      "default" : null,
+      "description" : "Comma-separated list of allowed paths for file operations",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_ALLOWED_PATHS",
+      "value" : null
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.data.max_csv_size",
+      "default" : null,
+      "description" : "Maximum CSV file size for processing (bytes)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_DATA_MAX_CSV_SIZE",
+      "value" : "104857600"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.data.max_json_depth",
+      "default" : null,
+      "description" : "Maximum JSON nesting depth",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_DATA_MAX_JSON_DEPTH",
+      "value" : "100"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.database.allowed_hosts",
+      "default" : null,
+      "description" : "Comma-separated list of allowed database hosts",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_DB_ALLOWED_HOSTS",
+      "value" : "localhost,127.0.0.1"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.database.connection_timeout_seconds",
+      "default" : null,
+      "description" : "Database connection timeout (seconds)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_DB_CONNECTION_TIMEOUT",
+      "value" : "10"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.database.max_connections",
+      "default" : null,
+      "description" : "Maximum database connections",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_DB_MAX_CONNECTIONS",
+      "value" : "10"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.document.extract_images",
+      "default" : null,
+      "description" : "Extract images from documents",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_DOC_EXTRACT_IMAGES",
+      "value" : "false"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.document.max_pdf_size",
+      "default" : null,
+      "description" : "Maximum PDF file size (bytes)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_DOC_MAX_PDF_SIZE",
+      "value" : "52428800"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.email.from_address",
+      "default" : null,
+      "description" : "Default from address for emails",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_EMAIL_FROM_ADDRESS",
+      "value" : null
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.email.rate_limit_per_minute",
+      "default" : null,
+      "description" : "Email rate limit (emails per minute)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_EMAIL_RATE_LIMIT",
+      "value" : "2"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.email.smtp_host",
+      "default" : null,
+      "description" : "SMTP host for email sending",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_EMAIL_SMTP_HOST",
+      "value" : null
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.email.smtp_port",
+      "default" : null,
+      "description" : "SMTP port for email sending",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_EMAIL_SMTP_PORT",
+      "value" : "587"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.enabled",
+      "default" : null,
+      "description" : "Enable tool system globally",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_ENABLED",
+      "value" : "true"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.file_operations.enabled",
+      "default" : null,
+      "description" : "Enable file operations tools",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_FILE_OPS_ENABLED",
+      "value" : "true"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.file_operations.max_file_size",
+      "default" : null,
+      "description" : "Maximum file size for operations (bytes)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_MAX_FILE_SIZE",
+      "value" : "104857600"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.media.image_max_dimensions",
+      "default" : null,
+      "description" : "Maximum image dimensions (width x height)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_MEDIA_IMAGE_MAX_DIMENSIONS",
+      "value" : "4096x4096"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.media.max_file_size",
+      "default" : null,
+      "description" : "Maximum media file size (bytes)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_MEDIA_MAX_SIZE",
+      "value" : "524288000"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.media.processing_timeout_seconds",
+      "default" : null,
+      "description" : "Media processing timeout (seconds)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_MEDIA_PROCESSING_TIMEOUT",
+      "value" : "300"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.network.max_retries",
+      "default" : null,
+      "description" : "Maximum network retries for tools",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_NETWORK_MAX_RETRIES",
+      "value" : "3"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.network.timeout_seconds",
+      "default" : null,
+      "description" : "Default network timeout for tools (seconds)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_NETWORK_TIMEOUT",
+      "value" : "30"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.network.verify_ssl",
+      "default" : null,
+      "description" : "Verify SSL certificates for network operations",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_NETWORK_VERIFY_SSL",
+      "value" : "true"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.rate_limit_per_minute",
+      "default" : null,
+      "description" : "Global rate limiting for tools (requests per minute)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_RATE_LIMIT",
+      "value" : "60"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.search.api_key",
+      "default" : null,
+      "description" : "API key for search services",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "LLMSPELL_TOOLS_SEARCH_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.search.default_engine",
+      "default" : null,
+      "description" : "Default search engine (google, bing, duckduckgo)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_SEARCH_ENGINE",
+      "value" : "duckduckgo"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.search.max_results",
+      "default" : null,
+      "description" : "Maximum search results to return",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_SEARCH_MAX_RESULTS",
+      "value" : "10"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.system.allowed_commands",
+      "default" : null,
+      "description" : "Comma-separated list of allowed system commands",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_SYSTEM_ALLOWED_COMMANDS",
+      "value" : "ls,cat,echo,pwd"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.system.allow_process_execution",
+      "default" : null,
+      "description" : "Allow process execution tools",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC",
+      "value" : "false"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.system.max_output_size",
+      "default" : null,
+      "description" : "Maximum output size from system commands (bytes)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_SYSTEM_MAX_OUTPUT_SIZE",
+      "value" : "1048576"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.web_tools.allowed_domains",
+      "default" : null,
+      "description" : "Comma-separated list of allowed domains for web tools",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_WEB_ALLOWED_DOMAINS",
+      "value" : "*"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.web_tools.blocked_domains",
+      "default" : null,
+      "description" : "Comma-separated list of blocked domains for web tools",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_WEB_BLOCKED_DOMAINS",
+      "value" : ""
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.web_tools.max_redirects",
+      "default" : null,
+      "description" : "Maximum redirects to follow",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_WEB_MAX_REDIRECTS",
+      "value" : "5"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.web_tools.scraping_delay_ms",
+      "default" : null,
+      "description" : "Delay between scraping requests (milliseconds)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_WEB_SCRAPING_DELAY",
+      "value" : "1000"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.web_tools.user_agent",
+      "default" : null,
+      "description" : "User agent for web tools",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "LLMSPELL_TOOLS_WEB_USER_AGENT",
+      "value" : "llmspell-web/1.0"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.news.api_key",
+      "default" : null,
+      "description" : "NewsAPI key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "NEWSAPI_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.openai.api_key",
+      "default" : null,
+      "description" : "OpenAI API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "OPENAI_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.openrouter.api_key",
+      "default" : null,
+      "description" : "OpenRouter API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "OPENROUTER_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.academic.pubmed_api_key",
+      "default" : null,
+      "description" : "PubMed API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "PUBMED_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : null,
+      "default" : null,
+      "description" : "Rust logging level/filter",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "RUST_LOG",
+      "value" : "info"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.search.serpapi_api_key",
+      "default" : null,
+      "description" : "SerpApi key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "SERPAPI_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.search.serper_api_key",
+      "default" : null,
+      "description" : "Serper.dev API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "SERPERDEV_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.search.tavily_api_key",
+      "default" : null,
+      "description" : "Tavily Search API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "TAVILY_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Runtime",
+      "config_path" : null,
+      "default" : null,
+      "description" : "Test variable for persistence verification",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "TEST_PERSIST_VAR",
+      "value" : "initialpersisted_changepersisted_value"
+   },
+   {
+      "category" : "Path",
+      "config_path" : null,
+      "default" : null,
+      "description" : "Windows user profile directory (system)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "USERPROFILE",
+      "value" : null
+   },
+   {
+      "category" : "Tool",
+      "config_path" : "tools.weather.api_key",
+      "default" : null,
+      "description" : "Weather API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "WEATHER_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Provider",
+      "config_path" : "providers.xai.api_key",
+      "default" : null,
+      "description" : "xAI API key",
+      "is_overridden" : false,
+      "is_sensitive" : true,
+      "name" : "XAI_API_KEY",
+      "value" : "***"
+   },
+   {
+      "category" : "Path",
+      "config_path" : null,
+      "default" : null,
+      "description" : "XDG configuration directory (system)",
+      "is_overridden" : false,
+      "is_sensitive" : false,
+      "name" : "XDG_CONFIG_HOME",
+      "value" : null
+   }
+]
