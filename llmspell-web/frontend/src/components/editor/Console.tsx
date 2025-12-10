@@ -4,8 +4,9 @@ import clsx from 'clsx';
 
 export interface LogEntry {
     type: 'stdout' | 'stderr' | 'info';
-    content: string;
+    content: string | object;
     timestamp: number;
+    isResult?: boolean;
 }
 
 interface ConsoleProps {
@@ -72,19 +73,27 @@ export default function Console({ logs, height = '300px', onClear, className }: 
                     <div className="text-gray-500 italic">No output</div>
                 ) : (
                     logs.map((log, index) => {
-                        const html = converter.toHtml(log.content);
+                        const isObject = typeof log.content === 'object' && log.content !== null;
 
                         return (
-                            <div key={index} className="flex group hover:bg-[#2a2a2a]">
-                                <span className="text-gray-600 mr-3 select-none flex-shrink-0 w-24 text-right">
+                            <div key={index} className="flex group hover:bg-[#2a2a2a] items-start">
+                                <span className="text-gray-600 mr-3 select-none flex-shrink-0 w-24 text-right pt-0.5">
                                     [{formatTime(log.timestamp)}]
                                 </span>
                                 <div className={clsx("flex-1 whitespace-pre-wrap break-all", {
-                                    'text-gray-300': log.type === 'stdout',
+                                    'text-gray-300': log.type === 'stdout' && !log.isResult,
                                     'text-red-400': log.type === 'stderr',
                                     'text-blue-400': log.type === 'info',
+                                    'text-green-400': log.isResult, // Distinct color for results
                                 })}>
-                                    <span dangerouslySetInnerHTML={{ __html: html }} />
+                                    {isObject ? (
+                                        <div className="bg-[#111] p-2 rounded border border-gray-800 mt-1">
+                                            <div className="text-xs text-gray-500 mb-1">Result:</div>
+                                            <pre className="text-green-300">{JSON.stringify(log.content, null, 2)}</pre>
+                                        </div>
+                                    ) : (
+                                        <span dangerouslySetInnerHTML={{ __html: converter.toHtml(log.content as string) }} />
+                                    )}
                                 </div>
                             </div>
                         );

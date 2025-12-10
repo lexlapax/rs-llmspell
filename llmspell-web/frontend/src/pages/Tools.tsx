@@ -28,12 +28,64 @@ export const Tools = () => {
 
     useEffect(() => {
         if (lastMessage && activeTab === 'scripts') {
-            // If backend streams logs via WS, we add them here
-            // Using a generic 'info' type for now as WS event structure might vary
+            // Handle streaming output from kernel
+            if (lastMessage.event_type === 'kernel.iopub.stream') {
+                const content = lastMessage.data?.content;
+                if (content && content.text) {
+                    setScriptLogs(prev => [...prev, {
+                        type: content.name === 'stderr' ? 'stderr' : 'stdout',
+                        content: content.text,
+                        timestamp: Date.now()
+                    }]);
+                    return; // Handled
+                }
+            }
+
+            // Also handle error output
+            if (lastMessage.event_type === 'kernel.iopub.error') {
+                const content = lastMessage.data?.content;
+                if (content) {
+                    const errorText = content.evalue || content.ename || 'Unknown error';
+                    setScriptLogs(prev => [...prev, {
+                        type: 'stderr',
+                        content: errorText,
+                        timestamp: Date.now()
+                    }]);
+                    return;
+                }
+            }
+
+            // Handle rich output (e.g. JSON results)
+            if (lastMessage.event_type === 'kernel.iopub.display_data') {
+                const content = lastMessage.data?.content;
+                if (content && content.data) {
+                    // prioritize json over text
+                    const richData = content.data['application/json'] || content.data['text/plain'];
+
+                    if (richData) {
+                        setScriptLogs(prev => [...prev, {
+                            type: 'stdout', // reuse stdout style but with object content
+                            content: richData, // Console.tsx will be updated to handle object
+                            timestamp: Date.now(),
+                            isResult: true // Optional flag if we want distinct styling later
+                        } as LogEntry]);
+                        return;
+                    }
+                }
+            }
+
+            // Ignore specific events to avoid noise
+            if (lastMessage.event_type === 'kernel.execute_reply' ||
+                lastMessage.event_type === 'kernel.status' ||
+                lastMessage.event_type === 'kernel.input_request') {
+                return;
+            }
+
+            // Fallback: log raw message
             setScriptLogs(prev => [...prev, {
                 type: 'info',
-                content: JSON.stringify(lastMessage.payload),
-                timestamp: lastMessage.timestamp
+                content: JSON.stringify(lastMessage.data),
+                timestamp: Date.now()
             } as LogEntry]);
         }
     }, [lastMessage, activeTab]);
@@ -50,12 +102,8 @@ export const Tools = () => {
         setScriptLogs(prev => [...prev, { type: 'info', content: `Running ${language} script...`, timestamp: now }]);
 
         try {
-            const response = await api.executeScript({ code, engine: language });
-            setScriptLogs(prev => [...prev, {
-                type: 'stdout',
-                content: response.output || '(No output)',
-                timestamp: Date.now()
-            }]);
+            await api.executeScript({ code, engine: language });
+            // Output is streamed via WebSocket, so we don't need to append response.output
             setScriptLogs(prev => [...prev, { type: 'info', content: 'Execution finished.', timestamp: Date.now() }]);
         } catch (err: any) {
             setScriptLogs(prev => [...prev, {

@@ -9,12 +9,24 @@ use std::sync::Arc;
 use tracing::{debug, instrument, trace};
 
 /// Console output collector
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ConsoleCapture {
     /// Captured output lines
     lines: Arc<Mutex<Vec<String>>>,
     /// Optional debug bridge for routing to debug system
     debug_bridge: Option<Arc<DebugBridge>>,
+    /// Optional callback for real-time output streaming
+    output_callback: Arc<parking_lot::RwLock<Option<Arc<dyn Fn(&str) + Send + Sync>>>>,
+}
+
+impl std::fmt::Debug for ConsoleCapture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConsoleCapture")
+            .field("lines", &self.lines)
+            .field("debug_bridge", &self.debug_bridge)
+            .field("output_callback", &self.output_callback.read().as_ref().map(|_| "Callback"))
+            .finish()
+    }
 }
 
 impl ConsoleCapture {
@@ -24,6 +36,7 @@ impl ConsoleCapture {
         Self {
             lines: Arc::new(Mutex::new(Vec::new())),
             debug_bridge: None,
+            output_callback: Arc::new(parking_lot::RwLock::new(None)),
         }
     }
 
@@ -33,7 +46,14 @@ impl ConsoleCapture {
         Self {
             lines: Arc::new(Mutex::new(Vec::new())),
             debug_bridge: Some(bridge),
+            output_callback: Arc::new(parking_lot::RwLock::new(None)),
         }
+    }
+
+    /// Set output callback
+    /// Set output callback
+    pub fn set_output_callback(&self, callback: Arc<dyn Fn(&str) + Send + Sync + 'static>) {
+        *self.output_callback.write() = Some(callback);
     }
 
     /// Get captured lines
@@ -55,7 +75,13 @@ impl ConsoleCapture {
         }
 
         // Also capture locally
-        self.lines.lock().push(line);
+        // Also capture locally
+        self.lines.lock().push(line.clone());
+
+        // Stream via callback if configured
+        if let Some(callback) = self.output_callback.read().as_ref() {
+            callback(&line);
+        }
     }
 }
 

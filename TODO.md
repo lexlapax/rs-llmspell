@@ -2954,6 +2954,7 @@ impl Default for WebConfig {
 **Description**: Enable real execution capabilities in the Web UI by splitting the "Tools" page into "Scripts" (Code Editor) and "Tools" (Form-based Invocation) tabs.
 **Status**: DONE ✅
 **Sub-tasks**:
+#### 14.6.4.1: Scripts Execution Tab
 - [x] **Backend**:
     - [x] Implement `POST /api/scripts/execute` endpoint.
         - [x] Input: `{ code: String, engine: String, input: Option<Value> }`.
@@ -3049,3 +3050,6 @@ async fn test_protected_routes() {
 3. **Quick Win Available**: Dev mode bypass unblocks all functionality
 4. **Architecture Preserved**: Can add production login later without breaking changes
 
+#### 14.6.4.1: Tools Execution Tab
+
+**Tasks and subtasks to fill out

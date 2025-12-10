@@ -100,6 +100,8 @@ pub enum KernelEvent {
         /// Event source component
         source: String,
     },
+    /// Raw `IOPub` message for bridging
+    IOPubMessage(IOPubMessage),
 }
 
 /// Error information for failed executions
@@ -160,6 +162,7 @@ impl KernelEvent {
             Self::KernelShutdown { .. } => "kernel.shutdown".to_string(),
             Self::StatusChange { .. } => "kernel.status_change".to_string(),
             Self::Custom { name, .. } => format!("kernel.custom.{name}"),
+            Self::IOPubMessage(msg) => format!("kernel.iopub.{}", msg.header.msg_type),
         }
     }
 
@@ -185,6 +188,7 @@ impl KernelEvent {
             Self::DebugEvent(_debug_event) => None,
             Self::SessionEvent(session_event) => Some(session_event.session_id.to_string()),
             Self::KernelSessionEvent(kernel_event) => Some(kernel_event.session_id.to_string()),
+            Self::IOPubMessage(msg) => Some(msg.header.session.clone()),
             _ => None,
         }
     }
@@ -256,6 +260,12 @@ impl KernelEvent {
                 "data": data,
                 "source": source
             }),
+            Self::IOPubMessage(msg) => json!({
+                "header": msg.header,
+                "parent_header": msg.parent_header,
+                "metadata": msg.metadata,
+                "content": msg.content
+            }),
         };
 
         UniversalEvent::new(self.event_type(), event_data, Language::Rust)
@@ -277,6 +287,7 @@ impl KernelEvent {
             Self::KernelShutdown { .. } => "kernel_shutdown",
             Self::StatusChange { .. } => "status",
             Self::Custom { .. } => "kernel_custom",
+            Self::IOPubMessage(msg) => return msg.clone(),
         };
 
         let session_str = session.unwrap_or("default");

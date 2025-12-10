@@ -1,7 +1,8 @@
 export interface WebSocketEvent {
-    type: string;
-    payload: unknown;
-    timestamp: number;
+    event_type: string;
+    data: any;
+    language?: string;
+    metadata?: any;
 }
 
 export interface ConfigItem {

@@ -102,6 +102,8 @@ impl Default for IOConfig {
     }
 }
 
+use crate::events::correlation::{KernelEvent, KernelEventCorrelator};
+
 /// Enhanced I/O Manager for multi-channel routing
 pub struct EnhancedIOManager {
     /// `IOPub` channel sender
@@ -114,6 +116,8 @@ pub struct EnhancedIOManager {
     parent_headers: Arc<RwLock<HashMap<String, MessageHeader>>>,
     /// Current execution parent header
     current_parent: Arc<RwLock<Option<MessageHeader>>>,
+    /// Event correlator for direct broadcasting
+    event_correlator: Option<Arc<KernelEventCorrelator>>,
     /// Configuration
     config: IOConfig,
     /// Session ID
@@ -138,6 +142,7 @@ impl EnhancedIOManager {
             ))),
             parent_headers: Arc::new(RwLock::new(HashMap::new())),
             current_parent: Arc::new(RwLock::new(None)),
+            event_correlator: None,
             config,
             session_id,
             tracing: None,
@@ -147,6 +152,11 @@ impl EnhancedIOManager {
     /// Set tracing instrumentation
     pub fn set_tracing(&mut self, tracing: TracingInstrumentation) {
         self.tracing = Some(tracing);
+    }
+
+    /// Set event correlator for direct broadcasting
+    pub fn set_event_correlator(&mut self, correlator: Arc<KernelEventCorrelator>) {
+        self.event_correlator = Some(correlator);
     }
 
     /// Set the `IOPub` channel sender
@@ -282,7 +292,15 @@ impl EnhancedIOManager {
             tracing.trace_transport_operation("jupyter", "iopub", "stream");
         }
 
-        // Send message
+        // Broadcast via Correlator if available (Direct Path)
+        if let Some(ref correlator) = self.event_correlator {
+            let event = KernelEvent::IOPubMessage(message.clone());
+            if let Err(e) = correlator.track_event(event).await {
+                warn!("Failed to track stream event via correlator: {}", e);
+            }
+        }
+
+        // Send message to channel (for IntegratedKernel loop processing/logging)
         sender
             .send(message)
             .await
@@ -322,6 +340,14 @@ impl EnhancedIOManager {
             metadata: HashMap::new(),
             content,
         };
+
+        // Broadcast via Correlator if available (Direct Path)
+        if let Some(ref correlator) = self.event_correlator {
+            let event = KernelEvent::IOPubMessage(message.clone());
+            if let Err(e) = correlator.track_event(event).await {
+                warn!("Failed to track status event via correlator: {}", e);
+            }
+        }
 
         // Use try_send to avoid blocking and handle channel full/closed gracefully
         match sender.try_send(message) {
@@ -379,6 +405,14 @@ impl EnhancedIOManager {
             content,
         };
 
+        // Broadcast via Correlator if available (Direct Path)
+        if let Some(ref correlator) = self.event_correlator {
+            let event = KernelEvent::IOPubMessage(message.clone());
+            if let Err(e) = correlator.track_event(event).await {
+                warn!("Failed to track execute_result event via correlator: {}", e);
+            }
+        }
+
         sender
             .send(message)
             .await
@@ -421,6 +455,14 @@ impl EnhancedIOManager {
             metadata: HashMap::new(),
             content,
         };
+
+        // Broadcast via Correlator if available (Direct Path)
+        if let Some(ref correlator) = self.event_correlator {
+            let event = KernelEvent::IOPubMessage(message.clone());
+            if let Err(e) = correlator.track_event(event).await {
+                warn!("Failed to track display_data event via correlator: {}", e);
+            }
+        }
 
         sender
             .send(message)
