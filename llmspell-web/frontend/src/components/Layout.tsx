@@ -10,13 +10,16 @@ import {
     Menu,
     X,
     Book,
-    Database
+    Database,
+    LogOut
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const location = useLocation();
+    const { logout } = useAuth();
 
     const navigation = [
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -78,14 +81,21 @@ export default function Layout() {
                     })}
                 </nav>
 
-                <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
+                <div className="absolute bottom-0 w-full p-4 border-t border-gray-200 bg-white">
                     <Link
                         to="/settings"
-                        className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900"
+                        className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900 mb-2"
                     >
                         <Settings className="w-5 h-5 mr-3 text-gray-400" />
                         Settings
                     </Link>
+                    <button
+                        onClick={logout}
+                        className="flex w-full items-center px-4 py-2 text-sm font-medium text-red-600 rounded-md hover:bg-red-50 hover:text-red-700"
+                    >
+                        <LogOut className="w-5 h-5 mr-3 text-red-400" />
+                        Logout
+                    </button>
                 </div>
             </div>
 

@@ -53,6 +53,14 @@ impl WebServer {
             warn!("   Set LLMSPELL_WEB_DEV_MODE=false to enable authentication");
         } else {
             info!("Production mode - Authentication required");
+            println!("\n┌──────────────────────────────────────────────────┐");
+            println!("│                🔐 Access Control                 │");
+            println!("├──────────────────────────────────────────────────┤");
+            println!("│ Use one of the following API keys to log in:     │");
+            for key in &config.api_keys {
+                println!("│ • {:<46} │", key);
+            }
+            println!("└──────────────────────────────────────────────────┘\n");
         }
 
         // Register known variables for Web UI Management (Task 14.5.1e)
@@ -200,7 +208,7 @@ impl WebServer {
         Router::new()
             .route("/health", get(health_check))
             .route("/metrics", get(handlers::metrics::get_metrics))
-            .route("/login", post(handlers::auth::login))
+            .route("/api/login", post(handlers::auth::login))
             .route("/ws/stream", get(handlers::ws::ws_handler))
             .nest("/api", api_routes)
             .layer(axum::middleware::from_fn(track_metrics))

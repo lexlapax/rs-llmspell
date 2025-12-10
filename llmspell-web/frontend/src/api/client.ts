@@ -45,7 +45,16 @@ async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> 
 
 import type { ConfigItem, UpdateConfigResponse, Template, TemplateDetails, LaunchTemplateResponse } from './types';
 
+interface LoginResponse {
+    token: string;
+}
+
 export const api = {
+    login: (apiKey: string) => fetchJson<LoginResponse>(`${API_BASE}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey }),
+    }),
     getHealth: () => fetchJson<HealthResponse>('/health'),
     getSessions: () => fetchJson<Session[]>(`${API_BASE}/sessions`),
     getSession: (id: string) => fetchJson<Session>(`${API_BASE}/sessions/${id}`),

@@ -72,6 +72,9 @@ pub struct EnvRegistry {
     cached_values: Arc<RwLock<HashMap<String, String>>>,
 }
 
+/// (Name, Description, Category, IsSensitive, ConfigPath)
+pub type EnvVarInfo = (String, String, EnvCategory, bool, Option<String>);
+
 impl EnvRegistry {
     /// Create a new environment registry
     pub fn new() -> Self {
@@ -209,7 +212,7 @@ impl EnvRegistry {
     }
 
     /// List all registered variables
-    pub fn list_vars(&self) -> Result<Vec<(String, String, EnvCategory, bool, Option<String>)>, String> {
+    pub fn list_vars(&self) -> Result<Vec<EnvVarInfo>, String> {
         let defs = self.definitions.read().map_err(|e| e.to_string())?;
         let mut vars: Vec<_> = defs
             .values()

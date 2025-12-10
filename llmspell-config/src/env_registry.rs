@@ -1484,25 +1484,31 @@ mod tests {
         let vars = registry.list_vars().unwrap();
         assert!(vars
             .iter()
-            .any(|(_, _, cat, _)| matches!(cat, EnvCategory::Runtime)));
+            .any(|(_, _, cat, _, _)| matches!(cat, EnvCategory::Runtime)));
+
         assert!(vars
             .iter()
-            .any(|(_, _, cat, _)| matches!(cat, EnvCategory::Provider)));
+            .any(|(_, _, cat, _, _)| matches!(cat, EnvCategory::Provider)));
+
         assert!(vars
             .iter()
-            .any(|(_, _, cat, _)| matches!(cat, EnvCategory::State)));
+            .any(|(_, _, cat, _, _)| matches!(cat, EnvCategory::State)));
+
         assert!(vars
             .iter()
-            .any(|(_, _, cat, _)| matches!(cat, EnvCategory::Tool)));
+            .any(|(_, _, cat, _, _)| matches!(cat, EnvCategory::Tool)));
+
         assert!(vars
             .iter()
-            .any(|(_, _, cat, _)| matches!(cat, EnvCategory::Session)));
+            .any(|(_, _, cat, _, _)| matches!(cat, EnvCategory::Session)));
+
         assert!(vars
             .iter()
-            .any(|(_, _, cat, _)| matches!(cat, EnvCategory::Hook)));
+            .any(|(_, _, cat, _, _)| matches!(cat, EnvCategory::Hook)));
+
         assert!(vars
             .iter()
-            .any(|(_, _, cat, _)| matches!(cat, EnvCategory::Path)));
+            .any(|(_, _, cat, _, _)| matches!(cat, EnvCategory::Path)));
 
         // Count total variables (should be comprehensive)
         assert!(
