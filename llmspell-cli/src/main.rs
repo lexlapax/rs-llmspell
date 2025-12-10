@@ -53,7 +53,7 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
     use std::path::PathBuf;
 
     // Extract daemon-specific parameters
-    let (port, id, log_file, pid_file) = match &cli.command {
+    let (port, id, log_file, pid_file, host) = match &cli.command {
         llmspell_cli::cli::Commands::Kernel {
             command:
                 llmspell_cli::cli::KernelCommands::Start {
@@ -63,7 +63,13 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
                     pid_file,
                     ..
                 },
-        } => (*port, id.clone(), log_file.clone(), pid_file.clone()),
+        } => (
+            *port,
+            id.clone(),
+            log_file.clone(),
+            pid_file.clone(),
+            "127.0.0.1".to_string(),
+        ),
 
         llmspell_cli::cli::Commands::Web {
             command:
@@ -71,6 +77,7 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
                     port,
                     log_file,
                     pid_file,
+                    host,
                     ..
                 },
         } => (
@@ -78,6 +85,7 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
             Some("web".to_string()),
             log_file.clone(),
             pid_file.clone(),
+            host.clone(),
         ),
 
         _ => unreachable!("Already checked this is a daemon start command"),
@@ -133,6 +141,37 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
         close_stdin: true,
         umask: Some(0o027),
     };
+
+    // Pre-flight check: Load config and print API keys if in production mode
+    // We do this BEFORE daemonizing so stdout is still attached to the terminal
+    {
+        // Use a temporary runtime for config loading
+        if let Ok(rt) = tokio::runtime::Runtime::new() {
+            let config_path = cli.config_path();
+            let profile = cli.profile.as_deref();
+            if let Ok(_config) = rt.block_on(load_runtime_config(config_path.as_deref(), profile)) {
+                // Get Web Service API keys (what the server actually uses)
+                // Note: Currently web command uses default config, so we mirror that here
+                let web_config = llmspell_web::config::WebConfig::default();
+                let api_keys = web_config.api_keys;
+
+                if !api_keys.is_empty() {
+                    println!("\n┌──────────────────────────────────────────────────┐");
+                    println!("│                🔐 Access Control                 │");
+                    println!("│        (Process will run in background)          │");
+                    println!("├──────────────────────────────────────────────────┤");
+                    let url = format!("http://{}:{}", host, port);
+                    println!("│ Access URL: {:<36} │", url); // aligned for box width
+                    println!("│                                                  │");
+                    println!("│ Use one of the following API keys to log in:     │");
+                    for key in &api_keys {
+                        println!("│ • {:<46} │", key);
+                    }
+                    println!("└──────────────────────────────────────────────────┘\n");
+                }
+            }
+        }
+    }
 
     // Create DaemonManager and daemonize BEFORE creating tokio runtime
     let mut daemon_manager = DaemonManager::new(daemon_config.clone());

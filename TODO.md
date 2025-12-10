@@ -1300,7 +1300,8 @@ To achieve 100% stability, we are pivoting from **Dynamic Loading** to **Static 
     - [x] Specifically suppress verbose/raw logs from `hyper`, `reqwest`, and `h2` (tracing sources).
     - [x] Note: `rig-core` noise in debug builds requires daemon mode.
 - [x] **Web Daemon**:
-    - [x] Verify `llmspell web start --daemon` functionality (forking, PID file creation, log redirection).
+    - [x] Verify Daemon API Key Print (run with prod profile, ensure stdout has keys)
+    - [x] Print Server URL in CLI Output (daemon and regular mode) (forking, PID file creation, log redirection).
     - [x] Ensure `web status` and `web stop` work correctly with the daemonized process.
     - [x] Improve `llmspell web --help` visibility if needed.
 

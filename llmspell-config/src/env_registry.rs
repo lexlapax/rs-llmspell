@@ -337,7 +337,6 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
             .build(),
     )?;
 
-
     registry.register_var(
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_GEMINI_API_KEY")
             .description("Google Gemini API key (LLMSpell format)")

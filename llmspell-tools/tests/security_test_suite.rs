@@ -582,13 +582,11 @@ async fn execute_file_system_tool(
         #[cfg(feature = "archives")]
         "archive-handler" => ArchiveHandlerTool::new().execute(input, context).await,
         #[cfg(not(feature = "archives"))]
-        "archive-handler" => {
-            return Err(LLMSpellError::Tool {
-                tool_name: Some("archive-handler".to_string()),
-                message: "archives feature not enabled".to_string(),
-                source: None,
-            })
-        }
+        "archive-handler" => Err(LLMSpellError::Tool {
+            tool_name: Some("archive-handler".to_string()),
+            message: "archives feature not enabled".to_string(),
+            source: None,
+        }),
         _ => Err(LLMSpellError::Tool {
             message: format!("Unknown file system tool: {tool_name}"),
             tool_name: Some(tool_name.to_string()),
@@ -620,49 +618,6 @@ async fn execute_web_tool(
         }
         _ => Err(LLMSpellError::Tool {
             message: format!("Unknown web tool: {tool_name}"),
-            tool_name: Some(tool_name.to_string()),
-            source: None,
-        }),
-    }
-}
-
-/// Execute data processing tools
-async fn execute_data_tool(
-    tool_name: &str,
-    #[allow(unused_variables)] input: AgentInput,
-    #[allow(unused_variables)] context: ExecutionContext,
-) -> Result<AgentOutput, LLMSpellError> {
-    match tool_name {
-        #[cfg(feature = "json-query")]
-        "json-processor" => {
-            JsonProcessorTool::new(JsonProcessorConfig::default())
-                .execute(input, context)
-                .await
-        }
-        #[cfg(not(feature = "json-query"))]
-        "json-processor" => {
-            return Err(LLMSpellError::Tool {
-                tool_name: Some("json-processor".to_string()),
-                message: "json-query feature not enabled".to_string(),
-                source: None,
-            })
-        }
-        #[cfg(feature = "database")]
-        "database-connector" => {
-            DatabaseConnectorTool::new(DatabaseConnectorConfig::default())?
-                .execute(input, context)
-                .await
-        }
-        #[cfg(not(feature = "database"))]
-        "database-connector" => {
-            return Err(LLMSpellError::Tool {
-                tool_name: Some("database-connector".to_string()),
-                message: "database feature not enabled".to_string(),
-                source: None,
-            })
-        }
-        _ => Err(LLMSpellError::Tool {
-            message: format!("Unknown data tool: {tool_name}"),
             tool_name: Some(tool_name.to_string()),
             source: None,
         }),
@@ -711,13 +666,11 @@ async fn execute_utility_tool(
                 .await
         }
         #[cfg(not(feature = "email"))]
-        "email-sender" => {
-            return Err(LLMSpellError::Tool {
-                tool_name: Some("email-sender".to_string()),
-                message: "email feature not enabled".to_string(),
-                source: None,
-            })
-        }
+        "email-sender" => Err(LLMSpellError::Tool {
+            tool_name: Some("email-sender".to_string()),
+            message: "email feature not enabled".to_string(),
+            source: None,
+        }),
         _ => Err(LLMSpellError::Tool {
             message: format!("Unknown utility tool: {tool_name}"),
             tool_name: Some(tool_name.to_string()),
@@ -738,9 +691,37 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
         }
         "web-scraper" | "api-tester" | "webhook-caller" | "url-analyzer" | "sitemap-crawler"
         | "web_search" => execute_web_tool(tool_name, input, context).await,
-        "json-processor" | "database-connector" => {
-            execute_data_tool(tool_name, input, context).await
-        }
+        "json-processor" | "database-connector" => match tool_name {
+            #[cfg(feature = "json-query")]
+            "json-processor" => {
+                JsonProcessorTool::new(JsonProcessorConfig::default())
+                    .execute(input, context)
+                    .await
+            }
+            #[cfg(not(feature = "json-query"))]
+            "json-processor" => Err(LLMSpellError::Tool {
+                tool_name: Some("json-processor".to_string()),
+                message: "json-query feature not enabled".to_string(),
+                source: None,
+            }),
+            #[cfg(feature = "database")]
+            "database-connector" => {
+                DatabaseConnectorTool::new(DatabaseConnectorConfig::default())?
+                    .execute(input, context)
+                    .await
+            }
+            #[cfg(not(feature = "database"))]
+            "database-connector" => Err(LLMSpellError::Tool {
+                tool_name: Some("database-connector".to_string()),
+                message: "database feature not enabled".to_string(),
+                source: None,
+            }),
+            _ => Err(LLMSpellError::Tool {
+                message: format!("Unknown data tool: {tool_name}"),
+                tool_name: Some(tool_name.to_string()),
+                source: None,
+            }),
+        },
         "process-executor" | "template-engine" | "text-manipulator" | "uuid-generator"
         | "email-sender" => execute_utility_tool(tool_name, input, context).await,
         _ => Err(LLMSpellError::Tool {
