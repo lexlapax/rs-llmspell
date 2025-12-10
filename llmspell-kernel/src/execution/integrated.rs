@@ -175,6 +175,8 @@ pub struct IntegratedKernel<P: Protocol> {
     )>,
     /// Hook system for kernel execution events (Phase 13.7.3a)
     hook_system: Option<Arc<crate::hooks::KernelHookSystem>>,
+    /// IOPub receiver (optional, used if not consumed by spawn)
+    iopub_receiver: Option<tokio::sync::mpsc::Receiver<crate::io::manager::IOPubMessage>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -213,39 +215,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let mut io_manager = EnhancedIOManager::new(io_config, session_id.clone());
 
         // Create IOPub channel for output streaming
-        let (iopub_sender, mut iopub_receiver) =
+        let (iopub_sender, iopub_receiver) =
             mpsc::channel::<crate::io::manager::IOPubMessage>(100);
         io_manager.set_iopub_sender(iopub_sender);
 
-        // Spawn task to route IOPub messages to stdout/stderr
-        // This will be properly connected to transport in subtask 9.4.6.4
-        tokio::spawn(async move {
-            while let Some(msg) = iopub_receiver.recv().await {
-                // For now, just log the messages - will be sent through transport later
-                match msg.header.msg_type.as_str() {
-                    "stream" => {
-                        if let Some(stream_type) = msg.content.get("name").and_then(|v| v.as_str())
-                        {
-                            if let Some(text) = msg.content.get("text").and_then(|v| v.as_str()) {
-                                match stream_type {
-                                    "stdout" => print!("{text}"),
-                                    "stderr" => eprint!("{text}"),
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                    "execute_result" | "display_data" => {
-                        if let Some(data) = msg.content.get("data") {
-                            if let Some(text) = data.get("text/plain").and_then(|v| v.as_str()) {
-                                println!("{text}");
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        });
+        // Initial log
+        debug!("IntegratedKernel initialized with IOPub channel");
 
         let io_manager = Arc::new(io_manager);
 
@@ -425,6 +400,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             memory_manager,
             consolidation_daemon,
             hook_system,
+            iopub_receiver: Some(iopub_receiver),
         })
     }
 
@@ -698,6 +674,47 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 if shutdown_rx.try_recv().is_ok() {
                     info!("Received shutdown signal");
                     break;
+                }
+            }
+
+            // Process IOPub messages (Output)
+            // This handles captured stdout/stderr and other kernel outputs
+            // We do this every loop iteration to ensure outputs are flushed
+            if let Some(ref mut receiver) = self.iopub_receiver {
+                while let Ok(msg) = receiver.try_recv() {
+                    // 1. Always print to process stdout/stderr (for CLI/Logs visibility)
+                    match msg.header.msg_type.as_str() {
+                        "stream" => {
+                            if let Some(text) = msg.content.get("text").and_then(|v| v.as_str()) {
+                                if msg.content.get("name").and_then(|v| v.as_str()) == Some("stderr") {
+                                    eprint!("{}", text);
+                                } else {
+                                    print!("{}", text);
+                                }
+                                // Ensure flush
+                                std::io::Write::flush(&mut std::io::stdout()).ok();
+                            }
+                        },
+                        "execute_result" | "display_data" => {
+                            if let Some(data) = msg.content.get("data") {
+                                if let Some(text) = data.get("text/plain").and_then(|v| v.as_str()) {
+                                    println!("{}", text);
+                                }
+                            }
+                        },
+                         _ => {}
+                    }
+
+                    // 2. Forward to transport if available
+                    if let Some(ref mut transport) = self.transport {
+                        // Serialize message to JSON bytes (simplified protocol format supported by api.rs)
+                        if let Ok(msg_bytes) = serde_json::to_vec(&msg) {
+                            // Send as single part message
+                            if let Err(e) = transport.send("iopub", vec![msg_bytes]).await {
+                                warn!("Failed to forward iopub message to transport: {}", e);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1559,9 +1576,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     }),
                 )?;
 
-                // TODO: Send execute_reply through transport once integrated
-                // For now, just create the response
-                let _ = execute_reply;
+                // Send execute_reply through transport
+                if let Some(ref mut transport) = self.transport {
+                    if let Err(e) = transport.send("shell", vec![execute_reply]).await {
+                        error!("Failed to send execute_reply: {}", e);
+                    }
+                }
 
                 // Track successful execute_reply event
                 let execute_reply_event = KernelEvent::ExecuteReply {
@@ -1600,8 +1620,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     }),
                 )?;
 
-                // TODO: Send execute_reply through transport once integrated
-                let _ = error_reply;
+                // Send execute_reply through transport
+                if let Some(ref mut transport) = self.transport {
+                    if let Err(e) = transport.send("shell", vec![error_reply]).await {
+                         error!("Failed to send error execute_reply: {}", e);
+                    }
+                }
 
                 // Track error execute_reply event
                 let error_info = crate::events::correlation::ErrorInfo {
@@ -1641,8 +1665,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     }),
                 )?;
 
-                // TODO: Send execute_reply through transport once integrated
-                let _ = timeout_reply;
+                // Send execute_reply through transport
+                if let Some(ref mut transport) = self.transport {
+                    if let Err(e) = transport.send("shell", vec![timeout_reply]).await {
+                        error!("Failed to send timeout execute_reply: {}", e);
+                    }
+                }
 
                 // Track timeout execute_reply event
                 let error_info = crate::events::correlation::ErrorInfo {

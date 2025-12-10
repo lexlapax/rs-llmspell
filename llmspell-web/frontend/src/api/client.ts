@@ -43,7 +43,7 @@ async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> 
     return response.json();
 }
 
-import type { ConfigItem, UpdateConfigResponse, Template, TemplateDetails, LaunchTemplateResponse } from './types';
+import type { ConfigItem, UpdateConfigResponse, Template, TemplateDetails, LaunchTemplateResponse, ExecuteScriptRequest, ExecuteScriptResponse, ToolDefinition, ExecuteToolResponse } from './types';
 
 interface LoginResponse {
     token: string;
@@ -106,4 +106,19 @@ export const api = {
         }
     },
     getConfigSchema: () => fetchJson<any>(`${API_BASE}/config/schema`),
+
+    // Scripts API
+    executeScript: (req: ExecuteScriptRequest) => fetchJson<ExecuteScriptResponse>(`${API_BASE}/scripts/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req)
+    }),
+
+    // Tools API
+    listTools: () => fetchJson<ToolDefinition[]>(`${API_BASE}/tools`),
+    executeTool: (id: string, parameters: Record<string, any>) => fetchJson<ExecuteToolResponse>(`${API_BASE}/tools/${id}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parameters })
+    }),
 };

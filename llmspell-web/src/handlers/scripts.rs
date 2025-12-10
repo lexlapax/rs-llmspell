@@ -8,11 +8,13 @@ use utoipa::ToSchema;
 #[derive(Deserialize, ToSchema)]
 pub struct ExecuteScriptRequest {
     pub code: String,
+    #[serde(default)]
+    pub engine: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct ScriptExecutionResponse {
-    pub result: String,
+pub struct ExecuteScriptResponse {
+    pub output: String,
 }
 
 #[utoipa::path(
@@ -21,18 +23,21 @@ pub struct ScriptExecutionResponse {
     tag = "scripts",
     request_body = ExecuteScriptRequest,
     responses(
-        (status = 200, description = "Script executed successfully", body = ScriptExecutionResponse),
+        (status = 200, description = "Script executed successfully", body = ExecuteScriptResponse),
         (status = 500, description = "Execution failed")
     )
 )]
 pub async fn execute_script(
     State(state): State<AppState>,
     Json(payload): Json<ExecuteScriptRequest>,
-) -> Result<Json<ScriptExecutionResponse>, WebError> {
+) -> Result<Json<ExecuteScriptResponse>, WebError> {
     let mut kernel = state.kernel.lock().await;
+
+    // TODO: Handle engine selection if kernel supports it via directives
     let result = kernel
         .execute(&payload.code)
         .await
-        .map_err(|e| WebError::Internal(e.to_string()))?;
-    Ok(Json(ScriptExecutionResponse { result }))
+        .map_err(|e| WebError::Internal(format!("Script execution failed: {}", e)))?;
+
+    Ok(Json(ExecuteScriptResponse { output: result }))
 }

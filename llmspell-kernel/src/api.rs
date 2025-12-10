@@ -78,20 +78,116 @@ impl KernelHandle {
         // Send request through transport
         self.transport.send("shell", vec![request]).await?;
 
-        // Wait for execute_reply
+        let mut output_buffer = String::new();
+        let mut result_content = String::new();
+
+        // Wait for execution completion
+        // The correct termination condition is receiving 'status: idle' on iopub channel.
+        // execute_reply on shell channel provides the execution result metadata.
+        let mut loop_timeout = tokio::time::interval(tokio::time::Duration::from_secs(30));
+        let mut shell_reply_received = false;
+        let mut kernel_is_idle = false;
+        
         loop {
-            if let Some(reply_parts) = self.transport.recv("shell").await? {
-                if let Some(first_part) = reply_parts.first() {
-                    // Parse reply and extract result
-                    let reply_msg = self.protocol.parse_message(first_part)?;
-                    if let Some(content) = reply_msg.get("content") {
-                        // Extract execution result
-                        return Ok(format!("Result: {content:?}"));
+            // Check termination condition at start of loop (in case we updated state)
+            if kernel_is_idle && shell_reply_received {
+                break;
+            }
+
+            tokio::select! {
+                _ = loop_timeout.tick() => {
+                    return Err(anyhow::anyhow!("Timeout waiting for execution completion"));
+                }
+
+                // Shell channel for execute_reply
+                shell_res = self.transport.recv("shell") => {
+                    if let Ok(Some(reply_parts)) = shell_res {
+                         if let Some(first_part) = reply_parts.first() {
+                             if let Ok(reply_msg) = self.protocol.parse_message(first_part) {
+                                 if let Some(header) = reply_msg.get("header") {
+                                     if let Some(msg_type) = header.as_object().and_then(|h| h.get("msg_type")).and_then(|v| v.as_str()) {
+                                         if msg_type == "execute_reply" {
+                                             shell_reply_received = true;
+                                             if let Some(content) = reply_msg.get("content") {
+                                                 result_content = format!("Result: {content:?}");
+                                             }
+                                             // Check termination immediate to avoid waiting for next select
+                                             if kernel_is_idle {
+                                                 break;
+                                             }
+                                         }
+                                     }
+                                 }
+                             }
+                         }
+                    }
+                }
+
+                // IOPub channel for stream/display_data and status
+                iopub_res = self.transport.recv("iopub") => {
+                    if let Ok(Some(msg_parts)) = iopub_res {
+                        if let Some(first_part) = msg_parts.first() {
+                            if let Ok(msg) = self.protocol.parse_message(first_part) {
+                                if let Some(header) = msg.get("header") {
+                                    if let Some(msg_type) = header.as_object().and_then(|h| h.get("msg_type")).and_then(|v| v.as_str()) {
+                                        match msg_type {
+                                            "status" => {
+                                                if let Some(content) = msg.get("content") {
+                                                    if let Some(execution_state) = content.get("execution_state").and_then(|s| s.as_str()) {
+                                                        if execution_state == "idle" {
+                                                            kernel_is_idle = true;
+                                                            // Check termination
+                                                            if shell_reply_received {
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "stream" => {
+                                                if let Some(content) = msg.get("content") {
+                                                    if let Some(text) = content.get("text").and_then(|t| t.as_str()) {
+                                                        output_buffer.push_str(text);
+                                                    }
+                                                }
+                                            },
+                                            "error" => {
+                                                if let Some(content) = msg.get("content") {
+                                                    if let Some(ename) = content.get("ename").and_then(|e| e.as_str()) {
+                                                        if let Some(evalue) = content.get("evalue").and_then(|e| e.as_str()) {
+                                                            output_buffer.push_str(&format!("\nError {}: {}\n", ename, evalue));
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                             "display_data" | "execute_result" => {
+                                                if let Some(content) = msg.get("content") {
+                                                    if let Some(data) = content.get("data") {
+                                                        if let Some(plain) = data.get("text/plain").and_then(|t| t.as_str()) {
+                                                            output_buffer.push_str(plain);
+                                                            output_buffer.push('\n');
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
+
+        let final_output = if output_buffer.is_empty() {
+            result_content
+        } else {
+            format!("{}\n\n{}", output_buffer, result_content)
+        };
+
+        Ok(final_output)
     }
 
     /// Send a tool request to the kernel and return the response

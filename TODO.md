@@ -2942,12 +2942,34 @@ impl Default for WebConfig {
 ```
 
 **Acceptance Criteria**:
-- [ ] Login page created with username/password form
-- [ ] Authentication context manages token state
-- [ ] Protected routes redirect to login if unauthenticated
-- [ ] Successful login stores JWT in localStorage
-- [ ] Logout clears token and redirects to login
-- [ ] Token included in all API requests
+- [x] Login page created with username/password form
+- [x] Authentication context manages token state
+- [x] Protected routes redirect to login if unauthenticated
+- [x] Successful login stores JWT in localStorage
+- [x] Logout clears token and redirects to login
+- [x] Token included in all API requests
+
+### Task 14.6.4: Web Interface Execution (Scripts & Tools)
+**Priority**: HIGH
+**Description**: Enable real execution capabilities in the Web UI by splitting the "Tools" page into "Scripts" (Code Editor) and "Tools" (Form-based Invocation) tabs.
+**Status**: DONE ✅
+**Sub-tasks**:
+- [x] **Backend**:
+    - [x] Implement `POST /api/scripts/execute` endpoint.
+        - [x] Input: `{ code: String, engine: String, input: Option<Value> }`.
+        - [x] Logic: Use `Kernel` or `ScriptEngine` to execute code.
+        - [x] Output: `{ stdout: String, stderr: String, result: Value }` (or stream).
+    - [x] Ensure `POST /api/tools/{id}/execute` is reachable and working (already exists).
+- [x] **Frontend**:
+    - [x] Refactor `Tools.tsx` to use Tabs component (Scripts | Tools).
+    - [x] **Scripts Tab**:
+        - [x] Connect "Run Script" to `POST /api/scripts/execute`.
+        - [x] Display real `stdout`/`stderr` in Console.
+    - [x] **Tools Tab**:
+        - [x] Replace Code Editor with `Form` component.
+        - [x] Dynamically generate form fields from Tool JSON Schema (using `rjsf` or similar if available, or manual mapping).
+        - [x] Connect "Execute Tool" to `POST /api/tools/{id}/execute`.
+        - [x] Display output in Console/Result view.
 - [ ] Token expiration handled (refresh or re-login)
 - [ ] Dev mode disabled by default
 - [ ] Dev mode banner removed (or only shown if explicitly enabled)

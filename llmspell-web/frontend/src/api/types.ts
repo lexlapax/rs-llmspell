@@ -166,3 +166,28 @@ export interface AgentCatalogItem {
     category: 'assistant' | 'researcher' | 'coder' | 'data';
     icon?: string;
 }
+
+export interface ExecuteScriptRequest {
+    code: string;
+    engine?: string; // 'lua' | 'javascript'
+}
+
+export interface ExecuteScriptResponse {
+    output: string;
+}
+
+export interface ToolDefinition {
+    name: string;
+    description: string;
+    category: string;
+    schema: Record<string, any>; // JSON Schema
+}
+
+export interface ExecuteToolRequest {
+    parameters: Record<string, any>;
+}
+
+export interface ExecuteToolResponse {
+    output: string;
+}
+
