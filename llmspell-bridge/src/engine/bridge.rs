@@ -100,6 +100,10 @@ pub trait ScriptEngineBridge: Send + Sync {
     /// - Agent creation and execution APIs
     /// - Tool execution APIs
     /// - Workflow execution APIs
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if API injection fails (e.g., runtime initialization issues).
     fn inject_apis(&mut self, deps: &ApiDependencies) -> Result<(), LLMSpellError>;
 
     /// Set a callback for real-time output capture (stdout/stderr)
@@ -107,7 +111,6 @@ pub trait ScriptEngineBridge: Send + Sync {
     /// This allows the kernel to stream output as it happens, rather than
     /// waiting for execution to complete.
     fn set_output_callback(&self, callback: Box<dyn Fn(&str) + Send + Sync>);
-
 
     /// Set script arguments to be made available in the script environment
     ///

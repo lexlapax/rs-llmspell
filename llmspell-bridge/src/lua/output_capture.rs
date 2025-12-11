@@ -8,6 +8,9 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use tracing::{debug, instrument, trace};
 
+/// Type alias for the output callback to reduce complexity
+type OutputCallback = Arc<parking_lot::RwLock<Option<Arc<dyn Fn(&str) + Send + Sync>>>>;
+
 /// Console output collector
 #[derive(Clone)]
 pub struct ConsoleCapture {
@@ -16,7 +19,7 @@ pub struct ConsoleCapture {
     /// Optional debug bridge for routing to debug system
     debug_bridge: Option<Arc<DebugBridge>>,
     /// Optional callback for real-time output streaming
-    output_callback: Arc<parking_lot::RwLock<Option<Arc<dyn Fn(&str) + Send + Sync>>>>,
+    output_callback: OutputCallback,
 }
 
 impl std::fmt::Debug for ConsoleCapture {
@@ -24,7 +27,10 @@ impl std::fmt::Debug for ConsoleCapture {
         f.debug_struct("ConsoleCapture")
             .field("lines", &self.lines)
             .field("debug_bridge", &self.debug_bridge)
-            .field("output_callback", &self.output_callback.read().as_ref().map(|_| "Callback"))
+            .field(
+                "output_callback",
+                &self.output_callback.read().as_ref().map(|_| "Callback"),
+            )
             .finish()
     }
 }
@@ -50,8 +56,7 @@ impl ConsoleCapture {
         }
     }
 
-    /// Set output callback
-    /// Set output callback
+    /// Set output callback for real-time streaming
     pub fn set_output_callback(&self, callback: Arc<dyn Fn(&str) + Send + Sync + 'static>) {
         *self.output_callback.write() = Some(callback);
     }
@@ -68,24 +73,18 @@ impl ConsoleCapture {
     }
 
     /// Add a line to the capture
-    fn add_line(&self, line: String) {
-        // [DEBUG] Log to stderr to verify capture is working
-        eprintln!("[DEBUG] ConsoleCapture::add_line: '{}'", line);
-
+    fn add_line(&self, line: &str) {
         // Route to debug system if available
         if let Some(bridge) = &self.debug_bridge {
-            bridge.log("info", &line, Some("lua.print"));
+            bridge.log("info", line, Some("lua.print"));
         }
 
         // Also capture locally
-        self.lines.lock().push(line.clone());
+        self.lines.lock().push(line.to_string());
 
         // Stream via callback if configured
         if let Some(callback) = self.output_callback.read().as_ref() {
-            eprintln!("[DEBUG] ConsoleCapture: invoking callback");
-            callback(&line);
-        } else {
-            eprintln!("[DEBUG] ConsoleCapture: no callback configured");
+            callback(line);
         }
     }
 }
@@ -137,7 +136,7 @@ pub fn override_print(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> 
         let line = output.join("\t");
 
         // Capture the output
-        capture.add_line(line.clone());
+        capture.add_line(&line);
 
         // Also print to stdout for immediate feedback
         println!("{line}");
@@ -176,7 +175,7 @@ pub fn override_io_functions(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResu
 
         // io.write doesn't add newline
         if !output.is_empty() {
-            capture.add_line(output.clone());
+            capture.add_line(&output);
             print!("{output}");
         }
 
@@ -223,8 +222,8 @@ mod tests {
     fn test_console_capture() {
         let capture = ConsoleCapture::new();
 
-        capture.add_line("Line 1".to_string());
-        capture.add_line("Line 2".to_string());
+        capture.add_line("Line 1");
+        capture.add_line("Line 2");
 
         let lines = capture.get_lines();
         assert_eq!(lines.len(), 2);

@@ -3051,7 +3051,7 @@ async fn test_protected_routes() {
 3. **Quick Win Available**: Dev mode bypass unblocks all functionality
 4. **Architecture Preserved**: Can add production login later without breaking changes
 
-#### 14.6.4.1: Fix Web Output Display (Tools Tab)
+#### 14.6.4.2: Fix Web Output Display (Tools Tab / Scripts Sub-Tab)
 
 **Objective**: Ensure Lua `print("...")` and `io.write("...")` output appears in real-time in the web UI console.
 

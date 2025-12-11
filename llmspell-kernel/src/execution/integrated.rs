@@ -214,7 +214,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Use provided event bus or fallback to SessionManager's bus (Phase 14.6 fix)
         // This ensures WebSocket subscribers (who use SessionManager bus) receive events
-        let effective_event_bus = event_bus.unwrap_or_else(|| (**session_manager.event_bus()).clone());
+        let effective_event_bus =
+            event_bus.unwrap_or_else(|| (**session_manager.event_bus()).clone());
 
         // Create event correlator
         let event_correlator = Arc::new(KernelEventCorrelator::new(
@@ -233,10 +234,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let mut io_manager = EnhancedIOManager::new(io_config, session_id.clone());
 
         // Create IOPub channel for output streaming
-        let (iopub_sender, iopub_receiver) =
-            mpsc::channel::<crate::io::manager::IOPubMessage>(100);
+        let (iopub_sender, iopub_receiver) = mpsc::channel::<crate::io::manager::IOPubMessage>(100);
         io_manager.set_iopub_sender(iopub_sender);
-        
+
         // Inject event correlator for direct broadcasting (fixes blocking IO issue)
         io_manager.set_event_correlator(event_correlator.clone());
 
@@ -293,26 +293,26 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             //  If we block_on in callback, we might block Lua thread.
             //  Better: spawn a task or use try_send if possible.
             //  Standard output shouldn't block kernel logic.
-            
+
             // For now, let's use a fire-and-forget spawn via tokio handle if available
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
                 let io = io_mgr_clone.clone();
                 // Append newline to ensure EnhancedIOManager flushes immediately
                 // otherwise strictly non-newline output sits in buffer
-                let text = format!("{}\n", text);
+                let text = format!("{text}\n");
                 handle.spawn(async move {
                     if let Err(e) = io.write_stdout(&text).await {
                         tracing::warn!("Failed to capture stdout from script: {}", e);
                     }
                 });
             } else {
-                 // Fallback if no runtime (e.g. unit tests or daemon init?)
-                 // Try blocking as last resort
-                 let io = io_mgr_clone.clone();
-                 let text = format!("{}\n", text);
-                 futures::executor::block_on(async move {
+                // Fallback if no runtime (e.g. unit tests or daemon init?)
+                // Try blocking as last resort
+                let io = io_mgr_clone.clone();
+                let text = format!("{text}\n");
+                futures::executor::block_on(async move {
                     let _ = io.write_stdout(&text).await;
-                 });
+                });
             }
         }));
 
@@ -679,15 +679,15 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                             // Ensure flush
                             std::io::Write::flush(&mut std::io::stdout()).ok();
                         }
-                    },
+                    }
                     "execute_result" | "display_data" => {
                         if let Some(data) = msg.content.get("data") {
                             if let Some(text) = data.get("text/plain").and_then(|v| v.as_str()) {
                                 println!("{text}");
                             }
                         }
-                    },
-                     _ => {}
+                    }
+                    _ => {}
                 }
 
                 // 2. Forward to transport if available
@@ -796,17 +796,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 trace!("Checking control channel");
                 let control_msg = if let Some(ref mut transport) = self.transport {
                     // Use timeout to prevent blocking if no message is available
-                    let result = tokio::time::timeout(
-                        Duration::from_millis(1),
-                        transport.recv("control")
-                    ).await;
-                    
+                    let result =
+                        tokio::time::timeout(Duration::from_millis(1), transport.recv("control"))
+                            .await;
+
                     match result {
                         Ok(inner_res) => {
                             trace!("Control recv result: {:?}", inner_res.is_ok());
-                             inner_res.ok().flatten()
-                        },
-                        Err(_) => None // Timeout
+                            inner_res.ok().flatten()
+                        }
+                        Err(_) => None, // Timeout
                     }
                 } else {
                     trace!("No transport for control channel");
@@ -894,11 +893,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 trace!("Checking shell channel");
                 let shell_msg = if let Some(ref mut transport) = self.transport {
                     // Use timeout to prevent blocking
-                    let result = tokio::time::timeout(
-                        Duration::from_millis(1),
-                        transport.recv("shell")
-                    ).await;
-                    
+                    let result =
+                        tokio::time::timeout(Duration::from_millis(1), transport.recv("shell"))
+                            .await;
+
                     match result {
                         Ok(inner_res) => {
                             match &inner_res {
@@ -910,8 +908,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                                 Err(e) => trace!("Shell recv ERROR: {}", e),
                             }
                             inner_res.ok().flatten()
-                        },
-                         Err(_) => None // Timeout
+                        }
+                        Err(_) => None, // Timeout
                     }
                 } else {
                     trace!("No transport for shell channel");
@@ -1045,14 +1043,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // Process Stdin channel for input replies
                 let stdin_msg = if let Some(ref mut transport) = self.transport {
                     // Use timeout to prevent blocking
-                    let result = tokio::time::timeout(
-                        Duration::from_millis(1),
-                        transport.recv("stdin")
-                    ).await;
-                    
+                    let result =
+                        tokio::time::timeout(Duration::from_millis(1), transport.recv("stdin"))
+                            .await;
+
                     match result {
-                         Ok(inner_res) => inner_res.ok().flatten(),
-                         Err(_) => None // Timeout
+                        Ok(inner_res) => inner_res.ok().flatten(),
+                        Err(_) => None, // Timeout
                     }
                 } else {
                     None
@@ -1112,14 +1109,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // Process heartbeat separately (simple echo)
                 let hb_data = if let Some(ref mut transport) = self.transport {
                     // Use timeout to prevent blocking
-                    let result = tokio::time::timeout(
-                        Duration::from_millis(1),
-                        transport.recv("heartbeat")
-                    ).await;
-                    
+                    let result =
+                        tokio::time::timeout(Duration::from_millis(1), transport.recv("heartbeat"))
+                            .await;
+
                     match result {
-                         Ok(inner_res) => inner_res.ok().flatten(),
-                         Err(_) => None // Timeout
+                        Ok(inner_res) => inner_res.ok().flatten(),
+                        Err(_) => None, // Timeout
                     }
                 } else {
                     None
@@ -1668,7 +1664,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     .publish_execute_result(exec_count.try_into().unwrap_or(i32::MAX), data)
                     .await?;
 
-                // CRITICAL: Ensure all side-effect IOPub messages (stdout/stderr/result) are processed 
+                // CRITICAL: Ensure all side-effect IOPub messages (stdout/stderr/result) are processed
                 // and forwarded to transport/EventBus BEFORE sending execute_reply.
                 // This prevents race conditions where reply arrives before output.
                 self.process_iopub_messages().await?;
@@ -1716,7 +1712,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     .write_stderr(&format!("Error: {e}\n"))
                     .await?;
 
-                // CRITICAL: Ensure all side-effect IOPub messages (stdout/stderr/error) are processed 
+                // CRITICAL: Ensure all side-effect IOPub messages (stdout/stderr/error) are processed
                 // and forwarded to transport/EventBus BEFORE sending execute_reply.
                 self.process_iopub_messages().await?;
 
@@ -1811,7 +1807,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Publish idle status
         self.io_manager.publish_status("idle").await?;
-        
+
         // CRITICAL: Flush "idle" status immediately so KernelHandle sees it
         self.process_iopub_messages().await?;
 
@@ -1855,10 +1851,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .await
             .map_err(|e| anyhow::anyhow!("Script execution failed: {e}"))?;
 
-        // Route console output through I/O manager
-        for line in &script_output.console_output {
-            self.io_manager.write_stdout(line).await?;
-        }
+        // Note: Console output is streamed in real-time via the output callback (set at kernel creation).
+        // We do NOT re-send script_output.console_output here to avoid duplicate output.
 
         // Send result as display_data if available
         if script_output.output != serde_json::Value::Null {
@@ -4436,6 +4430,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await;
 
@@ -4460,6 +4455,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4507,6 +4503,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4579,6 +4576,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4627,6 +4625,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4697,6 +4696,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4772,6 +4772,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4826,6 +4827,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4898,6 +4900,7 @@ async fn test_message_handling_performance() -> Result<()> {
         session_manager: create_test_session_manager().await,
         memory_manager: None,
         hook_system: None,
+        event_bus: None,
     })
     .await?;
 
@@ -5011,6 +5014,7 @@ mod daemon_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5042,6 +5046,7 @@ mod daemon_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5079,6 +5084,7 @@ mod daemon_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5166,6 +5172,7 @@ mod daemon_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5200,6 +5207,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5243,6 +5251,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5287,6 +5296,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5300,6 +5310,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5329,6 +5340,7 @@ mod multi_protocol_tests {
                 session_manager: create_test_session_manager().await,
                 memory_manager: None,
                 hook_system: None,
+                event_bus: None,
             })
             .await
             .unwrap(),
@@ -5383,6 +5395,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5421,6 +5434,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5463,6 +5477,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5504,6 +5519,7 @@ mod performance_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5599,6 +5615,7 @@ mod performance_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5647,6 +5664,7 @@ mod performance_tests {
                 session_manager: create_test_session_manager().await,
                 memory_manager: None,
                 hook_system: None,
+                event_bus: None,
             })
             .await
             .unwrap(),
@@ -5705,6 +5723,7 @@ mod performance_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5750,6 +5769,7 @@ mod performance_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5853,6 +5873,7 @@ mod security_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -6000,6 +6021,7 @@ mod security_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -6058,6 +6080,7 @@ mod security_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -6113,6 +6136,7 @@ mod security_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();

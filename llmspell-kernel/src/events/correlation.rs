@@ -440,7 +440,7 @@ impl KernelEventCorrelator {
         event_bus: Option<EventBus>,
     ) -> Self {
         let correlation_tracker = EventCorrelationTracker::with_default_config();
-        let event_bus = event_bus.unwrap_or_else(EventBus::new);
+        let event_bus = event_bus.unwrap_or_default();
         let broadcaster = EventBroadcaster::new(message_router, default_session);
 
         Self {

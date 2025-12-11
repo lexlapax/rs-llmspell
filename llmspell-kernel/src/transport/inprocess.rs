@@ -270,10 +270,7 @@ impl Transport for InProcessTransport {
         };
 
         if let Some(channel_pair) = channel_pair {
-            trace!(
-                "Receiving from channel {}",
-                channel
-            );
+            trace!("Receiving from channel {}", channel);
 
             let mut receiver = channel_pair.receiver.lock().await;
 

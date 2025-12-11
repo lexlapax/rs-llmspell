@@ -28,6 +28,9 @@ export const Tools = () => {
 
     useEffect(() => {
         if (lastMessage && activeTab === 'scripts') {
+            // Debug: log ALL messages
+            console.log('[WS Event]', lastMessage.event_type, lastMessage);
+
             // Handle streaming output from kernel
             if (lastMessage.event_type === 'kernel.iopub.stream') {
                 const content = lastMessage.data?.content;
@@ -76,17 +79,22 @@ export const Tools = () => {
 
             // Ignore specific events to avoid noise
             if (lastMessage.event_type === 'kernel.execute_reply' ||
+                lastMessage.event_type === 'kernel.execute_request' ||
                 lastMessage.event_type === 'kernel.status' ||
+                lastMessage.event_type === 'kernel.status_change' ||
+                lastMessage.event_type === 'kernel.iopub.status' ||
                 lastMessage.event_type === 'kernel.input_request') {
                 return;
             }
 
-            // Fallback: log raw message
-            setScriptLogs(prev => [...prev, {
-                type: 'info',
-                content: JSON.stringify(lastMessage.data),
-                timestamp: Date.now()
-            } as LogEntry]);
+            // Fallback: log raw message (for debugging unexpected events)
+            console.log('[Tools.tsx] Unhandled event type:', lastMessage.event_type, lastMessage);
+            // Don't show raw JSON in console UI - too noisy
+            // setScriptLogs(prev => [...prev, {
+            //     type: 'info',
+            //     content: JSON.stringify(lastMessage.data),
+            //     timestamp: Date.now()
+            // } as LogEntry]);
         }
     }, [lastMessage, activeTab]);
 

@@ -120,6 +120,11 @@ impl EventBus {
         }
 
         // Send to broadcast channel
+        let receiver_count = self.broadcast_tx.receiver_count();
+        info!(
+            "[EVENTBUS] Publishing event {} to {} receivers",
+            event.event_type, receiver_count
+        );
         if self.broadcast_tx.send(event.clone()).is_err() {
             debug!("No broadcast receivers for event: {}", event.event_type);
         }
@@ -191,6 +196,11 @@ impl EventBus {
     /// Get a broadcast receiver for all events
     pub fn subscribe_all(&self) -> broadcast::Receiver<UniversalEvent> {
         self.broadcast_tx.subscribe()
+    }
+
+    /// Get the number of active broadcast receivers
+    pub fn receiver_count(&self) -> usize {
+        self.broadcast_tx.receiver_count()
     }
 
     /// Route an event to matching subscriptions

@@ -14,29 +14,42 @@ pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> 
 }
 
 async fn handle_socket(socket: WebSocket, state: AppState) {
-    info!("WebSocket connection established");
+    info!("[WS] WebSocket connection established");
 
     // Get event bus from kernel -> session manager
     let event_bus = {
         let kernel = state.kernel.lock().await;
-        kernel.session_manager().event_bus().clone()
+        let bus = kernel.session_manager().event_bus();
+        info!(
+            "[WS] Got EventBus from SessionManager, broadcast_tx receiver_count before subscribe: {}",
+            bus.receiver_count()
+        );
+        (**bus).clone()
     };
 
     // Subscribe to all events
     let mut rx = event_bus.subscribe_all();
+    info!(
+        "[WS] Subscribed to EventBus, receiver_count after subscribe: {}",
+        event_bus.receiver_count()
+    );
 
     // Spawn a task to forward events to the websocket
     let (mut sender, mut receiver) = socket.split();
 
     let mut send_task = tokio::spawn(async move {
+        info!("[WS] Send task started, waiting for events...");
         while let Ok(event) = rx.recv().await {
+            info!("[WS] Received event from EventBus: {}", event.event_type);
             // Serialize event to JSON
             if let Ok(json) = serde_json::to_string(&event) {
                 if sender.send(Message::Text(json)).await.is_err() {
+                    info!("[WS] Failed to send event to WebSocket, closing");
                     break;
                 }
             }
         }
+        info!("[WS] Send task ended");
     });
 
     // Wait for the client to disconnect

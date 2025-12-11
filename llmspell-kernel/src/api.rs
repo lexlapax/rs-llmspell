@@ -81,18 +81,17 @@ impl KernelHandle {
 
         let mut output_buffer = String::new();
 
-
         // Wait for execution completion
         // The correct termination condition is receiving 'status: idle' on iopub channel.
         // execute_reply on shell channel provides the execution result metadata.
         let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(30));
         tokio::pin!(timeout);
         let mut kernel_is_idle = false;
-        
+
         loop {
             // Check termination condition at start of loop (in case we updated state)
             if kernel_is_idle {
-               // Optional: could break here if we used idle as signal, but we use execute_reply now
+                // Optional: could break here if we used idle as signal, but we use execute_reply now
             }
 
             tokio::select! {
@@ -122,7 +121,7 @@ impl KernelHandle {
                           }
                      }
                  }
- 
+
                  // IOPub channel for stream/display_data and status
                  iopub_res = self.transport.recv("iopub") => {
                      if let Ok(Some(msg_parts)) = iopub_res {
@@ -185,50 +184,68 @@ impl KernelHandle {
             // Very short timeout to peek for messages
             let drain_res = tokio::time::timeout(
                 tokio::time::Duration::from_millis(50),
-                self.transport.recv("iopub")
-            ).await;
+                self.transport.recv("iopub"),
+            )
+            .await;
 
             match drain_res {
                 Ok(Ok(Some(msg_parts))) => {
                     if let Some(first_part) = msg_parts.first() {
                         if let Ok(msg) = self.protocol.parse_message(first_part) {
                             if let Some(header) = msg.get("header") {
-                                if let Some(msg_type) = header.as_object().and_then(|h| h.get("msg_type")).and_then(|v| v.as_str()) {
+                                if let Some(msg_type) = header
+                                    .as_object()
+                                    .and_then(|h| h.get("msg_type"))
+                                    .and_then(|v| v.as_str())
+                                {
                                     match msg_type {
                                         "stream" => {
                                             if let Some(content) = msg.get("content") {
-                                                if let Some(text) = content.get("text").and_then(|t| t.as_str()) {
+                                                if let Some(text) =
+                                                    content.get("text").and_then(|t| t.as_str())
+                                                {
                                                     output_buffer.push_str(text);
                                                 }
                                             }
-                                        },
+                                        }
                                         "error" => {
                                             if let Some(content) = msg.get("content") {
-                                                if let Some(ename) = content.get("ename").and_then(|e| e.as_str()) {
-                                                    if let Some(evalue) = content.get("evalue").and_then(|e| e.as_str()) {
+                                                if let Some(ename) =
+                                                    content.get("ename").and_then(|e| e.as_str())
+                                                {
+                                                    if let Some(evalue) = content
+                                                        .get("evalue")
+                                                        .and_then(|e| e.as_str())
+                                                    {
                                                         use std::fmt::Write;
-                                                        let _ = write!(output_buffer, "\nError {ename}: {evalue}\n");
+                                                        let _ = write!(
+                                                            output_buffer,
+                                                            "\nError {ename}: {evalue}\n"
+                                                        );
                                                     }
                                                 }
                                             }
-                                        },
-                                         "display_data" | "execute_result" => {
+                                        }
+                                        "display_data" | "execute_result" => {
                                             if let Some(content) = msg.get("content") {
                                                 if let Some(data) = content.get("data") {
-                                                    if let Some(plain) = data.get("text/plain").and_then(|t| t.as_str()) {
+                                                    if let Some(plain) = data
+                                                        .get("text/plain")
+                                                        .and_then(|t| t.as_str())
+                                                    {
                                                         output_buffer.push_str(plain);
                                                         output_buffer.push('\n');
                                                     }
                                                 }
                                             }
-                                        },
+                                        }
                                         _ => {}
                                     }
                                 }
                             }
                         }
                     }
-                },
+                }
                 _ => break, // Timeout or error or empty -> done
             }
         }
