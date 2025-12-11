@@ -120,11 +120,6 @@ impl EventBus {
         }
 
         // Send to broadcast channel
-        let receiver_count = self.broadcast_tx.receiver_count();
-        info!(
-            "[EVENTBUS] Publishing event {} to {} receivers",
-            event.event_type, receiver_count
-        );
         if self.broadcast_tx.send(event.clone()).is_err() {
             debug!("No broadcast receivers for event: {}", event.event_type);
         }

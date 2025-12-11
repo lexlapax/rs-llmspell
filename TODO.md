@@ -3090,4 +3090,134 @@ async fn test_protected_routes() {
 - [x] **Verify End-to-End**: Re-ran `verify_stream_node.js`.
     -   *Result*: **Passed**. Script received `kernel.iopub.stream` messages with "TEST_VERIFICATION_OUTPUT" immediately.
 
-**Status**: ✅ Complete. Real-time output streaming is fully functional.
+6.  **Duplicate Output Fix (Session 2)**:
+    -   *Problem*: Output appeared twice in console - once via real-time callback, once via post-execution `console_output` loop.
+    -   *Root Cause*: `integrated.rs:1854-1857` was re-sending already-streamed output after execution completed.
+    -   *Fix*: Removed the duplicate loop. Output is now only sent via real-time callback.
+    -   *Result*: Single output stream, no duplicates.
+
+7.  **Clippy Compliance**:
+    -   Fixed all clippy warnings without `#[allow]` directives:
+        -   `unwrap_or_else(EventBus::new)` → `unwrap_or_default()`
+        -   Format strings inlined (`format!("{text}\n")`)
+        -   Added missing `# Errors` documentation to `inject_apis` trait method
+        -   Created type alias `OutputCallback` for complex Arc/RwLock type
+        -   Changed `add_line(String)` → `add_line(&str)` to avoid needless pass by value
+        -   Removed debug `eprintln!` statements from `output_capture.rs`
+
+8.  **EventBus Architecture Insights**:
+    -   `broadcast::Sender` clone shares the underlying channel (all clones send to same receivers)
+    -   `EventBus::receiver_count()` added for debugging (shows active WebSocket subscribers)
+    -   Two-kernel architecture: REAL kernel (spawned, executes code) and DUMMY kernel (in KernelHandle for API)
+    -   Both share same `SessionManager` Arc, thus same `EventBus` broadcast channel
+    -   Event flow: `Lua print() → ConsoleCapture → output callback → io_manager.write_stdout() → EventCorrelator.track_event() → EventBus.publish() → WebSocket.recv()`
+
+**Status**: ✅ Complete. Real-time output streaming is fully functional. Verification: `node verify_stream_node.js` → SUCCESS.
+
+#### 14.6.5: Remove Dummy Kernel Architecture (KernelHandle Simplification)
+
+**Objective**: Eliminate the wasteful "dummy kernel" pattern in `KernelHandle` by replacing it with direct Arc references.
+
+**Problem Analysis**:
+
+The current `create_embedded_kernel()` in `api.rs` creates TWO `IntegratedKernel` instances:
+1. **REAL kernel** (lines 1454-1465): Spawned in background, processes code execution
+2. **DUMMY kernel** (lines 1487-1498): Stored in `KernelHandle`, only used for accessor methods
+
+The dummy kernel is wasteful because `IntegratedKernel::new()` creates ~10 heavy components:
+- MessageRouter (with history buffer)
+- KernelEventCorrelator (subscribes to EventBus!)
+- EnhancedIOManager (creates mpsc channels!)
+- KernelState (memory backend allocation)
+- ExecutionManager + DAPBridge
+- TracingInstrumentation + HealthMonitor
+- ShutdownCoordinator + SignalBridge
+
+**All of these are NEVER used** - the dummy kernel only exists to provide access to:
+- `session_manager()` → returns `&self.kernel.session_manager`
+- `memory_manager()` → returns `&self.kernel.memory_manager`
+- `component_registry()` → returns `self.kernel.script_executor.component_registry()`
+
+**Why This Matters**:
+1. **Memory waste**: Duplicate allocations for unused components
+2. **Potential bugs**: Dummy's EventCorrelator subscribes to EventBus - could interfere
+3. **Code confusion**: "dummy-{session_id}" in logs, comments saying "won't be used"
+4. **Performance**: Slower kernel handle creation (50% more components)
+
+**Solution**:
+
+Replace the dummy kernel with direct Arc references in `KernelHandle`:
+
+```rust
+// BEFORE
+pub struct KernelHandle {
+    kernel: IntegratedKernel<JupyterProtocol>,  // FULL KERNEL - wasteful
+    kernel_id: String,
+    transport: Arc<InProcessTransport>,
+    protocol: JupyterProtocol,
+}
+
+// AFTER
+pub struct KernelHandle {
+    kernel_id: String,
+    transport: Arc<InProcessTransport>,
+    protocol: JupyterProtocol,
+    session_manager: Arc<SessionManager>,
+    memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+    script_executor: Arc<dyn ScriptExecutor>,  // For component_registry()
+}
+```
+
+**Implementation Tasks**:
+
+- [ ] **1. Update KernelHandle struct** (`api.rs:40-46`):
+    - Remove `kernel: IntegratedKernel<JupyterProtocol>` field
+    - Add `session_manager: Arc<SessionManager>`
+    - Add `memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>`
+    - Add `script_executor: Arc<dyn ScriptExecutor>`
+
+- [ ] **2. Update accessor methods** (`api.rs:734-749`):
+    - `session_manager()` → return `&self.session_manager`
+    - `memory_manager()` → return `self.memory_manager.as_ref()`
+    - `component_registry()` → return `self.script_executor.component_registry()`
+
+- [ ] **3. Remove unused methods**:
+    - `run(self)` - Never called for embedded mode (line 54-57)
+    - `into_kernel(self)` - No kernel to return (line 730-732)
+
+- [ ] **4. Update create_embedded_kernel()** (`api.rs:1487-1509`):
+    - Remove dummy kernel creation entirely
+    - Construct KernelHandle with direct Arc references:
+      ```rust
+      let handle = KernelHandle {
+          kernel_id: kernel_id.clone(),
+          transport: Arc::new(client_transport),
+          protocol,
+          session_manager: session_manager_clone,
+          memory_manager: None,
+          script_executor: script_executor_clone,
+      };
+      ```
+
+- [ ] **5. Fix any compilation errors** from removed methods/fields
+
+- [ ] **6. Run quality checks**:
+    - `cargo clippy --workspace --all-targets --all-features` → 0 warnings
+    - `cargo test --workspace` → all pass
+    - `node verify_stream_node.js` → SUCCESS
+
+- [ ] **7. Update tests** if any relied on `into_kernel()` or `run()`
+
+**Files to Modify**:
+- `llmspell-kernel/src/api.rs` - Main changes
+
+**Impact Assessment**:
+| Aspect | Impact |
+|--------|--------|
+| API Breaking | Minor - `run()` and `into_kernel()` removed |
+| Memory | Reduced - no duplicate kernel allocations |
+| Performance | Faster startup - 50% fewer components created |
+| Correctness | Improved - no potential EventBus interference |
+| Code clarity | Better - no confusing "dummy" concept |
+
+**Status**: 🔴 Not Started
