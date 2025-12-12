@@ -15,25 +15,15 @@ import { Login } from './pages/Login';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-
-
-import { AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+import { DevBanner } from './components/DevBanner';
 
 const queryClient = new QueryClient();
 
 function App() {
-  const [devMode] = useState(true); // Default to true in Phase 1
-
   return (
     <QueryClientProvider client={queryClient}>
-      {devMode && (
-        <div className="dev-mode-banner">
-          <AlertTriangle className="w-4 h-4" />
-          <span>Development Mode - Authentication Disabled</span>
-        </div>
-      )}
       <AuthProvider>
+        <DevBanner />
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />

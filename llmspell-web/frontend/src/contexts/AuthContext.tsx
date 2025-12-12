@@ -5,12 +5,16 @@ interface AuthContextType {
     token: string | null;
     login: (token: string) => void;
     logout: () => void;
+    devMode: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+
+    // Detect dev mode from Vite environment
+    const devMode = import.meta.env.MODE === 'development';
 
     useEffect(() => {
         // Sync state if localStorage changes (e.g. other tabs)
@@ -32,10 +36,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const value = {
-        isAuthenticated: !!token,
+        isAuthenticated: devMode || !!token,
         token,
         login,
-        logout
+        logout,
+        devMode
     };
 
     return (
@@ -45,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {

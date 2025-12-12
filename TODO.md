@@ -3783,3 +3783,476 @@ let db_path = "llmspell.db";  // Relative to cwd - causes conflicts!
 1.  **Robust Path Resolution**: The centralized `resolve_storage_paths` logic in `llmspell-config` eliminated bespoke path handling in downstream components, ensuring consistent behavior across CLI, Web, and Daemon modes.
 2.  **Concurrency Solved**: By enforcing strict WAL mode (`journal_mode=WAL`) and `busy_timeout` in the connection pool, combined with correct absolute path resolution, we successfully enabled concurrent access between the Web Server and CLI tools without file locking issues.
 3.  **Daemon Mode Safety**: Explicit absolute paths in the `daemon` profile (e.g., `/var/lib/llmspell`) prevent "current working directory" confusion when running as a system service.
+
+----
+
+#### 14.6.8: Fix Frontend Development Mode Authentication Bypass
+
+**Problem Statement**:
+
+When starting the web server with development mode enabled (default behavior), users are incorrectly redirected to the login page despite the backend properly bypassing authentication. This breaks the intended development workflow where developers should be able to access the application without authentication.
+
+**Symptom**:
+```bash
+# Start web server (dev_mode defaults to true)
+./target/debug/llmspell web start -p openai-prod
+
+# Backend logs show dev mode is active:
+# "⚠️  DEVELOPMENT MODE ENABLED - Authentication is bypassed!"
+
+# But accessing http://localhost:3000 redirects to /login
+# Users cannot access the application without logging in
+```
+
+**Root Cause Analysis**:
+
+1. **Backend**: ✅ Correctly implements dev_mode bypass
+   - `llmspell-web/src/middleware/auth.rs:26-32` bypasses all auth checks when `state.config.dev_mode = true`
+   - `llmspell-web/src/config.rs:21-23` defaults `dev_mode = true` unless `LLMSPELL_WEB_DEV_MODE=false`
+   - Backend logs warning on startup and per-request
+
+2. **Frontend**: ❌ No awareness of backend dev_mode
+   - `ProtectedRoute.tsx:15` always checks `isAuthenticated` and redirects to `/login`
+   - `AuthContext.tsx:35` only considers users authenticated if `!!token` (localStorage)
+   - `App.tsx:26` has hardcoded `devMode = true` for banner display only
+   - No mechanism for frontend to know backend's actual dev_mode state
+
+3. **Communication Gap**: ❌ No way for frontend to detect backend dev_mode
+   - No environment variable checked (e.g., `import.meta.env.VITE_DEV_MODE`)
+   - `/health` endpoint doesn't expose dev_mode status
+   - No API call to check server configuration
+
+**Historical Context**:
+
+This issue was introduced during Task 14.6.3 (Production Authentication). The task description said "Remove/disable development mode bypass" (Goal #5), which was misinterpreted as removing frontend dev_mode awareness entirely. The intended meaning was to implement production authentication while preserving dev_mode for development workflow.
+
+Task 14.6.2 (Development Mode Bypass - Phase 1) specified adding a dev_mode banner to the frontend (lines 2568-2609), but never specified making ProtectedRoute dev_mode aware. This oversight carried forward to 14.6.3.
+
+**Design Decision**: Use Environment Variable Approach
+
+We'll use Vite's `import.meta.env.MODE` which automatically provides `'development'` or `'production'` based on how the frontend is built. This is cleaner than:
+- Adding a `/api/dev-mode` endpoint (extra API surface)
+- Checking backend health endpoint (requires API call on every page load)
+- Using custom environment variables (requires manual coordination)
+
+The frontend dev mode should match the backend dev mode: both are enabled during development (`npm run dev` / default backend config) and disabled in production (`npm run build` / `LLMSPELL_WEB_DEV_MODE=false`).
+
+----
+
+**Implementation Tasks**:
+
+##### Phase 1: Frontend Dev Mode Detection
+
+**1.1 Update AuthContext to Support Dev Mode**
+
+**File**: `frontend/src/contexts/AuthContext.tsx`
+
+**Changes**:
+```typescript
+interface AuthContextType {
+    isAuthenticated: boolean;
+    token: string | null;
+    login: (token: string) => void;
+    logout: () => void;
+    devMode: boolean;  // NEW
+}
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+    const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+
+    // Detect dev mode from Vite environment
+    const devMode = import.meta.env.MODE === 'development';
+
+    useEffect(() => {
+        // Sync state if localStorage changes (e.g. other tabs)
+        const handleStorageChange = () => {
+            setToken(localStorage.getItem('token'));
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
+    const login = (newToken: string) => {
+        localStorage.setItem('token', newToken);
+        setToken(newToken);
+    };
+
+    const logout = () => {
+        localStorage.removeItem('token');
+        setToken(null);
+    };
+
+    const value = {
+        isAuthenticated: devMode || !!token,  // CHANGED: dev mode bypasses token check
+        token,
+        login,
+        logout,
+        devMode,  // NEW
+    };
+
+    return (
+        <AuthContext.Provider value={value}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+```
+
+**Rationale**:
+- `import.meta.env.MODE` is automatically set by Vite (`'development'` for `npm run dev`, `'production'` for `npm run build`)
+- `isAuthenticated: devMode || !!token` allows access in dev mode without a token
+- Exposing `devMode` in context allows other components to conditionally render dev-only features
+
+**1.2 Update ProtectedRoute to Use Dev Mode**
+
+**File**: `frontend/src/components/ProtectedRoute.tsx`
+
+**Changes**:
+```typescript
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { type ReactNode } from 'react';
+
+export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
+    const { isAuthenticated, devMode } = useAuth();
+    const location = useLocation();
+
+    // In development mode, backend bypasses authentication
+    // Frontend should mirror this behavior to avoid login redirects
+    if (devMode) {
+        return <>{children}</>;
+    }
+
+    if (!isAuthenticated) {
+        // Redirect to login page, but save the current location they were trying to go to
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    return <>{children}</>;
+};
+```
+
+**Rationale**:
+- Explicit dev mode check makes the bypass logic clear
+- Matches backend behavior (auth middleware bypass when dev_mode=true)
+- Production builds (`npm run build`) will have `devMode=false` and enforce authentication
+
+**1.3 Update App.tsx Dev Mode Banner**
+
+**File**: `frontend/src/App.tsx`
+
+**Changes**:
+```typescript
+import { useAuth } from './contexts/AuthContext';
+
+function App() {
+  const { devMode } = useAuth();  // CHANGED: use actual dev mode from context
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {devMode && (
+        <div className="dev-mode-banner">
+          <AlertTriangle className="w-4 h-4" />
+          <span>Development Mode - Authentication Disabled</span>
+        </div>
+      )}
+      <AuthProvider>
+        {/* ... rest of app ... */}
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
+```
+
+**Rationale**:
+- Remove hardcoded `useState(true)`
+- Banner now reflects actual dev mode state
+- Will automatically hide in production builds
+
+##### Phase 2: Validation & Testing
+
+**2.1 Add Type Declarations for Vite Environment**
+
+**File**: `frontend/src/vite-env.d.ts` (should already exist)
+
+**Verify it includes**:
+```typescript
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly MODE: string;
+  // Add other env variables here if needed
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+```
+
+**2.2 Update Frontend README**
+
+**File**: `frontend/README.md` (create if doesn't exist)
+
+**Add section**:
+```markdown
+## Development Mode
+
+The frontend automatically detects development mode via Vite's `import.meta.env.MODE`:
+
+- **Development** (`npm run dev`): `MODE = 'development'`
+  - Authentication bypassed (matches backend dev_mode=true)
+  - Dev mode banner visible
+  - No token required to access protected routes
+
+- **Production** (`npm run build`): `MODE = 'production'`
+  - Full authentication required
+  - Users must log in with API key
+  - No dev mode banner
+
+To test production mode locally:
+```bash
+npm run build
+npm run preview  # Serves production build
+```
+
+To disable backend dev mode:
+```bash
+LLMSPELL_WEB_DEV_MODE=false ./target/debug/llmspell web start
+```
+```
+
+----
+
+**Validation Steps**:
+
+**V1: Development Mode (Default)**
+```bash
+# Terminal 1: Start backend (dev mode enabled by default)
+cargo build
+./target/debug/llmspell web start -p openai-prod
+
+# Should see: "⚠️  DEVELOPMENT MODE ENABLED - Authentication is bypassed!"
+
+# Terminal 2: Start frontend dev server
+cd llmspell-web/frontend
+npm run dev
+
+# Browser: http://localhost:5173
+# Expected:
+# - Orange dev mode banner visible at top
+# - Dashboard loads immediately WITHOUT redirect to /login
+# - No authentication required
+# - Can navigate to all tabs (Dashboard, Tools, Sessions, Config, etc.)
+```
+
+**V2: Production Mode (Frontend Only)**
+```bash
+# Terminal 1: Backend still in dev mode
+./target/debug/llmspell web start -p openai-prod
+
+# Terminal 2: Build and serve production frontend
+cd llmspell-web/frontend
+npm run build
+npm run preview
+
+# Browser: http://localhost:4173
+# Expected:
+# - NO dev mode banner
+# - Redirects to /login immediately
+# - Must enter API key to access dashboard
+# - After login, can access all protected routes
+```
+
+**V3: Production Mode (Both Backend and Frontend)**
+```bash
+# Terminal 1: Backend with dev mode disabled
+LLMSPELL_WEB_DEV_MODE=false ./target/debug/llmspell web start -p openai-prod
+
+# Should see: "Production mode - Authentication required"
+# Should see: API keys printed to stdout
+
+# Terminal 2: Production frontend
+cd llmspell-web/frontend
+npm run build
+npm run preview
+
+# Browser: http://localhost:4173
+# Expected:
+# - NO dev mode banner
+# - Redirects to /login
+# - Must use API key from stdout to log in
+# - After login, full access to application
+```
+
+**V4: Mixed Mode Warning (Frontend Dev, Backend Prod)**
+```bash
+# Terminal 1: Backend production mode
+LLMSPELL_WEB_DEV_MODE=false ./target/debug/llmspell web start -p openai-prod
+
+# Terminal 2: Frontend dev mode
+cd llmspell-web/frontend
+npm run dev
+
+# Browser: http://localhost:5173
+# Expected:
+# - Dev mode banner SHOWS (frontend thinks it's dev mode)
+# - Dashboard loads without redirect (frontend bypasses auth)
+# - API calls return 401 errors (backend enforces auth)
+# - This is EXPECTED behavior - mismatched configuration
+# - User should align both modes
+```
+
+**V5: Embedded Frontend (Production Binary)**
+```bash
+# Build production frontend
+cd llmspell-web/frontend
+npm run build
+
+# Build Rust with embedded frontend
+cargo build --release
+
+# Run in production mode
+LLMSPELL_WEB_DEV_MODE=false ./target/release/llmspell web start -p openai-prod
+
+# Browser: http://localhost:3000
+# Expected:
+# - Serves embedded frontend assets
+# - NO dev mode banner
+# - Redirects to /login
+# - Requires API key authentication
+# - Full production security enabled
+```
+
+**V6: TypeScript Compilation**
+```bash
+cd llmspell-web/frontend
+npm run type-check  # or tsc --noEmit
+# Expected: No type errors
+```
+
+**V7: Linting**
+```bash
+cd llmspell-web/frontend
+npm run lint
+# Expected: No lint errors
+```
+
+----
+
+**Verification Checklist**:
+
+**Frontend Changes**:
+- [x] `AuthContext.tsx` adds `devMode` field to context
+- [x] `AuthContext.tsx` detects dev mode via `import.meta.env.MODE`
+- [x] `AuthContext.tsx` sets `isAuthenticated = devMode || !!token`
+- [x] `ProtectedRoute.tsx` imports `devMode` from `useAuth()`
+- [x] `ProtectedRoute.tsx` bypasses redirect when `devMode=true`
+- [x] `App.tsx` uses `devMode` from context instead of hardcoded state
+- [x] `vite-env.d.ts` includes type declarations for `import.meta.env`
+
+**Build & Type Safety**:
+- [x] `npm run type-check` passes (no TypeScript errors)
+- [x] `npm run lint` passes (no ESLint warnings)
+- [x] `npm run build` succeeds
+- [x] `npm run dev` works correctly
+
+**Behavior Tests**:
+- [x] **V1**: Dev mode frontend + dev mode backend = no login required ✅
+- [x] **V2**: Prod mode frontend + dev mode backend = login required ✅
+- [x] **V3**: Prod mode frontend + prod mode backend = login required + API auth works ✅
+- [x] **V4**: Dev mode frontend + prod mode backend = loads but API fails (expected) ✅
+- [x] **V5**: Embedded frontend production build = full auth enforcement ✅
+- [x] Dev mode banner shows only in development mode
+- [x] Dev mode banner hides in production builds
+- [x] Protected routes accessible without token in dev mode
+- [x] Protected routes redirect to /login in production mode
+- [x] Login flow works correctly in production mode
+- [x] Logout clears token and redirects to login
+
+**Regression Tests**:
+- [x] Existing auth tests still pass
+- [x] API key authentication still works in production
+- [x] JWT token authentication still works in production
+- [x] Session management unchanged
+- [x] WebSocket connections work in both modes
+- [x] No console errors in browser DevTools
+- [x] No security regressions (dev mode only enabled when appropriate)
+
+**Quality Standards**:
+- [x] Zero TypeScript errors
+- [x] Zero ESLint warnings
+- [x] No hardcoded dev mode values
+- [x] Clear comments explaining dev mode logic
+- [x] README documentation updated
+- [x] No breaking changes to production authentication
+- [x] Backend dev_mode and frontend dev mode stay aligned during normal usage
+
+----
+
+**Files to Modify**:
+
+| File | Changes | Lines Affected |
+|------|---------|----------------|
+| `frontend/src/contexts/AuthContext.tsx` | Add `devMode` field, detect via `import.meta.env.MODE`, update `isAuthenticated` logic | ~10-15 |
+| `frontend/src/components/ProtectedRoute.tsx` | Add dev mode bypass check before redirect | ~5 |
+| `frontend/src/App.tsx` | Use `devMode` from context instead of hardcoded state | ~3 |
+| `frontend/src/vite-env.d.ts` | Verify type declarations exist (should be auto-generated) | 0 (verify only) |
+| `frontend/README.md` | Add development mode documentation section | +20 (new content) |
+
+**Total**: 5 files, ~40 lines changed
+
+----
+
+**Acceptance Criteria**:
+
+✅ **Core Functionality**:
+1. Frontend dev server (`npm run dev`) allows access without login
+2. Production build (`npm run build`) requires authentication
+3. Dev mode banner appears only in development builds
+4. `isAuthenticated` returns `true` in dev mode without token
+5. `ProtectedRoute` allows access in dev mode
+6. Backend dev_mode and frontend dev mode aligned by default
+
+✅ **User Experience**:
+7. Developers can `npm run dev` and immediately access the app
+8. Production deployments require API key login
+9. Clear visual indicator (banner) when auth is disabled
+10. No breaking changes to existing login/logout flow
+
+✅ **Code Quality**:
+11. TypeScript compilation succeeds
+12. ESLint passes with zero warnings
+13. No hardcoded boolean values
+14. Clear code comments explaining dev mode logic
+15. README documents dev mode behavior
+
+✅ **Testing**:
+16. All 7 validation scenarios (V1-V7) pass
+17. No regression in existing authentication tests
+18. Browser console shows no errors
+19. Embedded frontend works in production mode
+
+----
+
+**Security Considerations**:
+
+1. **Production Safety**: `npm run build` ALWAYS produces a production build with `MODE='production'`, ensuring authentication cannot be accidentally disabled in production deployments.
+
+2. **No Runtime Toggle**: Dev mode is determined at build time (Vite environment), not runtime configuration. This prevents accidental exposure of unauthenticated production deployments.
+
+3. **Clear Indication**: Dev mode banner provides visual warning that authentication is disabled.
+
+4. **Backend Alignment**: Frontend dev mode detection mirrors backend behavior (both use development defaults, both require explicit production configuration).
+
+5. **No Security Bypass in Production**: Even if someone modifies the frontend code to bypass auth, the backend still enforces authentication in production mode (`LLMSPELL_WEB_DEV_MODE=false`).
+
+----
+
+**Status**: ✅ **COMPLETE**
+
+**Implementation Insights**:
+- ✅ **Vite Environment Integration**: Leveraged `import.meta.env.MODE` for zero-cost build-time dev mode detection.
+- ✅ **Type Safety**: Added `vite-env.d.ts` to ensure strict typing for environment variables.
+- ✅ **UX Improvement**: `DevBanner.tsx` provides clear context awareness without polluting production builds.
+- ✅ **Architecture**: Refactored `App.tsx` context nesting to fix provider/consumer dependency pattern.
+- ✅ **Backend Parity**: Frontend now correctly mirrors the backend's default development posture.
