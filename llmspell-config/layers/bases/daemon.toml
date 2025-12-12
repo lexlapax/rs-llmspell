@@ -93,3 +93,8 @@ emit_state_events = true
 
 [events.export]
 file = "/var/log/llmspell/events.jsonl"
+
+[storage]
+base_dir = "/var/lib/llmspell"
+database_path = "/var/lib/llmspell/data/llmspell.db"
+sessions_dir = "/var/lib/llmspell/sessions"

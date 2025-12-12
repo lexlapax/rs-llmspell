@@ -8,12 +8,13 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 ## Critical References
 - **Architecture**: `/docs/technical/master-architecture-vision.md`
 - **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (23+ phase roadmap)
-- **Current Status**: v0.14.0 - Phase 13c Complete (Storage Consolidation & Usability)
+- **Current Status**: v0.14.x - Phase 14 In Progress (Web Interface - through 14.6.7)
 - **Phase 13c Design**: `/docs/in-progress/phase-13c-design-doc.md` (Storage Consolidation)
 - **Phase 13c Completion**: `/docs/in-progress/PHASE13c-DONE.md` (Detailed implementation notes)
+- **Phase 14 Design**: `/docs/in-progress/phase-14-design-doc.md` (Web Interface)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
-## Current Status (Phase 14 - NEXT)
+## Current Status (Phase 14 - In Progress)
 - ✅ **Phases 7-13c**: Complete
 - ✅ **Phase 13c**: Storage Consolidation & Usability → v0.14.0 COMPLETE
   - ✅ 13c.1: Dependencies cleanup (10+ deps removed)
@@ -23,7 +24,17 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
   - ✅ 13c.3: Trait Centralization (3,714 lines to llmspell-core)
   - ✅ 13c.4: Profile System Overhaul (18 layers + 20 presets)
   - ✅ 13c.5-13c.8: Examples, Validation, Documentation, Release
-- ⏳ **Phase 14**: Web Interface (HTTP API + Web UI + WebSocket) (NEXT)
+- ⏳ **Phase 14**: Web Interface (HTTP API + Web UI + WebSocket) (IN PROGRESS)
+  - ✅ 14.1: Foundation & Crate Setup (llmspell-web crate, Axum server)
+  - ✅ 14.2: HTTP Backend Implementation (REST API, WebSocket streaming)
+  - ✅ 14.3: Frontend Integration (React/Vite, Monaco editor, embedded UI)
+  - ✅ 14.4: Security & Daemon Integration (API Key/JWT auth, CLI lifecycle)
+  - ✅ 14.5: Testing & Documentation (Integration tests, real config management)
+  - ✅ 14.6.4.1: Scripts Execution Tab (Web console output)
+  - ✅ 14.6.4.2: Fix Web Output Display (Real-time Lua print streaming)
+  - ✅ 14.6.5: Kernel Execution Mode Refactoring (Eliminate dual waste)
+  - ✅ 14.6.6: Fix Verbose Debug Output (rig-core 0.25→0.26 upgrade)
+  - ✅ 14.6.7: Proper Database Path Configuration (WAL mode, home directory fallback)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
@@ -85,6 +96,7 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - `llmspell-context`: Context engineering pipeline (Phase 13)
 - `llmspell-bridge`: Script language integration
 - `llmspell-storage`: State management and persistence (Phase 13c)
+- `llmspell-web`: HTTP/WebSocket API server with embedded React UI (Phase 14)
 - `llmspell-utils`: Shared utilities (use for ALL shared code)
 - `llmspell-state-persistence`: State with persistence
 - `llmspell-hooks`: Hook system with replay
@@ -99,6 +111,7 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 4. Update TODO.md sub-tasks as completed
 
 ## Recent Releases
+- **v0.14.x** (In Progress): Web interface (HTTP API, WebSocket streaming, React UI, daemon mode), database path configuration, kernel execution mode refactoring
 - **v0.14.0**: Storage consolidation (SQLite unified), vectorlite-rs HNSW, layer-based profiles, 635+ tests
 - **v0.13.0**: 3-tier memory, hot-swap backends, context engineering, 149 tests
 - **v0.12.0**: 10 templates, multi-agent workflows, CLI+Lua

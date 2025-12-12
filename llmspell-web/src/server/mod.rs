@@ -83,9 +83,37 @@ impl WebServer {
         let _ = runtime_config.load_from_env();
 
         // Initialize Storage for Config Persistence (Task 14.5.1e)
-        // Assume default DB path for now, matching kernel default if possible
-        // Ideally this should come from config or shared constant
-        let db_path = "llmspell.db";
+        // Load full configuration to get resolved paths
+        let mut llm_config = if let Some(path) = &config_path {
+            match llmspell_config::LLMSpellConfig::load_from_file(path).await {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("Failed to load config file {:?}: {}", path, e);
+                    llmspell_config::LLMSpellConfig::default()
+                }
+            }
+        } else {
+            llmspell_config::LLMSpellConfig::default()
+        };
+
+        // Apply env overrides and resolve paths
+        if let Err(e) = llm_config.apply_env_registry() {
+            warn!("Failed to apply environment overrides: {}", e);
+        }
+        if let Err(e) = llm_config.resolve_storage_paths() {
+            warn!("Failed to resolve storage paths: {}", e);
+        }
+
+        let db_path = llm_config.database_path();
+        info!("Using database path: {:?}", db_path);
+
+        // Ensure parent directory exists
+        if let Some(parent) = db_path.parent() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                warn!("Failed to create database directory {:?}: {}", parent, e);
+            }
+        }
+
         let sqlite_config = llmspell_storage::backends::sqlite::SqliteConfig::new(db_path);
 
         let config_store =

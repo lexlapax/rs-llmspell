@@ -45,6 +45,7 @@ sessions/
 *.exe
 *.pdb
 *.lib
+*.hnsw
 
 # Example generated artifacts (Phase 13c.5.4)
 examples/script-users/applications/*/generated/

@@ -19,6 +19,13 @@ features = [
 name = "SQLite Backend"
 description = "Persistent storage using libsql with vectorlite-rs integration"
 
+[storage]
+# Defaults to ~/.llmspell if not set
+# base_dir will be resolved relative to home
+
+[storage.sqlite]
+journal_mode = "WAL"
+
 [runtime.state_persistence]
 enabled = true
 backend_type = "sqlite"

@@ -11,6 +11,9 @@ pub fn register_standard_vars(registry: &EnvRegistry) -> Result<(), String> {
     // State Persistence Variables
     register_state_vars(registry)?;
 
+    // Storage Path Variables
+    register_storage_vars(registry)?;
+
     // Provider Configuration Variables
     register_provider_vars(registry)?;
 
@@ -240,6 +243,36 @@ fn register_state_vars(registry: &EnvRegistry) -> Result<(), String> {
                     .map(|_| ())
                     .map_err(|e| format!("Invalid size: {}", e))
             })
+            .build(),
+    )?;
+
+    Ok(())
+}
+
+/// Register storage path environment variables
+fn register_storage_vars(registry: &EnvRegistry) -> Result<(), String> {
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_STORAGE_BASE_DIR")
+            .description("Base directory for storage")
+            .category(EnvCategory::Path)
+            .config_path("storage.base_dir")
+            .default("~/.llmspell")
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_STORAGE_DATABASE_PATH")
+            .description("Path to main SQLite database")
+            .category(EnvCategory::Path)
+            .config_path("storage.database_path")
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_STORAGE_SESSIONS_DIR")
+            .description("Directory for session storage")
+            .category(EnvCategory::Path)
+            .config_path("storage.sessions_dir")
             .build(),
     )?;
 

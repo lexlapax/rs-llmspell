@@ -22,6 +22,39 @@ pub use crate::rag::{
 };
 pub use crate::tools::{FileOperationsConfig, ToolsConfig};
 
+/// Storage configuration
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(default)]
+pub struct StorageConfig {
+    /// Base directory for all storage (defaults to ~/.llmspell)
+    pub base_dir: Option<PathBuf>,
+    /// Path to the main database file
+    pub database_path: Option<PathBuf>,
+    /// Path to the sessions directory
+    pub sessions_dir: Option<PathBuf>,
+    /// SQLite specific configuration
+    pub sqlite: Option<SqliteStorageConfig>,
+}
+
+/// SQLite specific storage configuration
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct SqliteStorageConfig {
+    /// Path override specific to SQLite backend
+    pub database_path: Option<PathBuf>,
+    /// SQLite journal mode (WAL, DELETE, etc.)
+    pub journal_mode: Option<String>,
+}
+
+impl Default for SqliteStorageConfig {
+    fn default() -> Self {
+        Self {
+            database_path: None,
+            journal_mode: Some("WAL".to_string()),
+        }
+    }
+}
+
 pub mod debug;
 pub mod engines;
 pub mod env;
@@ -36,6 +69,22 @@ pub mod providers;
 pub mod rag;
 pub mod tools;
 pub mod validation;
+
+/// Helper to expand ~ in paths
+fn resolve_path(path: &Path, home_dir: Option<&PathBuf>) -> PathBuf {
+    if let Ok(stripped) = path.strip_prefix("~") {
+        if let Some(home) = home_dir {
+            return home.join(stripped);
+        }
+    } else if let Some(path_str) = path.to_str() {
+        if let Some(stripped) = path_str.strip_prefix("~/") {
+            if let Some(home) = home_dir {
+                return home.join(stripped);
+            }
+        }
+    }
+    path.to_path_buf()
+}
 
 use crate::env_registry::register_standard_vars;
 
@@ -95,6 +144,8 @@ pub struct LLMSpellConfig {
     pub debug: DebugConfig,
     /// RAG (Retrieval-Augmented Generation) configuration
     pub rag: RAGConfig,
+    /// Storage configuration
+    pub storage: StorageConfig,
 }
 
 impl Default for LLMSpellConfig {
@@ -109,6 +160,7 @@ impl Default for LLMSpellConfig {
             events: EventsConfig::default(),
             debug: DebugConfig::default(),
             rag: RAGConfig::default(),
+            storage: StorageConfig::default(),
         }
     }
 }
@@ -135,6 +187,7 @@ impl LLMSpellConfig {
 
         // Use registry for environment overrides
         config.apply_env_registry()?;
+        config.resolve_storage_paths()?;
         config.validate()?;
 
         Ok(config)
@@ -160,6 +213,76 @@ impl LLMSpellConfig {
         self.merge_from_json_impl(&env_config)?;
 
         Ok(())
+    }
+
+    /// Resolve all storage paths, expanding ~ and handling defaults
+    pub fn resolve_storage_paths(&mut self) -> Result<(), ConfigError> {
+        // Helper to get home directory
+        let home_dir = std_env::var("HOME")
+            .or_else(|_| std_env::var("USERPROFILE"))
+            .ok()
+            .map(PathBuf::from);
+
+        // 1. Resolve base_dir
+        let base_dir = if let Some(base) = &self.storage.base_dir {
+            resolve_path(base, home_dir.as_ref())
+        } else if let Some(home) = &home_dir {
+            home.join(".llmspell")
+        } else {
+            // Fallback to current directory if no home
+            PathBuf::from(".llmspell")
+        };
+        self.storage.base_dir = Some(base_dir.clone());
+
+        // 2. Resolve database_path
+        if let Some(db_path) = &self.storage.database_path {
+            self.storage.database_path = Some(resolve_path(db_path, home_dir.as_ref()));
+        } else {
+            // Default: base_dir/data/llmspell.db
+            self.storage.database_path = Some(base_dir.join("data").join("llmspell.db"));
+        }
+
+        // 3. Resolve sessions_dir
+        if let Some(sessions_path) = &self.storage.sessions_dir {
+            self.storage.sessions_dir = Some(resolve_path(sessions_path, home_dir.as_ref()));
+        } else {
+            // Default: base_dir/sessions
+            self.storage.sessions_dir = Some(base_dir.join("sessions"));
+        }
+
+        // 4. Resolve sqlite specific path if set
+        if let Some(sqlite) = &mut self.storage.sqlite {
+            if let Some(db_path) = &sqlite.database_path {
+                sqlite.database_path = Some(resolve_path(db_path, home_dir.as_ref()));
+            }
+        }
+
+        // Ensure directories exist
+        if let Some(db_path) = &self.storage.database_path {
+            if let Some(parent) = db_path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| ConfigError::FileSystem {
+                    path: parent.to_path_buf(),
+                    message: format!("Failed to create database directory: {}", e),
+                })?;
+            }
+        }
+
+        if let Some(sessions_dir) = &self.storage.sessions_dir {
+            std::fs::create_dir_all(sessions_dir).map_err(|e| ConfigError::FileSystem {
+                path: sessions_dir.clone(),
+                message: format!("Failed to create sessions directory: {}", e),
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Helper to get resolved database path
+    pub fn database_path(&self) -> PathBuf {
+        self.storage.database_path.clone().unwrap_or_else(|| {
+            // This should generally not be hit if resolve_storage_paths is called
+            PathBuf::from("llmspell.db")
+        })
     }
 
     /// Merge values from JSON config (from registry) - exposed for testing
@@ -933,6 +1056,34 @@ impl LLMSpellConfig {
             }
         }
 
+        // Merge storage configuration
+        if let Some(storage) = json.get("storage").and_then(|v| v.as_object()) {
+            if let Some(base_dir) = storage.get("base_dir").and_then(|v| v.as_str()) {
+                debug!("Overriding storage.base_dir from env: {}", base_dir);
+                self.storage.base_dir = Some(PathBuf::from(base_dir));
+            }
+            if let Some(db_path) = storage.get("database_path").and_then(|v| v.as_str()) {
+                debug!("Overriding storage.database_path from env: {}", db_path);
+                self.storage.database_path = Some(PathBuf::from(db_path));
+            }
+            if let Some(sessions_dir) = storage.get("sessions_dir").and_then(|v| v.as_str()) {
+                debug!("Overriding storage.sessions_dir from env: {}", sessions_dir);
+                self.storage.sessions_dir = Some(PathBuf::from(sessions_dir));
+            }
+
+            if let Some(sqlite) = storage.get("sqlite").and_then(|v| v.as_object()) {
+                let sqlite_config = self
+                    .storage
+                    .sqlite
+                    .get_or_insert(SqliteStorageConfig::default());
+                if let Some(db_path) = sqlite.get("database_path").and_then(|v| v.as_str()) {
+                    sqlite_config.database_path = Some(PathBuf::from(db_path));
+                }
+                if let Some(journal) = sqlite.get("journal_mode").and_then(|v| v.as_str()) {
+                    sqlite_config.journal_mode = Some(journal.to_string());
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1129,7 +1280,12 @@ impl LLMSpellConfig {
 
         // Use ProfileComposer to load and compose the layers
         let mut composer = ProfileComposer::new();
-        let config = composer.load_multi(&layers)?;
+        let mut config = composer.load_multi(&layers)?;
+
+        // Apply environment variable overrides and resolve paths
+        config.apply_env_registry()?;
+        config.resolve_storage_paths()?;
+        config.validate()?;
 
         Ok(config)
     }
@@ -1671,6 +1827,12 @@ pub struct EventExportConfig {
 pub enum ConfigError {
     #[error("Configuration file not found: {path} - {message}")]
     NotFound { path: String, message: String },
+
+    #[error("Filesystem error at {path:?}: {message}")]
+    FileSystem {
+        path: std::path::PathBuf,
+        message: String,
+    },
 
     #[error("Configuration validation failed in field '{field:?}': {message}")]
     Validation {

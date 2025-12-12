@@ -42,6 +42,21 @@ impl SessionManagerConfig {
     pub fn builder() -> SessionManagerConfigBuilder {
         SessionManagerConfigBuilder::new()
     }
+
+    /// Create configuration from `LLMSpellConfig`
+    pub fn from_llm_config(config: &llmspell_config::LLMSpellConfig) -> Self {
+        let mut builder = Self::builder();
+
+        // Apply storage paths
+        if let Some(sessions_dir) = &config.storage.sessions_dir {
+            builder = builder.storage_path(sessions_dir.clone());
+        }
+
+        // Apply runtime settings relevant to sessions if any
+        // Example: logic for max sessions could be mapped here if exposed in LLMSpellConfig
+
+        builder.build()
+    }
 }
 
 impl Default for SessionManagerConfig {

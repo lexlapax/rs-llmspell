@@ -31,3 +31,7 @@ format = "json"
 [runtime]
 script_timeout_seconds = 300
 max_concurrent_scripts = 100
+
+[storage]
+# Production deployments should override these via env vars or explicitly here
+# base_dir = "/app/data"
