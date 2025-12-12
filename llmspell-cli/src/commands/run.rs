@@ -120,8 +120,8 @@ async fn execute_script_embedded(
 
     // For embedded mode, we need to directly execute using the kernel
     // The KernelHandle.execute() method requires the kernel to be running,
-    // which would cause a deadlock. Instead, we'll get the kernel and execute directly.
-    let mut kernel = handle.into_kernel();
+    // which would cause a deadlock. Instead, we'll get the kernel and execute directly (Direct mode).
+    let mut kernel = handle.into_kernel()?;
 
     // Execute the script with arguments
     let result = kernel

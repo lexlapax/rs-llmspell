@@ -488,8 +488,8 @@ async fn execute_app_script_embedded(
         );
     }
 
-    // Get the kernel and execute directly (same pattern as run.rs)
-    let mut kernel = handle.into_kernel();
+    // Get the kernel and execute directly (same pattern as run.rs, Direct mode)
+    let mut kernel = handle.into_kernel()?;
 
     // Execute the script with arguments
     let result = kernel

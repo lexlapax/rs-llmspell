@@ -3114,110 +3114,250 @@ async fn test_protected_routes() {
 
 **Status**: ✅ Complete. Real-time output streaming is fully functional. Verification: `node verify_stream_node.js` → SUCCESS.
 
-#### 14.6.5: Remove Dummy Kernel Architecture (KernelHandle Simplification)
+#### 14.6.5: Kernel Execution Mode Refactoring (Eliminate Dual Waste)
 
-**Objective**: Eliminate the wasteful "dummy kernel" pattern in `KernelHandle` by replacing it with direct Arc references.
+**Objective**: Introduce `KernelExecutionMode` to eliminate resource waste in BOTH CLI and Web paths.
 
-**Problem Analysis**:
+**Problem Analysis (Expanded)**:
 
-The current `create_embedded_kernel()` in `api.rs` creates TWO `IntegratedKernel` instances:
-1. **REAL kernel** (lines 1454-1465): Spawned in background, processes code execution
-2. **DUMMY kernel** (lines 1487-1498): Stored in `KernelHandle`, only used for accessor methods
+The current `start_embedded_kernel_with_executor_and_provider_internal()` in `api.rs` creates TWO `IntegratedKernel` instances:
+1. **REAL kernel** (lines 1454-1465): Spawned in background with transport
+2. **DUMMY kernel** (lines 1487-1498): Stored in `KernelHandle`
 
-The dummy kernel is wasteful because `IntegratedKernel::new()` creates ~10 heavy components:
-- MessageRouter (with history buffer)
-- KernelEventCorrelator (subscribes to EventBus!)
-- EnhancedIOManager (creates mpsc channels!)
-- KernelState (memory backend allocation)
-- ExecutionManager + DAPBridge
-- TracingInstrumentation + HealthMonitor
-- ShutdownCoordinator + SignalBridge
+**The Dual Waste Problem**:
 
-**All of these are NEVER used** - the dummy kernel only exists to provide access to:
-- `session_manager()` → returns `&self.kernel.session_manager`
-- `memory_manager()` → returns `&self.kernel.memory_manager`
-- `component_registry()` → returns `self.kernel.script_executor.component_registry()`
+| Execution Path | Who Uses | What Happens | Waste |
+|----------------|----------|--------------|-------|
+| **CLI** | run.rs, exec.rs, repl.rs, debug.rs, apps.rs, state.rs, session.rs | `handle.into_kernel()` → `kernel.execute_direct_with_args()` | REAL kernel spawned but **never used** |
+| **Web** | llmspell-web handlers | `handle.execute()` → transport → REAL kernel | DUMMY kernel created but only **accessors used** |
 
-**Why This Matters**:
-1. **Memory waste**: Duplicate allocations for unused components
-2. **Potential bugs**: Dummy's EventCorrelator subscribes to EventBus - could interfere
-3. **Code confusion**: "dummy-{session_id}" in logs, comments saying "won't be used"
-4. **Performance**: Slower kernel handle creation (50% more components)
+**Why Both Are Wasteful**:
 
-**Solution**:
+1. **CLI wastes**: The spawned REAL kernel runs in background doing nothing (CLI uses DUMMY directly)
+2. **Web wastes**: The DUMMY kernel creates ~10 heavy components just for 3 accessor methods:
+   - MessageRouter (with history buffer)
+   - KernelEventCorrelator (subscribes to EventBus!)
+   - EnhancedIOManager (creates mpsc channels!)
+   - KernelState (memory backend allocation)
+   - ExecutionManager + DAPBridge
+   - TracingInstrumentation + HealthMonitor
+   - ShutdownCoordinator + SignalBridge
 
-Replace the dummy kernel with direct Arc references in `KernelHandle`:
+**Solution: Mode-Based KernelHandle**:
 
 ```rust
-// BEFORE
-pub struct KernelHandle {
-    kernel: IntegratedKernel<JupyterProtocol>,  // FULL KERNEL - wasteful
-    kernel_id: String,
-    transport: Arc<InProcessTransport>,
-    protocol: JupyterProtocol,
+/// Execution mode for kernel handle
+pub enum KernelExecutionMode {
+    /// Direct execution mode (CLI)
+    /// - Kernel available via into_kernel()
+    /// - No background spawn
+    /// - Use execute_direct_with_args() on kernel
+    Direct,
+
+    /// Transport execution mode (Web)
+    /// - Kernel spawned in background
+    /// - Use execute() via transport
+    /// - into_kernel() returns error
+    Transport,
 }
 
-// AFTER
+/// Internal mode data - no duplication
+enum KernelModeData {
+    Direct {
+        kernel: IntegratedKernel<JupyterProtocol>,
+    },
+    Transport {
+        transport: Arc<InProcessTransport>,
+        session_manager: Arc<SessionManager>,
+        memory_manager: Option<Arc<dyn MemoryManager>>,
+        script_executor: Arc<dyn ScriptExecutor>,
+    },
+}
+
 pub struct KernelHandle {
     kernel_id: String,
-    transport: Arc<InProcessTransport>,
     protocol: JupyterProtocol,
-    session_manager: Arc<SessionManager>,
-    memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
-    script_executor: Arc<dyn ScriptExecutor>,  // For component_registry()
+    mode: KernelModeData,
 }
+```
+
+**Architecture Comparison**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    BEFORE (Wasteful in Both Paths)                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Always creates:                                                         │
+│    1. REAL kernel → spawned in background                               │
+│    2. DUMMY kernel → stored in handle                                   │
+│                                                                          │
+│  CLI: into_kernel() → DUMMY → direct execution                          │
+│       [Spawned REAL kernel sits idle - WASTED]                          │
+│                                                                          │
+│  Web: execute() → transport → REAL kernel                               │
+│       [DUMMY kernel's 10+ components unused - WASTED]                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    AFTER (Mode-Based, Zero Waste)                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Direct Mode (CLI):                                                      │
+│    1. Create ONE kernel                                                  │
+│    2. NO spawn                                                           │
+│    3. Store kernel in handle                                             │
+│    4. into_kernel() works ✓                                             │
+│                                                                          │
+│  Transport Mode (Web):                                                   │
+│    1. Create ONE kernel                                                  │
+│    2. Spawn in background                                                │
+│    3. Store Arc refs only (lightweight)                                  │
+│    4. execute() works ✓, into_kernel() errors                           │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Implementation Tasks**:
 
-- [ ] **1. Update KernelHandle struct** (`api.rs:40-46`):
-    - Remove `kernel: IntegratedKernel<JupyterProtocol>` field
-    - Add `session_manager: Arc<SessionManager>`
-    - Add `memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>`
-    - Add `script_executor: Arc<dyn ScriptExecutor>`
+**Phase 1: Core API Changes** (`llmspell-kernel/src/api.rs`)
 
-- [ ] **2. Update accessor methods** (`api.rs:734-749`):
-    - `session_manager()` → return `&self.session_manager`
-    - `memory_manager()` → return `self.memory_manager.as_ref()`
-    - `component_registry()` → return `self.script_executor.component_registry()`
+- [ ] **1.1. Add KernelExecutionMode enum** (after line 38):
+    ```rust
+    pub enum KernelExecutionMode {
+        Direct,
+        Transport,
+    }
+    ```
 
-- [ ] **3. Remove unused methods**:
-    - `run(self)` - Never called for embedded mode (line 54-57)
-    - `into_kernel(self)` - No kernel to return (line 730-732)
+- [ ] **1.2. Add KernelModeData internal enum** (after KernelExecutionMode):
+    ```rust
+    enum KernelModeData {
+        Direct {
+            kernel: IntegratedKernel<JupyterProtocol>,
+        },
+        Transport {
+            transport: Arc<InProcessTransport>,
+            session_manager: Arc<SessionManager>,
+            memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+            script_executor: Arc<dyn ScriptExecutor>,
+        },
+    }
+    ```
 
-- [ ] **4. Update create_embedded_kernel()** (`api.rs:1487-1509`):
-    - Remove dummy kernel creation entirely
-    - Construct KernelHandle with direct Arc references:
-      ```rust
-      let handle = KernelHandle {
-          kernel_id: kernel_id.clone(),
-          transport: Arc::new(client_transport),
-          protocol,
-          session_manager: session_manager_clone,
-          memory_manager: None,
-          script_executor: script_executor_clone,
-      };
-      ```
+- [ ] **1.3. Update KernelHandle struct** (lines 40-46):
+    ```rust
+    pub struct KernelHandle {
+        kernel_id: String,
+        protocol: JupyterProtocol,
+        mode: KernelModeData,
+    }
+    ```
 
-- [ ] **5. Fix any compilation errors** from removed methods/fields
+- [ ] **1.4. Update into_kernel()** to work only in Direct mode:
+    ```rust
+    pub fn into_kernel(self) -> Result<IntegratedKernel<JupyterProtocol>> {
+        match self.mode {
+            KernelModeData::Direct { kernel } => Ok(kernel),
+            KernelModeData::Transport { .. } => {
+                Err(anyhow!("Cannot get kernel from transport-mode handle"))
+            }
+        }
+    }
+    ```
 
-- [ ] **6. Run quality checks**:
-    - `cargo clippy --workspace --all-targets --all-features` → 0 warnings
-    - `cargo test --workspace` → all pass
-    - `node verify_stream_node.js` → SUCCESS
+- [ ] **1.5. Update accessor methods** for both modes:
+    ```rust
+    pub fn session_manager(&self) -> &Arc<SessionManager> {
+        match &self.mode {
+            KernelModeData::Direct { kernel } => kernel.get_session_manager(),
+            KernelModeData::Transport { session_manager, .. } => session_manager,
+        }
+    }
+    // Similar for memory_manager(), component_registry()
+    ```
 
-- [ ] **7. Update tests** if any relied on `into_kernel()` or `run()`
+- [ ] **1.6. Update execute() method** to work only in Transport mode (or both)
+
+- [ ] **1.7. Remove run() method** - not needed with mode-based approach
+
+- [ ] **1.8. Update start_embedded_kernel_with_executor()** signature:
+    ```rust
+    pub async fn start_embedded_kernel_with_executor(
+        config: LLMSpellConfig,
+        script_executor: Arc<dyn ScriptExecutor>,
+        mode: KernelExecutionMode,  // NEW PARAMETER
+    ) -> Result<KernelHandle>
+    ```
+
+- [ ] **1.9. Update internal function** to handle both modes:
+    - Direct mode: Create kernel, no spawn, store in handle
+    - Transport mode: Create kernel, spawn, store Arc refs
+
+**Phase 2: CLI Updates** (~8 files)
+
+- [ ] **2.1. llmspell-cli/src/commands/run.rs**: Add `KernelExecutionMode::Direct`
+- [ ] **2.2. llmspell-cli/src/commands/exec.rs**: Add `KernelExecutionMode::Direct`
+- [ ] **2.3. llmspell-cli/src/commands/repl.rs**: Add `KernelExecutionMode::Direct`
+- [ ] **2.4. llmspell-cli/src/commands/debug.rs**: Add `KernelExecutionMode::Direct`
+- [ ] **2.5. llmspell-cli/src/commands/apps.rs**: Add `KernelExecutionMode::Direct`
+- [ ] **2.6. llmspell-cli/src/commands/state.rs**: Add `KernelExecutionMode::Direct`
+- [ ] **2.7. llmspell-cli/src/commands/session.rs**: Add `KernelExecutionMode::Direct`
+- [ ] **2.8. Handle Result from into_kernel()** in all above files
+
+**Phase 3: Web Updates** (~2 files)
+
+- [ ] **3.1. llmspell-web/src/state.rs**: Use `KernelExecutionMode::Transport`
+- [ ] **3.2. Verify accessor methods work** in transport mode
+
+**Phase 4: Test Updates** (~15 files)
+
+- [ ] **4.1. llmspell-kernel/tests/*.rs**: Add mode parameter
+- [ ] **4.2. llmspell-kernel/benches/*.rs**: Add mode parameter
+- [ ] **4.3. llmspell-cli/tests/*.rs**: Add mode parameter, handle Result
+
+**Phase 5: Quality Assurance**
+
+- [ ] **5.1. cargo clippy --workspace --all-targets --all-features** → 0 warnings
+- [ ] **5.2. cargo test --workspace** → all pass
+- [ ] **5.3. node verify_stream_node.js** → SUCCESS (web streaming still works)
+- [ ] **5.4. Manual CLI test**: `llmspell run examples/hello.lua` works
 
 **Files to Modify**:
-- `llmspell-kernel/src/api.rs` - Main changes
+
+| Category | Files | Changes |
+|----------|-------|---------|
+| Core API | `llmspell-kernel/src/api.rs` | Enums, struct, methods, creation function |
+| CLI Commands | 8 files in `llmspell-cli/src/commands/` | Add mode param, handle Result |
+| Web | `llmspell-web/src/state.rs` | Add mode param |
+| Tests | ~10 files in `llmspell-kernel/tests/` | Add mode param |
+| Benchmarks | ~1 file in `llmspell-kernel/benches/` | Add mode param |
 
 **Impact Assessment**:
-| Aspect | Impact |
-|--------|--------|
-| API Breaking | Minor - `run()` and `into_kernel()` removed |
-| Memory | Reduced - no duplicate kernel allocations |
-| Performance | Faster startup - 50% fewer components created |
-| Correctness | Improved - no potential EventBus interference |
-| Code clarity | Better - no confusing "dummy" concept |
 
-**Status**: 🔴 Not Started
+| Aspect | Impact | Notes |
+|--------|--------|-------|
+| API Breaking | **Yes** | New mode parameter required |
+| CLI Changes | Medium | ~8 files, mechanical changes |
+| Web Changes | Low | ~2 files |
+| Memory | **-50%** | No duplicate kernel allocations |
+| Performance | **Faster** | No wasteful spawn (CLI) or creation (Web) |
+| Type Safety | **Improved** | Can't misuse into_kernel() in wrong mode |
+| Code Clarity | **Better** | Explicit mode, no "dummy" concept |
+
+**Risk Assessment**:
+
+| Risk | Likelihood | Mitigation |
+|------|------------|------------|
+| Runtime errors if wrong mode | Low | Clear error messages, doc comments |
+| Tests fail | High | Systematic update, run incrementally |
+| Web streaming breaks | Medium | Test with verify_stream_node.js |
+| CLI commands break | Medium | Test each command after changes |
+
+**Verification Checklist**:
+- [ ] `cargo build --workspace` compiles
+- [ ] `cargo clippy` passes with 0 warnings
+- [ ] `cargo test --workspace` all pass
+- [ ] CLI: `llmspell run examples/hello.lua` works
+- [ ] CLI: `llmspell exec "print('test')"` works
+- [ ] Web: `node verify_stream_node.js` → SUCCESS
+- [ ] Web: Browser script execution shows output
+
+**Status**: 🟡 In Progress

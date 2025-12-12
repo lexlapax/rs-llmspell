@@ -142,6 +142,7 @@ impl ExecutionContext {
                 let handle = llmspell_kernel::api::start_embedded_kernel_with_executor(
                     config.clone(),
                     script_executor,
+                    llmspell_kernel::api::KernelExecutionMode::Direct, // CLI uses Direct mode
                 )
                 .await?;
 
@@ -176,6 +177,7 @@ impl ExecutionContext {
                     let handle = llmspell_kernel::api::start_embedded_kernel_with_executor(
                         default_config.clone(),
                         script_executor,
+                        llmspell_kernel::api::KernelExecutionMode::Direct, // CLI uses Direct mode
                     )
                     .await?;
 

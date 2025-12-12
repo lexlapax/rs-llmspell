@@ -46,8 +46,8 @@ async fn execute_code_embedded(
     use std::collections::HashMap;
     use tracing::debug;
 
-    // Get the kernel from the handle and execute the code
-    let mut kernel = handle.into_kernel();
+    // Get the kernel from the handle and execute the code (Direct mode)
+    let mut kernel = handle.into_kernel()?;
     let result = kernel
         .execute_direct_with_args(code, HashMap::new())
         .await?;

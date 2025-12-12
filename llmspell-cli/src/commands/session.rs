@@ -39,7 +39,7 @@ async fn list_sessions(
 
     match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
+            let _kernel = handle.into_kernel()?;
 
             // Create placeholder session data
             let sessions = create_placeholder_sessions();
@@ -66,7 +66,7 @@ async fn show_session(
 
     match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
+            let _kernel = handle.into_kernel()?;
 
             // Create placeholder session details
             let session_details = create_placeholder_session_details(&session_id);
@@ -97,7 +97,7 @@ async fn replay_session(
 
     match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
+            let _kernel = handle.into_kernel()?;
 
             // Session replay logic would go here
             match output_format {
@@ -159,7 +159,7 @@ async fn delete_session(
 
     match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
+            let _kernel = handle.into_kernel()?;
 
             // Session deletion logic would go here
             if delete_all {

@@ -2,7 +2,7 @@ use crate::cli::WebCommands;
 use anyhow::Result;
 use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
-use llmspell_kernel::api::start_embedded_kernel_with_executor;
+use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
 use llmspell_web::{config::WebConfig, server::WebServer};
 use std::sync::Arc;
 
@@ -26,10 +26,14 @@ pub async fn handle_web_command(
                 .expect("Failed to create runtime");
             let executor = Arc::new(runtime);
 
-            // 2. Start Kernel
-            let kernel_handle = start_embedded_kernel_with_executor(config, executor)
-                .await
-                .expect("Failed to start kernel");
+            // 2. Start Kernel (Transport mode for web interface)
+            let kernel_handle = start_embedded_kernel_with_executor(
+                config,
+                executor,
+                KernelExecutionMode::Transport, // Web uses Transport mode
+            )
+            .await
+            .expect("Failed to start kernel");
 
             // 3. Configure Web Server
             let web_config = WebConfig {

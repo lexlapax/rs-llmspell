@@ -1,7 +1,7 @@
 use anyhow::Result;
 use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
-use llmspell_kernel::api::start_embedded_kernel_with_executor;
+use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
 use llmspell_web::config::WebConfig;
 use llmspell_web::server::WebServer;
 use std::sync::Arc;
@@ -19,10 +19,14 @@ async fn main() -> Result<()> {
         .expect("Failed to create runtime");
     let executor = Arc::new(runtime);
 
-    // 3. Start Kernel
-    let kernel_handle = start_embedded_kernel_with_executor(config, executor)
-        .await
-        .expect("Failed to start kernel");
+    // 3. Start Kernel (Transport mode for web interface)
+    let kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor,
+        KernelExecutionMode::Transport, // Web uses Transport mode
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // 4. Configure Web Server
     // 4. Configure Web Server
