@@ -166,7 +166,7 @@ async fn test_list_providers_api() -> Result<()> {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     let login_resp = client
-        .post(format!("{}/login", base_url))
+        .post(format!("{}/api/login", base_url))
         .json(&json!({ "api_key": "test-key" }))
         .send()
         .await?;

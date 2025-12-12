@@ -830,10 +830,9 @@ impl KernelHandle {
     ) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
         match &self.mode {
             KernelModeData::Direct { kernel } => kernel.get_component_registry(),
-            KernelModeData::Transport { .. } => {
-                // In Transport mode, component registry is only accessible via direct kernel
-                None
-            }
+            KernelModeData::Transport {
+                script_executor, ..
+            } => script_executor.component_registry(),
         }
     }
 
