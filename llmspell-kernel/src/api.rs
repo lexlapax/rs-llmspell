@@ -57,19 +57,20 @@ pub enum KernelExecutionMode {
     Transport,
 }
 
-/// Internal mode data for KernelHandle
+/// Internal mode data for `KernelHandle`
 ///
 /// Stores mode-specific resources without duplication.
 enum KernelModeData {
     /// Direct mode: kernel available for direct execution
     Direct {
-        kernel: IntegratedKernel<JupyterProtocol>,
+        kernel: Box<IntegratedKernel<JupyterProtocol>>,
     },
     /// Transport mode: kernel spawned, only Arc refs stored
     Transport {
         transport: Arc<InProcessTransport>,
         session_manager: Arc<crate::sessions::SessionManager>,
         memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+        #[allow(dead_code)] // Reserved for future use (direct script execution via handle)
         script_executor: Arc<dyn ScriptExecutor>,
     },
 }
@@ -798,7 +799,7 @@ impl KernelHandle {
     /// Returns an error if called in Transport mode
     pub fn into_kernel(self) -> Result<IntegratedKernel<JupyterProtocol>> {
         match self.mode {
-            KernelModeData::Direct { kernel } => Ok(kernel),
+            KernelModeData::Direct { kernel } => Ok(*kernel),
             KernelModeData::Transport { .. } => Err(anyhow::anyhow!(
                 "into_kernel() not available in Transport mode - kernel is spawned in background"
             )),
@@ -1362,7 +1363,7 @@ impl ServiceHandle {
 /// implementation, such as a real `ScriptRuntime` from llmspell-bridge.
 ///
 /// # Arguments
-/// * `config` - LLMSpell configuration
+/// * `config` - `LLMSpell` configuration
 /// * `script_executor` - Script executor implementation
 /// * `mode` - Execution mode (Direct for CLI, Transport for Web)
 ///
@@ -1476,6 +1477,7 @@ pub async fn create_provider_manager(
 /// # Errors
 ///
 /// Returns an error if the kernel fails to start or transport setup fails
+#[allow(clippy::too_many_lines)]
 async fn start_embedded_kernel_with_executor_and_provider_internal(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
@@ -1532,7 +1534,9 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
             })
             .await?;
 
-            KernelModeData::Direct { kernel }
+            KernelModeData::Direct {
+                kernel: Box::new(kernel),
+            }
         }
         KernelExecutionMode::Transport => {
             // Transport mode: Spawn kernel in background (Web)

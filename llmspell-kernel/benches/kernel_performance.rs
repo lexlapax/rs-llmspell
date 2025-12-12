@@ -10,7 +10,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
-use llmspell_kernel::api::start_embedded_kernel_with_executor;
+use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,9 +39,13 @@ fn bench_kernel_startup(c: &mut Criterion) {
                 .await
                 .expect("Failed to create runtime");
             let executor = Arc::new(runtime);
-            let kernel_handle = start_embedded_kernel_with_executor(config, executor)
-                .await
-                .expect("Failed to start kernel");
+            let kernel_handle = start_embedded_kernel_with_executor(
+                config,
+                executor,
+                KernelExecutionMode::Transport,
+            )
+            .await
+            .expect("Failed to start kernel");
             black_box(kernel_handle)
         });
     });
@@ -63,7 +67,7 @@ fn bench_message_handling(c: &mut Criterion) {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        start_embedded_kernel_with_executor(config, executor)
+        start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
             .await
             .expect("Failed to start kernel")
     });
@@ -105,7 +109,7 @@ fn bench_tool_invocation(c: &mut Criterion) {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        start_embedded_kernel_with_executor(config, executor)
+        start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
             .await
             .expect("Failed to start kernel")
     });
@@ -214,7 +218,7 @@ fn bench_registry_operations(c: &mut Criterion) {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        start_embedded_kernel_with_executor(config, executor)
+        start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
             .await
             .expect("Failed to start kernel")
     });

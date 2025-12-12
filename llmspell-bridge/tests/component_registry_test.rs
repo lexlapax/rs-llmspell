@@ -44,7 +44,7 @@ async fn test_script_executor_component_registry_access() {
 async fn test_kernel_can_access_registry() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use std::sync::Arc;
 
     // Create a runtime with component registry
@@ -54,11 +54,12 @@ async fn test_kernel_can_access_registry() {
         .await
         .expect("Failed to create runtime");
 
-    // Create kernel with the runtime as executor
+    // Create kernel with the runtime as executor (Transport mode for message-based tests)
     let executor = Arc::new(runtime);
     let mut kernel_handle = Box::pin(start_embedded_kernel_with_executor(
         config,
         executor.clone(),
+        KernelExecutionMode::Transport,
     ))
     .await
     .expect("Failed to start kernel");

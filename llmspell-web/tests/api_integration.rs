@@ -5,7 +5,7 @@ use axum::{
 use http_body_util::BodyExt; // for collecting body
 use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
-use llmspell_kernel::api::start_embedded_kernel_with_executor;
+use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
 use llmspell_web::{config::WebConfig, server::WebServer, state::AppState};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::sync::Arc;
@@ -58,9 +58,13 @@ async fn setup_env() -> (AppState, tempfile::TempDir) {
         .expect("Failed to create runtime");
     let executor = Arc::new(runtime);
 
-    let kernel = start_embedded_kernel_with_executor(config.clone(), executor)
-        .await
-        .expect("Failed to start kernel");
+    let kernel = start_embedded_kernel_with_executor(
+        config.clone(),
+        executor,
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Setup Metrics
     // Since this is a standalone integration test binary, we can install the recorder once.

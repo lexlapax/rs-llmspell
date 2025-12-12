@@ -5,7 +5,9 @@ use llmspell_core::traits::script_executor::{ScriptExecutionOutput, ScriptExecut
 use llmspell_core::LLMSpellError;
 use llmspell_events::bus::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelHandle};
+use llmspell_kernel::api::{
+    start_embedded_kernel_with_executor, KernelExecutionMode, KernelHandle,
+};
 use llmspell_kernel::sessions::config::SessionManagerConfig;
 use llmspell_kernel::sessions::SessionManager;
 use llmspell_storage::MemoryBackend;
@@ -157,7 +159,7 @@ async fn setup_kernel() -> Result<KernelHandle> {
     let config = LLMSpellConfig::default();
 
     // start_embedded_kernel... expects executor to have session manager.
-    start_embedded_kernel_with_executor(config, executor).await
+    start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport).await
 }
 
 #[tokio::test]

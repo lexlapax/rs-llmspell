@@ -5,7 +5,7 @@
 async fn test_kernel_tool_handlers_with_registry() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use llmspell_tools::util::{CalculatorTool, DateTimeHandlerTool};
     use serde_json::json;
     use std::sync::Arc;
@@ -37,9 +37,13 @@ async fn test_kernel_tool_handlers_with_registry() {
 
     // Create kernel with the runtime as executor
     let executor = Arc::new(runtime);
-    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
-        .await
-        .expect("Failed to start kernel");
+    let mut kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor.clone(),
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Test 1: Tool list command
     let list_request = json!({
@@ -167,7 +171,7 @@ async fn test_kernel_tool_handlers_with_registry() {
 async fn test_kernel_tool_count() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -179,9 +183,13 @@ async fn test_kernel_tool_count() {
 
     // Create kernel
     let executor = Arc::new(runtime);
-    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
-        .await
-        .expect("Failed to start kernel");
+    let mut kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor.clone(),
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Get tool list
     let list_request = json!({
@@ -214,7 +222,7 @@ async fn test_kernel_tool_count() {
 async fn test_tool_invocation_with_timeout() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -226,9 +234,13 @@ async fn test_tool_invocation_with_timeout() {
 
     // Create kernel (calculator already registered via register_all_tools)
     let executor = Arc::new(runtime);
-    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
-        .await
-        .expect("Failed to start kernel");
+    let mut kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor.clone(),
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Test 1: Normal invocation with timeout
     let invoke_request = json!({
@@ -294,7 +306,7 @@ async fn test_tool_invocation_with_timeout() {
 async fn test_tool_parameter_validation() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -306,9 +318,13 @@ async fn test_tool_parameter_validation() {
 
     // Create kernel (calculator already registered via register_all_tools)
     let executor = Arc::new(runtime);
-    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
-        .await
-        .expect("Failed to start kernel");
+    let mut kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor.clone(),
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Test 1: Valid parameters
     let valid_request = json!({
@@ -375,7 +391,7 @@ async fn test_tool_parameter_validation() {
 async fn test_tool_invocation_error_handling() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -386,9 +402,13 @@ async fn test_tool_invocation_error_handling() {
 
     // Calculator already registered via register_all_tools
     let executor = Arc::new(runtime);
-    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
-        .await
-        .expect("Failed to start kernel");
+    let mut kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor.clone(),
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Test 1: Invalid expression for calculator (should handle error)
     let invalid_expr = json!({
@@ -449,7 +469,7 @@ async fn test_tool_invocation_error_handling() {
 async fn test_tool_reply_message_routing() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -463,9 +483,13 @@ async fn test_tool_reply_message_routing() {
 
     // Create kernel with executor
     let executor = Arc::new(runtime);
-    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
-        .await
-        .expect("Failed to start kernel");
+    let mut kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor.clone(),
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Test 1: Tool list should return proper message structure
     let list_request = json!({
@@ -535,7 +559,7 @@ async fn test_tool_reply_message_routing() {
 async fn test_message_correlation_and_identity() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -547,9 +571,13 @@ async fn test_message_correlation_and_identity() {
     // Calculator already registered via register_all_tools
 
     let executor = Arc::new(runtime);
-    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
-        .await
-        .expect("Failed to start kernel");
+    let mut kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor.clone(),
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Test that multiple concurrent requests maintain proper correlation
     let requests = vec![
@@ -585,7 +613,7 @@ async fn test_message_correlation_and_identity() {
 async fn test_bidirectional_communication_flow() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -597,9 +625,13 @@ async fn test_bidirectional_communication_flow() {
     // Calculator and datetime already registered via register_all_tools
 
     let executor = Arc::new(runtime);
-    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
-        .await
-        .expect("Failed to start kernel");
+    let mut kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        executor.clone(),
+        KernelExecutionMode::Transport,
+    )
+    .await
+    .expect("Failed to start kernel");
 
     // Test complete bidirectional flow: CLI → Kernel → Tool → Kernel → CLI
 
