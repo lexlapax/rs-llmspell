@@ -3333,10 +3333,12 @@ pub struct KernelHandle {
 | Web | `llmspell-web/src/bin/llmspell-web-dev.rs` | Add `KernelExecutionMode::Transport` |
 | Tests | 6 test files across 4 crates | Add mode parameter + imports |
 
-**Verification Checklist** (Completed):
+**Verification Checklist** (All Verified):
 - [x] `cargo build --workspace` compiles (0 errors)
 - [x] `cargo build --workspace --tests` compiles (0 errors)
-- [x] Zero warnings after fix
+- [x] `cargo clippy --workspace --all-targets --all-features` → 0 warnings
+- [x] `cargo test --workspace --lib` → all pass (88+ tests)
+- [x] `node verify_stream_node.js` → **SUCCESS** (web streaming works after refactoring)
 
 **Status**: ✅ **COMPLETE**
 
@@ -3446,3 +3448,85 @@ Changing `into_kernel()` to return `Result` was a breaking change that propagate
 3. **Breaking changes cascade** - One signature change (`into_kernel()` → `Result`) touched 8+ files
 4. **Arc sharing is lightweight** - Transport mode stores references, not heavy duplicate components
 5. **`#[allow(dead_code)]` is acceptable** for reserved-for-future fields with clear documentation
+
+#### 14.6.6: Fix Verbose Debug Output from rig-core (Upstream Bug)
+
+**Objective**: Eliminate the verbose debug output (HTTP request bodies as byte arrays) that appeared during any LLM provider call.
+
+**Symptom**:
+```
+[/Users/spuri/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rig-core-0.25.0/src/client/mod.rs:356:9] &req = Request {
+    method: POST,
+    uri: https://api.openai.com/v1/responses,
+    ...
+    body: [123, 34, 105, 110, 112, 117, 116, ...]  // JSON body as UTF-8 bytes
+}
+```
+
+This output appeared:
+- On every CLI command (`llmspell run`, `llmspell exec`, etc.)
+- On web server startup (`llmspell web start`)
+- During any HTTP request to LLM providers (OpenAI, etc.)
+
+**Root Cause Analysis**:
+
+| Aspect | Finding |
+|--------|---------|
+| **Location** | `rig-core 0.25.0/src/client/mod.rs:356` |
+| **Culprit** | `dbg!(&req)` macro accidentally left in production code |
+| **Why unfiltered** | `dbg!` is compile-time, bypasses ALL runtime logging/tracing filters |
+| **Our tracing config** | `NOISY_CRATES` filter in `llmspell-cli/src/main.rs` correctly suppresses `rig_core` tracing, but `dbg!` is not controlled by tracing |
+
+**Key Insight**: The `dbg!` Macro vs Tracing
+
+```rust
+// This in rig-core 0.25.0/src/client/mod.rs:356
+dbg!(&req);  // ALWAYS prints to stderr - NO way to filter at runtime
+```
+
+The `dbg!` macro:
+- Is a **compile-time** directive that generates code outputting to stderr
+- Is NOT part of the `tracing` or `log` ecosystem
+- Cannot be filtered by `RUST_LOG`, tracing subscribers, or any runtime config
+- The ONLY solutions are: (1) upgrade/patch the library, or (2) redirect stderr
+
+**Solution Implemented**:
+
+| Step | Action |
+|------|--------|
+| 1 | Updated `Cargo.toml` workspace.dependencies: `rig-core = "0.26"` (was `"0.25"`) |
+| 2 | Ran `cargo update rig-core` |
+| 3 | Rebuilt workspace with new dependency |
+
+**File Modified**:
+- `Cargo.toml` (line 158): `rig-core = "0.25"` → `rig-core = "0.26"`
+
+**Verification**:
+- [x] `cargo build --workspace` compiles successfully
+- [x] rig-core 0.26.0 in Cargo.lock (confirmed via `grep -A 2 'name = "rig-core"' Cargo.lock`)
+- [x] No verbose request debug output on server startup
+
+**Architectural Insights**:
+
+1. **Tracing vs dbg! - Critical Distinction**:
+   - `tracing::debug!()`, `log::debug!()` → Controllable via runtime config
+   - `dbg!()` → Compile-time, always outputs to stderr, CANNOT be filtered
+   - When debugging libraries, use `dbg!` locally but NEVER commit to production
+
+2. **Dependency Hygiene Matters**:
+   - A single `dbg!` in a transitive dependency can flood your logs
+   - Audit dependencies periodically for debug artifacts
+   - Consider running in release mode for cleaner output
+
+3. **Why Our Filters Were Correct but Ineffective**:
+   ```rust
+   // llmspell-cli/src/main.rs - This CORRECTLY filters rig_core tracing
+   const NOISY_CRATES: &[&str] = &["rig_core", "hyper", "h2", ...];
+   ```
+   The filter works perfectly for tracing - but `dbg!` predates and bypasses the entire tracing system.
+
+**Status**: ✅ **COMPLETE**
+
+- rig-core upgraded from 0.25 → 0.26
+- Debug output eliminated
+- Build and tests pass

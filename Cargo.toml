@@ -155,7 +155,7 @@ boa_engine = "0.20"
 # Phase 13c.1.7: quickjs_runtime removed (unused - no crate depends on it)
 
 # LLM providers and AI
-rig-core = "0.25"
+rig-core = "0.26"
 candle-core = "0.9"
 candle-nn = "0.9"
 candle-transformers = "0.9"
