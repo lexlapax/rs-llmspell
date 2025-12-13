@@ -5185,9 +5185,10 @@ async fn test_template_launch_to_visualization() {
 ```
 
 
-#### Phase 5: Clean up, clippy, refactor
-
-- [x] **Workspace Clippy Cleanup**: Eliminated all warnings across the workspace (including `clippy::too_many_arguments`, `clippy::clone_on_copy`).
+#### Phase 5: Clean up, clippy, refactor <!-- id: 14.6.9 -->
+    - [x] Fix "database is locked" error by enforcing WAL mode, busy timeouts, and startup checks in `llmspell-web`
+    - [x] Run full clippy pass on `llmspell-web`
+    - [x] **Workspace Clippy Cleanup**: Eliminated all warnings across the workspace (including `clippy::too_many_arguments`, `clippy::clone_on_copy`).
 - [x] **Refactoring**:
     - Refactored `WebServer::run` and `WebServer::run_with_dependencies` to use `WebDependencies` struct, resolving argument bloat.
     - Refactored `execute_template_and_update_session` to use `TemplateExecutionParams` struct.

@@ -41,6 +41,7 @@ llmspell-tools = { path = "../llmspell-tools" }
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-workflows = { path = "../llmspell-workflows" }
 llmspell-providers = { path = "../llmspell-providers" }
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 
 [dev-dependencies]

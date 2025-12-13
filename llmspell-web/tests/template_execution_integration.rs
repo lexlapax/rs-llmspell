@@ -139,7 +139,6 @@ async fn test_template_launch_and_execution_flow() {
     // We expect status to be "running" then "completed" (or failed).
     // Execution happens in background tokio task.
 
-
     let mut attempts = 0;
     while attempts < 10 {
         // 10 * 500ms = 5s timeout
