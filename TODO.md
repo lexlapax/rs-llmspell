@@ -3969,9 +3969,173 @@ function App() {
 - Banner now reflects actual dev mode state
 - Will automatically hide in production builds
 
-##### Phase 2: Validation & Testing
+##### Phase 2: Backend Dev Mode Detection (For Embedded UI)
 
-**2.1 Add Type Declarations for Vite Environment**
+**Context**: The Phase 1 implementation works for `npm run dev` (development builds), but when using the embedded UI (production build served by backend), `import.meta.env.MODE` is always `'production'`. For embedded UI usage, the frontend must query the backend to determine dev_mode status.
+
+**2.1 Update Health Endpoint to Expose Dev Mode**
+
+**File**: `llmspell-web/src/handlers/health.rs`
+
+**Changes**:
+```rust
+use axum::{extract::State, response::IntoResponse, Json};
+use serde_json::json;
+
+use crate::state::AppState;
+
+pub async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
+    Json(json!({
+        "status": "ok",
+        "version": env!("CARGO_PKG_VERSION"),
+        "dev_mode": state.config.dev_mode  // NEW: Expose backend dev_mode
+    }))
+}
+```
+
+**Rationale**:
+- Health endpoint is unauthenticated, so frontend can check before login
+- No new API endpoint needed
+- Minimal changes to existing code
+
+**2.2 Update AuthContext to Detect Backend Dev Mode**
+
+**File**: `frontend/src/contexts/AuthContext.tsx`
+
+**Changes**:
+```typescript
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+
+interface AuthContextType {
+    isAuthenticated: boolean;
+    token: string | null;
+    login: (token: string) => void;
+    logout: () => void;
+    devMode: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+    const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+    const [devMode, setDevMode] = useState(false);
+    const [devModeChecked, setDevModeChecked] = useState(false);
+
+    // Check backend dev_mode on mount
+    useEffect(() => {
+        const checkBackendDevMode = async () => {
+            try {
+                // For dev server (npm run dev), check Vite environment first
+                const viteDevMode = import.meta.env.MODE === 'development';
+                if (viteDevMode) {
+                    console.log('[AuthContext] Vite dev mode detected');
+                    setDevMode(true);
+                    setDevModeChecked(true);
+                    return;
+                }
+
+                // For embedded UI (production build), check backend
+                console.log('[AuthContext] Checking backend dev_mode via /health');
+                const response = await fetch('/health');
+                if (!response.ok) {
+                    throw new Error(`Health check failed: ${response.status}`);
+                }
+                const data = await response.json();
+                const backendDevMode = data.dev_mode === true;
+                console.log('[AuthContext] Backend dev_mode:', backendDevMode);
+                setDevMode(backendDevMode);
+            } catch (error) {
+                console.error('[AuthContext] Failed to check dev mode:', error);
+                setDevMode(false); // Default to production mode on error
+            } finally {
+                setDevModeChecked(true);
+            }
+        };
+
+        checkBackendDevMode();
+    }, []);
+
+    useEffect(() => {
+        // Sync state if localStorage changes (e.g. other tabs)
+        const handleStorageChange = () => {
+            setToken(localStorage.getItem('token'));
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
+    const login = (newToken: string) => {
+        localStorage.setItem('token', newToken);
+        setToken(newToken);
+    };
+
+    const logout = () => {
+        localStorage.removeItem('token');
+        setToken(null);
+    };
+
+    // Don't render until dev mode is checked (prevents flash of login screen)
+    if (!devModeChecked) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh'
+            }}>
+                Loading...
+            </div>
+        );
+    }
+
+    const value = {
+        isAuthenticated: devMode || !!token,
+        token,
+        login,
+        logout,
+        devMode,
+    };
+
+    return (
+        <AuthContext.Provider value={value}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+};
+```
+
+**Rationale**:
+- Hybrid approach: Uses Vite dev mode for `npm run dev`, backend dev_mode for embedded UI
+- Prevents flash of login screen by waiting for dev_mode check
+- Graceful fallback to production mode on error
+- Console logging for debugging
+
+**2.3 Verify Health Endpoint Registration**
+
+**File**: `llmspell-web/src/server/mod.rs`
+
+**Verify health endpoint is NOT behind auth middleware** (should already be correct):
+```rust
+// Health endpoint should be registered BEFORE auth middleware
+let app = Router::new()
+    .route("/health", get(handlers::health::health_check))
+    // ... other unauthenticated routes ...
+    .route("/api/*", /* routes with auth middleware */)
+```
+
+**Note**: Critical that `/health` is accessible without authentication, or frontend can't check dev_mode before authenticating.
+
+##### Phase 3: Validation & Testing
+
+**3.1 Add Type Declarations for Vite Environment**
 
 **File**: `frontend/src/vite-env.d.ts` (should already exist)
 
@@ -4102,35 +4266,63 @@ npm run dev
 # - User should align both modes
 ```
 
-**V5: Embedded Frontend (Production Binary)**
+**V5: Embedded Frontend with Backend Dev Mode (PRIMARY USE CASE)**
 ```bash
 # Build production frontend
 cd llmspell-web/frontend
 npm run build
 
 # Build Rust with embedded frontend
-cargo build --release
+cargo build
 
-# Run in production mode
-LLMSPELL_WEB_DEV_MODE=false ./target/release/llmspell web start -p openai-prod
+# Run with backend in dev mode (default)
+./target/debug/llmspell web start -p openai-prod
+
+# Backend logs should show: "⚠️  DEVELOPMENT MODE ENABLED"
+
+# Browser: http://localhost:3000
+# Open DevTools Console (F12)
+# Expected console output:
+# [AuthContext] Checking backend dev_mode via /health
+# [AuthContext] Backend dev_mode: true
+# [ProtectedRoute] devMode: true
+# [ProtectedRoute] ✅ Bypassing auth check - dev mode enabled
+
+# Expected behavior:
+# - Brief "Loading..." screen (~100ms)
+# - Orange dev mode banner appears
+# - Dashboard loads immediately WITHOUT redirect to /login
+# - No authentication required
+# - Can navigate to all tabs
+```
+
+**V6: Embedded Frontend Production Mode**
+```bash
+# Frontend already built from V5
+
+# Run backend in production mode
+LLMSPELL_WEB_DEV_MODE=false ./target/debug/llmspell web start -p openai-prod
+
+# Should see: "Production mode - Authentication required"
+# Should see: API keys printed to stdout
 
 # Browser: http://localhost:3000
 # Expected:
-# - Serves embedded frontend assets
+# - Brief "Loading..." screen
 # - NO dev mode banner
 # - Redirects to /login
-# - Requires API key authentication
-# - Full production security enabled
+# - Must use API key from stdout to log in
+# - After login, full access to application
 ```
 
-**V6: TypeScript Compilation**
+**V7: TypeScript Compilation**
 ```bash
 cd llmspell-web/frontend
 npm run type-check  # or tsc --noEmit
 # Expected: No type errors
 ```
 
-**V7: Linting**
+**V8: Linting**
 ```bash
 cd llmspell-web/frontend
 npm run lint
@@ -4141,9 +4333,18 @@ npm run lint
 
 **Verification Checklist**:
 
-**Frontend Changes**:
+**Backend Changes (Phase 2)**:
+- [ ] `health.rs` health_check takes `State(state): State<AppState>`
+- [ ] `health.rs` response includes `"dev_mode": state.config.dev_mode`
+- [ ] `/health` endpoint is NOT behind auth middleware
+- [ ] `/health` endpoint accessible without authentication
+- [ ] Backend returns correct dev_mode value in /health response
+
+**Frontend Changes (Phase 1 + Phase 2)**:
 - [x] `AuthContext.tsx` adds `devMode` field to context
-- [x] `AuthContext.tsx` detects dev mode via `import.meta.env.MODE`
+- [ ] `AuthContext.tsx` adds `devModeChecked` state for async loading
+- [ ] `AuthContext.tsx` checks Vite env first (for dev server compatibility)
+- [ ] `AuthContext.tsx` checks backend `/health` for embedded UI
 - [x] `AuthContext.tsx` sets `isAuthenticated = devMode || !!token`
 - [x] `ProtectedRoute.tsx` imports `devMode` from `useAuth()`
 - [x] `ProtectedRoute.tsx` bypasses redirect when `devMode=true`
@@ -4161,7 +4362,8 @@ npm run lint
 - [x] **V2**: Prod mode frontend + dev mode backend = login required ✅
 - [x] **V3**: Prod mode frontend + prod mode backend = login required + API auth works ✅
 - [x] **V4**: Dev mode frontend + prod mode backend = loads but API fails (expected) ✅
-- [x] **V5**: Embedded frontend production build = full auth enforcement ✅
+- [ ] **V5**: Embedded UI + backend dev mode = no login required (PRIMARY USE CASE)
+- [ ] **V6**: Embedded UI + backend prod mode = login required
 - [x] Dev mode banner shows only in development mode
 - [x] Dev mode banner hides in production builds
 - [x] Protected routes accessible without token in dev mode
@@ -4193,13 +4395,14 @@ npm run lint
 
 | File | Changes | Lines Affected |
 |------|---------|----------------|
-| `frontend/src/contexts/AuthContext.tsx` | Add `devMode` field, detect via `import.meta.env.MODE`, update `isAuthenticated` logic | ~10-15 |
-| `frontend/src/components/ProtectedRoute.tsx` | Add dev mode bypass check before redirect | ~5 |
-| `frontend/src/App.tsx` | Use `devMode` from context instead of hardcoded state | ~3 |
-| `frontend/src/vite-env.d.ts` | Verify type declarations exist (should be auto-generated) | 0 (verify only) |
-| `frontend/README.md` | Add development mode documentation section | +20 (new content) |
+| `llmspell-web/src/handlers/health.rs` | Add `dev_mode` field to health response (Phase 2) | ~3 |
+| `frontend/src/contexts/AuthContext.tsx` | Add async backend dev_mode check, hybrid detection logic (Phase 1 + Phase 2) | ~40-50 |
+| `frontend/src/components/ProtectedRoute.tsx` | Add dev mode bypass check before redirect (Phase 1) | ~5 |
+| `frontend/src/App.tsx` | Use `devMode` from context instead of hardcoded state (Phase 1) | ~3 |
+| `frontend/src/vite-env.d.ts` | Verify type declarations exist (should be auto-generated) (Phase 3) | 0 (verify only) |
+| `frontend/README.md` | Add development mode documentation section (Phase 3) | +20 (new content) |
 
-**Total**: 5 files, ~40 lines changed
+**Total**: 6 files, ~70 lines changed
 
 ----
 

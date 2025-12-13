@@ -12,9 +12,42 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+    const [devMode, setDevMode] = useState(false);
+    const [devModeChecked, setDevModeChecked] = useState(false);
 
-    // Detect dev mode from Vite environment
-    const devMode = import.meta.env.MODE === 'development';
+    // Check backend dev_mode on mount
+    useEffect(() => {
+        const checkBackendDevMode = async () => {
+            try {
+                // For dev server (npm run dev), check Vite environment first
+                const viteDevMode = import.meta.env.MODE === 'development';
+                if (viteDevMode) {
+                    console.log('[AuthContext] Vite dev mode detected');
+                    setDevMode(true);
+                    setDevModeChecked(true);
+                    return;
+                }
+
+                // For embedded UI (production build), check backend
+                console.log('[AuthContext] Checking backend dev_mode via /health');
+                const response = await fetch('/health');
+                if (!response.ok) {
+                    throw new Error(`Health check failed: ${response.status}`);
+                }
+                const data = await response.json();
+                const backendDevMode = data.dev_mode === true;
+                console.log('[AuthContext] Backend dev_mode:', backendDevMode);
+                setDevMode(backendDevMode);
+            } catch (error) {
+                console.error('[AuthContext] Failed to check dev mode:', error);
+                setDevMode(false); // Default to production mode on error
+            } finally {
+                setDevModeChecked(true);
+            }
+        };
+
+        checkBackendDevMode();
+    }, []);
 
     useEffect(() => {
         // Sync state if localStorage changes (e.g. other tabs)
@@ -34,6 +67,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('token');
         setToken(null);
     };
+
+    // Don't render until dev mode is checked (prevents flash of login screen)
+    if (!devModeChecked) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                fontSize: '14px',
+                color: '#666'
+            }}>
+                Loading...
+            </div>
+        );
+    }
 
     const value = {
         isAuthenticated: devMode || !!token,
