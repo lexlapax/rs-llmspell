@@ -19,19 +19,30 @@ use crate::middleware::metrics::track_metrics;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use utoipa::OpenApi;
 
+#[derive(Clone, Default)]
+pub struct WebDependencies {
+    pub tool_registry: Option<Arc<llmspell_tools::ToolRegistry>>,
+    pub agent_registry: Option<Arc<llmspell_agents::FactoryRegistry>>,
+    pub workflow_factory: Option<Arc<dyn llmspell_workflows::WorkflowFactory>>,
+    pub provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+    pub provider_config: Option<Arc<llmspell_config::providers::ProviderManagerConfig>>,
+}
+
 impl WebServer {
     pub async fn run(
         config: WebConfig,
         kernel: KernelHandle,
         config_path: Option<std::path::PathBuf>,
+        dependencies: WebDependencies,
     ) -> Result<()> {
-        Self::run_with_custom_setup(config, kernel, config_path).await
+        Self::run_with_dependencies(config, kernel, config_path, dependencies).await
     }
 
-    pub async fn run_with_custom_setup(
+    pub async fn run_with_dependencies(
         config: WebConfig,
         kernel: KernelHandle,
         config_path: Option<std::path::PathBuf>,
+        dependencies: WebDependencies,
     ) -> Result<()> {
         // Setup metrics - this will panic if called twice (e.g. in multiple tests running in parallel if not careful)
         // For production usage this is fine.
@@ -174,6 +185,11 @@ impl WebServer {
             runtime_config,
             config_store,
             static_config_path: config_path,
+            tool_registry: dependencies.tool_registry,
+            agent_registry: dependencies.agent_registry,
+            workflow_factory: dependencies.workflow_factory,
+            provider_manager: dependencies.provider_manager,
+            provider_config: dependencies.provider_config,
         };
 
         let app = Self::build_app(state);
@@ -193,6 +209,10 @@ impl WebServer {
             .route("/scripts/execute", post(handlers::scripts::execute_script))
             .route("/sessions", get(handlers::sessions::list_sessions))
             .route("/sessions/:id", get(handlers::sessions::get_session))
+            .route(
+                "/sessions/:id/details",
+                get(handlers::sessions::get_session_details),
+            )
             .route("/memory/search", get(handlers::memory::search_memory))
             .route("/agents", get(handlers::agents::list_agents))
             .route("/agents/:id/execute", post(handlers::agents::execute_agent))

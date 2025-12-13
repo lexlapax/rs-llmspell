@@ -58,6 +58,17 @@ async fn setup_env() -> (AppState, tempfile::TempDir) {
         .expect("Failed to create runtime");
     let executor = Arc::new(runtime);
 
+    // Extract registries
+    let tool_registry = executor.tool_registry().clone();
+    let agent_registry = executor.agent_registry().clone();
+    let workflow_factory = executor.workflow_factory().clone();
+    let provider_manager = executor
+        .provider_manager()
+        .create_core_manager_arc()
+        .await
+        .expect("Failed to create provider manager");
+    let provider_config = Arc::new(config.providers.clone());
+
     let kernel = start_embedded_kernel_with_executor(
         config.clone(),
         executor,
@@ -97,6 +108,11 @@ async fn setup_env() -> (AppState, tempfile::TempDir) {
         runtime_config,
         static_config_path: None,
         config_store: None,
+        tool_registry: Some(tool_registry),
+        agent_registry: Some(agent_registry),
+        workflow_factory: Some(workflow_factory),
+        provider_manager: Some(provider_manager),
+        provider_config: Some(provider_config),
     };
 
     (state, temp_dir)
@@ -166,7 +182,7 @@ async fn test_full_integration_flow() {
         .expect("Response should contain session_id");
     println!("Created session: {}", session_id);
 
-    assert_eq!(launch_res["status"], "created");
+    assert_eq!(launch_res["status"], "started");
 
     // 3. Verify Session Exists
     let response = app

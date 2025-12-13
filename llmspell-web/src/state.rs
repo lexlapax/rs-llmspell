@@ -12,4 +12,11 @@ pub struct AppState {
     pub runtime_config: Arc<tokio::sync::RwLock<llmspell_config::env::EnvRegistry>>,
     pub config_store: Option<Arc<llmspell_storage::backends::sqlite::SqliteKVStorage>>,
     pub static_config_path: Option<std::path::PathBuf>,
+
+    // Infrastructure components for template execution
+    pub tool_registry: Option<Arc<llmspell_tools::ToolRegistry>>,
+    pub agent_registry: Option<Arc<llmspell_agents::FactoryRegistry>>,
+    pub workflow_factory: Option<Arc<dyn llmspell_workflows::WorkflowFactory>>,
+    pub provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+    pub provider_config: Option<Arc<llmspell_config::providers::ProviderManagerConfig>>,
 }

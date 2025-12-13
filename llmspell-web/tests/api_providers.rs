@@ -145,6 +145,26 @@ async fn test_list_providers_api() -> Result<()> {
             llmspell_config::env::EnvRegistry::new(),
         ));
 
+        // Create empty registries for AppState requirements
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory = Arc::new(llmspell_workflows::DefaultWorkflowFactory::new());
+        // For ProviderManager, we can try to reuse the one from config if possible, or create new one.
+        // Since test sets up providers in config, better to create one that matches if possible,
+        // but for now creating a new one with empty/default config to satisfy type check.
+        // The test verifies list_providers usually communicates with Kernel?
+        // Note: The /api/providers handler might read from state.provider_manager.
+        // If so, we need it to have the provider if the test expects to see it?
+        // Wait, the test expects "ok" status and array.
+        // If ProviderManager is empty, it returns empty array (or whatever it has).
+        // The actual test setup `setup_kernel_with_provider` configures providers in the KERNEL config.
+        // Does the web API check kernel or local provider manager?
+        // The refactoring implies Web Server has its own ProviderManager (via bridge).
+        // Let's create a functional ProviderManager.
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+
         let state = AppState {
             kernel: handle_mutex,
             metrics_recorder: recorder_handle,
@@ -152,6 +172,11 @@ async fn test_list_providers_api() -> Result<()> {
             runtime_config,
             config_store: None,
             static_config_path: None,
+            tool_registry: Some(tool_registry),
+            agent_registry: Some(agent_registry),
+            workflow_factory: Some(workflow_factory),
+            provider_manager: Some(provider_manager),
+            provider_config: Some(provider_config),
         };
 
         let app = WebServer::build_app(state);

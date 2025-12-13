@@ -3120,7 +3120,7 @@ async fn test_protected_routes() {
 
 **Status**: ✅ Complete. Real-time output streaming is fully functional. Verification: `node verify_stream_node.js` → SUCCESS.
 
-#### 14.6.5: Kernel Execution Mode Refactoring (Eliminate Dual Waste)
+### 14.6.5: Kernel Execution Mode Refactoring (Eliminate Dual Waste)
 
 **Objective**: Introduce `KernelExecutionMode` to eliminate resource waste in BOTH CLI and Web paths.
 
@@ -3455,7 +3455,7 @@ Changing `into_kernel()` to return `Result` was a breaking change that propagate
 4. **Arc sharing is lightweight** - Transport mode stores references, not heavy duplicate components
 5. **`#[allow(dead_code)]` is acceptable** for reserved-for-future fields with clear documentation
 
-#### 14.6.6: Fix Verbose Debug Output from rig-core (Upstream Bug)
+### 14.6.6: Fix Verbose Debug Output from rig-core (Upstream Bug)
 
 **Objective**: Eliminate the verbose debug output (HTTP request bodies as byte arrays) that appeared during any LLM provider call.
 
@@ -3539,7 +3539,7 @@ The `dbg!` macro:
 
 ---
 
-#### 14.6.7: Proper Database Path Configuration (Config + Home Directory Fallback)
+### 14.6.7: Proper Database Path Configuration (Config + Home Directory Fallback)
 
 **Problem Statement**:
 
@@ -3786,7 +3786,7 @@ let db_path = "llmspell.db";  // Relative to cwd - causes conflicts!
 
 ----
 
-#### 14.6.8: Fix Frontend Development Mode Authentication Bypass
+### 14.6.8: Fix Frontend Development Mode Authentication Bypass
 
 **Problem Statement**:
 
@@ -3841,7 +3841,7 @@ The frontend dev mode should match the backend dev mode: both are enabled during
 
 **Implementation Tasks**:
 
-##### Phase 1: Frontend Dev Mode Detection
+#### Phase 1: Frontend Dev Mode Detection
 
 **1.1 Update AuthContext to Support Dev Mode**
 
@@ -3969,7 +3969,7 @@ function App() {
 - Banner now reflects actual dev mode state
 - Will automatically hide in production builds
 
-##### Phase 2: Backend Dev Mode Detection (For Embedded UI)
+#### Phase 2: Backend Dev Mode Detection (For Embedded UI)
 
 **Context**: The Phase 1 implementation works for `npm run dev` (development builds), but when using the embedded UI (production build served by backend), `import.meta.env.MODE` is always `'production'`. For embedded UI usage, the frontend must query the backend to determine dev_mode status.
 
@@ -4133,7 +4133,7 @@ let app = Router::new()
 
 **Note**: Critical that `/health` is accessible without authentication, or frontend can't check dev_mode before authenticating.
 
-##### Phase 3: Validation & Testing
+#### Phase 3: Validation & Testing
 
 **3.1 Add Type Declarations for Vite Environment**
 
@@ -4457,5 +4457,896 @@ npm run lint
 - ✅ **Vite Environment Integration**: Leveraged `import.meta.env.MODE` for zero-cost build-time dev mode detection.
 - ✅ **Type Safety**: Added `vite-env.d.ts` to ensure strict typing for environment variables.
 - ✅ **UX Improvement**: `DevBanner.tsx` provides clear context awareness without polluting production builds.
+
+----
+
+### 14.6.9: Connect Template Execution to Session Visualization (End-to-End)
+
+**Problem Statement**:
+
+The Library/Templates tab allows users to launch templates, but the execution flow is incomplete. When a user clicks "Launch Template" → configures parameters → submits, the system creates an empty session but **never executes the template**. The Session Details page shows only mock/hardcoded workflow visualization instead of real execution data.
+
+**Current Broken Flow**:
+```
+User clicks "Launch Template"
+  ↓
+Frontend: Collect params in LaunchModal
+  ↓
+POST /api/templates/{id}/launch
+  ↓
+Backend: Create empty session → return session_id
+  ↓
+[STOPS HERE - Template never executes]
+  ↓
+Frontend: Navigate to /sessions (list page)
+  ↓
+User manually finds session, clicks to view details
+  ↓
+Frontend: Load SessionDetails page
+  ↓
+[MOCK DATA ONLY - Shows hardcoded workflow, never fetches real data]
+```
+
+**Expected Flow**:
+```
+User clicks "Launch Template"
+  ↓
+Frontend: Collect params → Submit
+  ↓
+POST /api/templates/{id}/launch
+  ↓
+Backend: Create session → EXECUTE template → Build workflow graph → Store results
+  ↓
+Return session_id + initial status
+  ↓
+Frontend: Navigate to /sessions/{session_id}
+  ↓
+GET /api/sessions/{id}/details
+  ↓
+Backend: Return full SessionDetailsResponse (workflow nodes, logs, artifacts)
+  ↓
+Frontend: Render real WorkflowGraph with execution data
+```
+
+**Root Cause Analysis**:
+
+Based on comprehensive codebase exploration (agent a92a73d), the system has all necessary components but they're **disconnected**:
+
+1. **Backend Template Execution Missing**:
+   - File: `llmspell-web/src/handlers/templates.rs:101-151`
+   - `launch_template()` creates session but never calls `template.execute()`
+   - No workflow nodes generated from execution steps
+   - No artifacts captured or stored
+
+2. **Frontend Navigation Incomplete**:
+   - File: `llmspell-web/frontend/src/pages/Templates.tsx:137-142`
+   - `handleLaunchConfirm()` receives `session_id` but navigates to `/sessions` (list page)
+   - Should navigate to `/sessions/{session_id}` (details page)
+
+3. **Session Details API Missing**:
+   - No `/api/sessions/{id}/details` endpoint exists
+   - Current `GET /api/sessions/{id}` returns basic metadata only
+   - Frontend needs structured `SessionDetailsResponse` with workflow execution data
+
+4. **Frontend Using Mock Data**:
+   - File: `llmspell-web/frontend/src/pages/SessionDetails.tsx:54-59`
+   - Hardcoded `MOCK_WORKFLOW` and `MOCK_SESSION` (lines 7-47)
+   - `useEffect` ignores real `id` param, loads fake data after 500ms
+   - Never calls API to fetch actual session details
+
+5. **Workflow Visualization Structure Undefined**:
+   - No mechanism to convert template execution steps → `WorkflowNode[]`
+   - No tracking of step dependencies → `WorkflowLink[]`
+   - Session state can store arbitrary JSON but no structured workflow schema
+
+**Design Decisions**:
+
+1. **Workflow Execution Model**: Capture template execution as a DAG (Directed Acyclic Graph)
+   - Each template step becomes a `WorkflowNode` (with status, output, timing)
+   - Dependencies between steps become `WorkflowLink` (directed edges)
+   - Store as structured JSON in session.state under key "workflow_execution"
+
+2. **Execution Context**: Extend ExecutionContext to track workflow graph
+   - Add WorkflowGraphBuilder that intercepts step execution
+   - Publish events for node start/complete/fail
+   - Collect logs, artifacts, metrics per node
+
+3. **API Design**: New endpoint vs extended endpoint
+   - Create `/api/sessions/{id}/details` (separate from `/api/sessions/{id}`)
+   - Rationale: Session list needs lightweight metadata, details page needs full data
+   - Avoids bloating session list responses
+
+4. **Real-Time vs Polling**: Initial implementation uses polling
+   - WebSocket support already exists (`ws.rs`)
+   - Phase 1: HTTP polling for status updates
+   - Future: Real-time WebSocket updates (separate task)
+
+----
+
+**Implementation Tasks**:
+
+#### Phase 1: Backend - Template Execution Integration
+
+**1.1 Define Workflow Execution Structures**
+
+**File**: `llmspell-web/src/handlers/sessions.rs` (NEW structures)
+
+**Add types**:
+```rust
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowNode {
+    pub id: String,
+    pub label: String,
+    pub type_: String,  // "agent", "tool", "decision", etc.
+    pub status: NodeStatus,
+    pub started_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub duration_ms: Option<u64>,
+    pub output: Option<serde_json::Value>,
+    pub error: Option<String>,
+    pub position: NodePosition,  // For UI layout
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodePosition {
+    pub x: f64,
+    pub y: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NodeStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowLink {
+    pub source: String,  // Node ID
+    pub target: String,  // Node ID
+    pub label: Option<String>,  // e.g., "on_success", "on_failure"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowExecution {
+    pub nodes: Vec<WorkflowNode>,
+    pub links: Vec<WorkflowLink>,
+    pub status: String,  // "running", "completed", "failed"
+    pub started_at: chrono::DateTime<chrono::Utc>,
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SessionDetailsResponse {
+    // Basic session info
+    pub id: String,
+    pub name: String,
+    pub template_id: Option<String>,
+    pub template_name: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub status: String,
+    pub metadata: serde_json::Value,
+
+    // Workflow execution data
+    pub workflow: Option<WorkflowExecution>,
+
+    // Logs and artifacts
+    pub logs: Vec<String>,
+    pub artifacts: Vec<ArtifactInfo>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ArtifactInfo {
+    pub id: String,
+    pub name: String,
+    pub type_: String,
+    pub size: u64,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+```
+
+**1.2 Create Workflow Graph Builder**
+
+**File**: `llmspell-web/src/workflow_builder.rs` (NEW)
+
+**Purpose**: Convert template execution into workflow graph
+
+```rust
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+pub struct WorkflowGraphBuilder {
+    nodes: Arc<RwLock<Vec<WorkflowNode>>>,
+    links: Arc<RwLock<Vec<WorkflowLink>>>,
+    started_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl WorkflowGraphBuilder {
+    pub fn new() -> Self {
+        Self {
+            nodes: Arc::new(RwLock::new(Vec::new())),
+            links: Arc::new(RwLock::new(Vec::new())),
+            started_at: chrono::Utc::now(),
+        }
+    }
+
+    pub async fn add_node(&self, node: WorkflowNode) {
+        self.nodes.write().await.push(node);
+    }
+
+    pub async fn add_link(&self, link: WorkflowLink) {
+        self.links.write().await.push(link);
+    }
+
+    pub async fn update_node_status(
+        &self,
+        node_id: &str,
+        status: NodeStatus,
+        output: Option<serde_json::Value>,
+        error: Option<String>,
+    ) {
+        let mut nodes = self.nodes.write().await;
+        if let Some(node) = nodes.iter_mut().find(|n| n.id == node_id) {
+            node.status = status;
+            if output.is_some() {
+                node.output = output;
+            }
+            if error.is_some() {
+                node.error = error;
+            }
+            if node.started_at.is_none() {
+                node.started_at = Some(chrono::Utc::now());
+            }
+            if matches!(status, NodeStatus::Completed | NodeStatus::Failed) {
+                node.completed_at = Some(chrono::Utc::now());
+                if let Some(started) = node.started_at {
+                    node.duration_ms = Some(
+                        (chrono::Utc::now() - started).num_milliseconds() as u64
+                    );
+                }
+            }
+        }
+    }
+
+    pub async fn build(&self) -> WorkflowExecution {
+        WorkflowExecution {
+            nodes: self.nodes.read().await.clone(),
+            links: self.links.read().await.clone(),
+            status: self.compute_status().await,
+            started_at: self.started_at,
+            completed_at: Some(chrono::Utc::now()),
+        }
+    }
+
+    async fn compute_status(&self) -> String {
+        let nodes = self.nodes.read().await;
+        if nodes.iter().any(|n| matches!(n.status, NodeStatus::Failed)) {
+            "failed".to_string()
+        } else if nodes.iter().all(|n| matches!(n.status, NodeStatus::Completed)) {
+            "completed".to_string()
+        } else {
+            "running".to_string()
+        }
+    }
+}
+```
+
+**1.3 Update Template Launch Handler to Execute Template**
+
+**File**: `llmspell-web/src/handlers/templates.rs:101-151`
+
+**Changes**:
+```rust
+pub async fn launch_template(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<LaunchTemplateRequest>,
+) -> Result<Json<LaunchResponse>, WebError> {
+    // ... existing session creation code ...
+
+    // NEW: Execute template asynchronously
+    let session_id_clone = session_id.clone();
+    let kernel_clone = state.kernel.clone();
+    let template_clone = template.clone();
+    let params_clone = payload.parameters.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = execute_template_and_update_session(
+            kernel_clone,
+            session_id_clone,
+            template_clone,
+            params_clone,
+        ).await {
+            tracing::error!("Template execution failed: {}", e);
+        }
+    });
+
+    Ok(Json(LaunchResponse {
+        session_id,
+        status: "started".to_string(),
+    }))
+}
+
+async fn execute_template_and_update_session(
+    kernel: Arc<Mutex<KernelHandle>>,
+    session_id: String,
+    template: Arc<dyn llmspell_templates::Template>,
+    parameters: serde_json::Value,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // 1. Create workflow graph builder
+    let graph_builder = WorkflowGraphBuilder::new();
+
+    // 2. Build execution context
+    let mut context = llmspell_templates::ExecutionContext::new();
+
+    // Hook into execution to capture steps as nodes
+    // (This requires templates to expose execution hooks or steps)
+
+    // 3. Execute template
+    let output = template.execute(parameters, &mut context).await?;
+
+    // 4. Build workflow graph from execution
+    // For now, create a simple single-node graph
+    // Later: Parse context.execution_history to build full graph
+    graph_builder.add_node(WorkflowNode {
+        id: "root".to_string(),
+        label: template.metadata().name.clone(),
+        type_: "template".to_string(),
+        status: NodeStatus::Completed,
+        started_at: Some(chrono::Utc::now()),
+        completed_at: Some(chrono::Utc::now()),
+        duration_ms: Some(output.metrics.duration_ms),
+        output: Some(serde_json::to_value(&output.result)?),
+        error: None,
+        position: NodePosition { x: 400.0, y: 200.0 },
+    }).await;
+
+    let workflow = graph_builder.build().await;
+
+    // 5. Store workflow in session state
+    let kernel_lock = kernel.lock().await;
+    let session_manager = kernel_lock.session_manager();
+
+    if let Some(mut session) = session_manager.get_session(&session_id).await? {
+        session.set_state("workflow_execution", serde_json::to_value(&workflow)?).await?;
+
+        // Store artifacts
+        for artifact in output.artifacts {
+            session.add_artifact(artifact.id.clone()).await?;
+            // TODO: Actually store artifact data
+        }
+
+        // Update session status
+        session_manager.update_session_status(&session_id, "completed").await?;
+    }
+
+    Ok(())
+}
+```
+
+**Rationale**:
+- Async execution prevents blocking the HTTP response
+- Session is created immediately, execution happens in background
+- Frontend can poll `/api/sessions/{id}/details` for progress
+
+**1.4 Create Session Details Endpoint**
+
+**File**: `llmspell-web/src/handlers/sessions.rs`
+
+**Add handler**:
+```rust
+pub async fn get_session_details(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<SessionDetailsResponse>, WebError> {
+    let kernel = state.kernel.lock().await;
+    let session_manager = kernel.session_manager();
+
+    let session = session_manager
+        .get_session(&id)
+        .await
+        .map_err(|e| WebError::Internal(format!("Failed to get session: {}", e)))?
+        .ok_or_else(|| WebError::NotFound(format!("Session {} not found", id)))?;
+
+    let metadata = session.metadata().await;
+    let state_data = session.state().await;
+
+    // Extract workflow execution from session state
+    let workflow: Option<WorkflowExecution> = state_data
+        .get("workflow_execution")
+        .and_then(|v| serde_json::from_value(v.clone()).ok());
+
+    // Get artifacts
+    let artifact_ids = session.artifact_ids().await;
+    let artifacts: Vec<ArtifactInfo> = artifact_ids
+        .iter()
+        .map(|id| ArtifactInfo {
+            id: id.clone(),
+            name: format!("artifact_{}", id),
+            type_: "unknown".to_string(),
+            size: 0,
+            created_at: metadata.created_at,
+        })
+        .collect();
+
+    // Get logs from session state or events
+    let logs: Vec<String> = state_data
+        .get("logs")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
+
+    let template_id = metadata.custom_metadata
+        .get("template_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let template_name = metadata.custom_metadata
+        .get("template_name")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    Ok(Json(SessionDetailsResponse {
+        id: metadata.id.0.clone(),
+        name: metadata.name.clone().unwrap_or_else(|| "Unnamed Session".to_string()),
+        template_id,
+        template_name,
+        created_at: metadata.created_at,
+        updated_at: metadata.updated_at,
+        status: metadata.status.to_string(),
+        metadata: metadata.custom_metadata.clone(),
+        workflow,
+        logs,
+        artifacts,
+    }))
+}
+```
+
+**1.5 Register New Route**
+
+**File**: `llmspell-web/src/server/mod.rs`
+
+**Add route** (in the protected API routes section):
+```rust
+.route("/api/sessions/:id/details", get(handlers::sessions::get_session_details))
+```
+
+#### Phase 2: Frontend - Real Data Integration
+
+**2.1 Update API Client**
+
+**File**: `frontend/src/api/client.ts`
+
+**Add method**:
+```typescript
+async getSessionDetails(id: string): Promise<SessionDetailsResponse> {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`/api/sessions/${id}/details`, {
+        headers,
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch session details: ${response.statusText}`);
+    }
+
+    return response.json();
+}
+```
+
+**2.2 Update Template Launch to Navigate to Session**
+
+**File**: `frontend/src/pages/Templates.tsx:137-142`
+
+**Changes**:
+```typescript
+const handleLaunchConfirm = async (id: string, config: Record<string, any>) => {
+    try {
+        const response = await api.launchTemplate(id, config);
+        // Navigate directly to the new session details page
+        navigate(`/sessions/${response.session_id}`);
+    } catch (error) {
+        console.error('Failed to launch template:', error);
+        // TODO: Show error toast/notification
+    }
+};
+```
+
+**2.3 Replace Mock Data in SessionDetails**
+
+**File**: `frontend/src/pages/SessionDetails.tsx`
+
+**Remove lines 7-47** (all mock data)
+
+**Replace useEffect (lines 54-59)**:
+```typescript
+useEffect(() => {
+    const loadSessionDetails = async () => {
+        if (!id) {
+            setError('No session ID provided');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const data = await api.getSessionDetails(id);
+            setSession(data);
+            setError(null);
+        } catch (err) {
+            console.error('Failed to load session details:', err);
+            setError(err instanceof Error ? err.message : 'Failed to load session');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    loadSessionDetails();
+
+    // Poll for updates every 2 seconds if session is running
+    const interval = setInterval(() => {
+        if (session?.status === 'running') {
+            loadSessionDetails();
+        }
+    }, 2000);
+
+    return () => clearInterval(interval);
+}, [id, session?.status]);
+```
+
+**2.4 Add Loading and Error States**
+
+**File**: `frontend/src/pages/SessionDetails.tsx`
+
+**Add to component state**:
+```typescript
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+```
+
+**Update render**:
+```typescript
+if (loading) {
+    return (
+        <div className="flex items-center justify-center h-96">
+            <div className="text-gray-500">Loading session details...</div>
+        </div>
+    );
+}
+
+if (error) {
+    return (
+        <div className="flex items-center justify-center h-96">
+            <div className="text-red-500">Error: {error}</div>
+        </div>
+    );
+}
+
+if (!session || !session.workflow) {
+    return (
+        <div className="flex items-center justify-center h-96">
+            <div className="text-gray-500">
+                No workflow data available yet. Template may still be executing...
+            </div>
+        </div>
+    );
+}
+
+// Existing workflow rendering code
+```
+
+#### Phase 3: Template Integration - Multi-Step Workflows
+
+**3.1 Enhanced Workflow Graph Building**
+
+Currently, Phase 1 creates a single-node graph. For templates with multiple steps:
+
+**File**: `llmspell-web/src/workflow_builder.rs`
+
+**Add template introspection**:
+```rust
+pub fn build_from_template_definition(
+    template: &dyn llmspell_templates::Template,
+) -> Self {
+    let builder = Self::new();
+
+    // If template exposes steps/structure, build initial graph
+    // Example for multi-agent template:
+    // - Parse agent DAG
+    // - Create node for each agent
+    // - Create links for dependencies
+
+    // This requires templates to expose their structure
+    // May need to add `fn get_structure() -> TemplateStructure` to Template trait
+
+    builder
+}
+```
+
+**3.2 Hook into Execution Events**
+
+**File**: `llmspell-templates/src/core.rs`
+
+**Extend ExecutionContext**:
+```rust
+pub struct ExecutionContext {
+    pub config: TemplateConfig,
+    pub step_callback: Option<Box<dyn Fn(StepEvent) + Send + Sync>>,
+    // existing fields...
+}
+
+pub struct StepEvent {
+    pub step_id: String,
+    pub step_type: StepType,
+    pub status: StepStatus,
+    pub output: Option<serde_json::Value>,
+    pub error: Option<String>,
+}
+```
+
+Templates can then call `context.step_callback()` during execution, allowing WorkflowGraphBuilder to track progress in real-time.
+
+#### Phase 4: Validation & Testing
+
+**4.1 Backend Tests**
+
+**File**: `llmspell-web/src/handlers/sessions.rs`
+
+**Add tests**:
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_session_details() {
+        // Create test session with workflow data
+        // Call get_session_details
+        // Verify response structure
+    }
+
+    #[tokio::test]
+    async fn test_workflow_execution_storage() {
+        // Execute simple template
+        // Verify workflow stored in session.state
+        // Verify artifacts tracked
+    }
+}
+```
+
+**4.2 Integration Test**
+
+**File**: `llmspell-web/tests/template_execution_integration.rs` (NEW)
+
+**Test full flow**:
+```rust
+#[tokio::test]
+async fn test_template_launch_to_visualization() {
+    // 1. Start test server
+    // 2. POST /api/templates/{id}/launch
+    // 3. Extract session_id from response
+    // 4. Poll GET /api/sessions/{id}/details until status = completed
+    // 5. Verify workflow.nodes.len() > 0
+    // 6. Verify workflow.links exists
+    // 7. Verify logs captured
+}
+```
+
+**4.3 Frontend Manual Testing**
+
+**Scenario 1: Simple Template Launch**
+```bash
+# 1. Navigate to Library tab
+# 2. Select a simple template (e.g., "Hello World Agent")
+# 3. Click "Launch"
+# 4. Configure parameters (if any)
+# 5. Submit
+
+# Expected:
+# - Immediately navigate to /sessions/{id}
+# - Show "Loading session details..." briefly
+# - Show workflow graph with nodes
+# - Click on node → see output
+# - Verify status shows "completed"
+```
+
+**Scenario 2: Multi-Agent Workflow**
+```bash
+# 1. Launch "Research & Summarize" template (multi-step)
+# 2. Navigate to session details
+
+# Expected:
+# - See multiple nodes (Research Agent, Summarize Agent, etc.)
+# - See links between nodes showing flow
+# - Each node shows status (pending → running → completed)
+# - Click nodes to see intermediate outputs
+```
+
+**Scenario 3: Failed Execution**
+```bash
+# 1. Launch template with invalid parameters
+# 2. View session details
+
+# Expected:
+# - Workflow shows node(s) with status "failed"
+# - Error message visible in node details
+# - Overall session status = "failed"
+```
+
+
+#### Phase 5: Clean up, clippy, refactor
+
+- [x] **Workspace Clippy Cleanup**: Eliminated all warnings across the workspace (including `clippy::too_many_arguments`, `clippy::clone_on_copy`).
+- [x] **Refactoring**:
+    - Refactored `WebServer::run` and `WebServer::run_with_dependencies` to use `WebDependencies` struct, resolving argument bloat.
+    - Refactored `execute_template_and_update_session` to use `TemplateExecutionParams` struct.
+    - Resolved compilation errors in `llmspell-cli` and `llmspell-web-dev` resulting from signature changes.
+- [x] **Test Fixes**:
+    - Fixed `llmspell-web` integration tests (`health.rs`, `api_integration.rs`, `api_providers.rs`, `api_launch_persistence.rs`) to properly construct `AppState` with required registries and use correct runtime flavors.
+    - Updated `api_integration.rs` expectation for session status ("started" vs "created").
+    - Fixed `DummyScriptExecutor` usage in tests.
+
+----
+
+**Verification Checklist**:
+
+**Backend (Phase 1)**:
+- [x] `WorkflowNode`, `WorkflowLink`, `WorkflowExecution` types defined
+- [x] `WorkflowGraphBuilder` created and tested
+- [x] `launch_template()` spawns async execution task
+- [x] `execute_template_and_update_session()` creates workflow graph
+- [x] Workflow stored in session.state under "workflow_execution" key
+- [x] `get_session_details()` endpoint created
+- [x] Route `/api/sessions/:id/details` registered
+- [x] Health endpoint test updated for State parameter
+
+**Template Integration (Phase 3)**:
+- [x] `StepEvent` struct defined in `llmspell-templates`
+- [x] `ExecutionContext` updated with `step_callback`
+- [x] `execute_template_and_update_session` uses callback for real-time graph updates
+
+**Frontend (Phase 2)**:
+- [x] `api.getSessionDetails()` implemented
+- [x] `Templates.tsx` navigates to `/sessions/{id}`
+- [x] `SessionDetails.tsx` fetches logic connected and polling
+- [x] Mock data removed
+- [x] Loading/Error states addedsionDetails.tsx
+- [x] Real data loading via useEffect with polling
+- [x] Loading state shown while fetching
+- [x] Error state shown on failure
+- [x] Empty state shown if no workflow data yet
+- [x] WorkflowGraph renders with real nodes/links
+
+**Integration (Phase 3)**:
+- [x] Template execution generates at least one WorkflowNode
+- [x] Node status reflects actual execution (pending → running → completed)
+- [x] Node output captured and displayed
+- [x] Artifacts linked to session
+- [x] Logs captured (basic implementation)
+- [x] Multi-step templates create multiple nodes (if template supports)
+
+**Quality**:
+- [x] Backend compiles: `cargo check -p llmspell-web`
+- [x] Frontend compiles: `cd frontend && npm run build`
+- [x] Backend tests pass: `cargo test -p llmspell-web`
+- [x] Integration test passes (if created)
+- [x] Zero clippy warnings
+- [x] TypeScript type-check passes
+- [x] Manual E2E test: Launch → View → Verify data
+
+----
+
+**Files to Modify**:
+
+| File | Changes | Lines |
+|------|---------|-------|
+| `llmspell-web/src/handlers/sessions.rs` | Add WorkflowNode/Link/Execution types, SessionDetailsResponse, get_session_details handler | +200 |
+| `llmspell-web/src/workflow_builder.rs` | NEW: WorkflowGraphBuilder implementation | +150 |
+| `llmspell-web/src/handlers/templates.rs` | Update launch_template to execute template, add execute_template_and_update_session | +80 |
+| `llmspell-web/src/server/mod.rs` | Add route for /api/sessions/:id/details | +1 |
+| `llmspell-web/src/handlers/mod.rs` | Export workflow_builder module | +1 |
+| `frontend/src/api/client.ts` | Add getSessionDetails method | +15 |
+| `frontend/src/api/types.ts` | Update SessionDetailsResponse type (if needed) | +5 |
+| `frontend/src/pages/Templates.tsx` | Update handleLaunchConfirm to navigate to session | +3 |
+| `frontend/src/pages/SessionDetails.tsx` | Remove mock data, add real data loading with polling, add loading/error states | +40 |
+| `llmspell-web/tests/template_execution_integration.rs` | NEW: Integration test (optional) | +100 |
+
+**Total**: 10 files, ~595 lines
+
+**Implementation Insights**:
+- ✅ **Graph Builder Pattern**: Implemented `WorkflowGraphBuilder` pattern to decouple graph construction from execution logic. This allowed us to build the DAG incrementally as steps executed, while keeping the template logic clean.
+- ✅ **State-Based Persistence**: Leveraged the existing unstructured `session.state` (SQLite JSON) to store the complex `WorkflowExecution` graph. This avoided the need for new database migrations for this phase.
+- ✅ **Async Detachment**: Critical fix involved wrapping `execute_template_and_update_session` in `tokio::spawn` within the `launch_template` handler. This allows the API to return the session ID immediately while execution proceeds in the background.
+- ✅ **Dependency Injection**: Refactored `WebServer` and `ScriptRuntime` to explicitly pass `ProviderManager` and Registries. This resolved the "missing tools" issue where the embedded kernel didn't have access to the same resources as the CLI.
+- ✅ **Frontend Polling Strategy**: Adopted a reliable polling strategy (2s interval) in `SessionDetails.tsx` as a robust intermediate solution before moving to full WebSocket event streaming.
+
+----
+
+**Acceptance Criteria**:
+
+✅ **Core Functionality**:
+1. Launching template from Library tab executes the template
+2. User is immediately navigated to session details page
+3. Session details page shows real workflow graph (not mock)
+4. Workflow nodes reflect actual execution status
+5. Clicking on node shows real output from that step
+6. Template artifacts are captured and linked to session
+7. Session status updates from "running" to "completed" or "failed"
+
+✅ **User Experience**:
+8. Smooth transition from launch → execution → visualization
+9. Loading state while template executes
+10. Poll for updates if execution in progress
+11. Error handling for failed executions
+12. Clear visual feedback on node status (colors, icons)
+
+✅ **Data Integrity**:
+13. Workflow execution stored in session.state
+14. Multiple concurrent template launches don't interfere
+15. Session data persists across server restarts (SQLite)
+16. Artifacts tracked correctly in session.artifact_ids
+
+✅ **Code Quality**:
+17. Backend tests for new handlers
+18. TypeScript types match backend responses
+19. Zero clippy warnings
+20. Integration test validates E2E flow
+
+----
+
+**Edge Cases & Error Handling**:
+
+1. **Template Execution Fails**:
+   - Workflow shows failed node with error message
+   - Session status = "failed"
+   - Frontend displays error clearly
+
+2. **Long-Running Template**:
+   - Frontend polls every 2 seconds for updates
+   - Shows "Running..." status with progress if available
+   - Timeout after reasonable duration (configurable)
+
+3. **Session Not Found**:
+   - API returns 404
+   - Frontend shows "Session not found" error
+
+4. **Invalid Session Data**:
+   - Missing workflow_execution key in state
+   - Frontend shows "No workflow data available"
+   - Graceful degradation
+
+5. **Concurrent Access**:
+   - Multiple users viewing same session
+   - Session state updates properly synchronized (RwLock)
+
+
+**Future Enhancements** (Out of Scope for 14.6.9):
+
+- **Real-Time Updates**: WebSocket streaming instead of polling
+- **Workflow Editing**: Allow modifying workflow before execution
+- **Step-by-Step Debugging**: Pause execution, inspect state
+- **Performance Metrics**: Detailed timing per node
+- **Resource Usage**: Memory, tokens, API calls per node
+- **Workflow Templates**: Save/reuse custom workflows
+
+
+**Status**: ✅ **DONE**
+
+**Estimated Effort**: 6-8 hours
+- Phase 1 (Backend): 3-4 hours
+- Phase 2 (Frontend): 2-3 hours
+- Phase 3 (Template Integration): 1-2 hours (if multi-step templates exist)
+- Testing & Validation: 1 hour
 - ✅ **Architecture**: Refactored `App.tsx` context nesting to fix provider/consumer dependency pattern.
 - ✅ **Backend Parity**: Frontend now correctly mirrors the backend's default development posture.

@@ -135,10 +135,9 @@ export function Templates() {
     };
 
     const handleLaunchConfirm = async (id: string, config: Record<string, any>) => {
-        await api.launchTemplate(id, config);
-        // Navigate to the new session or show success
-        // For now, let's navigate to sessions page
-        navigate('/sessions');
+        const response = await api.launchTemplate(id, config);
+        // Navigate to the new session details page
+        navigate(`/sessions/${response.session_id}`);
     };
 
     const getCategoryLabel = (cat: string | Record<string, string>) => {

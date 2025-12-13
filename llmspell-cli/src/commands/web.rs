@@ -26,7 +26,22 @@ pub async fn handle_web_command(
                 .expect("Failed to create runtime");
             let executor = Arc::new(runtime);
 
-            // 2. Start Kernel (Transport mode for web interface)
+            // 2. Extract Dependencies (before moving ownership)
+            let dependencies = llmspell_web::server::WebDependencies {
+                tool_registry: Some(executor.tool_registry().clone()),
+                agent_registry: Some(executor.agent_registry().clone()),
+                workflow_factory: Some(executor.workflow_factory().clone()),
+                provider_manager: Some(
+                    executor
+                        .provider_manager()
+                        .create_core_manager_arc()
+                        .await
+                        .expect("Failed to create provider manager"),
+                ),
+                provider_config: Some(Arc::new(config.providers.clone())),
+            };
+
+            // 3. Start Kernel (Transport mode for web interface)
             let kernel_handle = start_embedded_kernel_with_executor(
                 config,
                 executor,
@@ -35,7 +50,7 @@ pub async fn handle_web_command(
             .await
             .expect("Failed to start kernel");
 
-            // 3. Configure Web Server
+            // 4. Configure Web Server
             let web_config = WebConfig {
                 port,
                 host,
@@ -47,8 +62,8 @@ pub async fn handle_web_command(
                 web_config.host, web_config.port
             );
 
-            // 4. Run Server
-            WebServer::run(web_config, kernel_handle, config_path).await?;
+            // 5. Run Server
+            WebServer::run(web_config, kernel_handle, config_path, dependencies).await?;
 
             Ok(())
         }

@@ -43,7 +43,7 @@ async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> 
     return response.json();
 }
 
-import type { ConfigItem, UpdateConfigResponse, Template, TemplateDetails, LaunchTemplateResponse, ExecuteScriptRequest, ExecuteScriptResponse, ToolDefinition, ExecuteToolResponse } from './types';
+import type { ConfigItem, UpdateConfigResponse, Template, TemplateDetails, LaunchTemplateResponse, ExecuteScriptRequest, ExecuteScriptResponse, ToolDefinition, ExecuteToolResponse, SessionDetailsResponse } from './types';
 
 interface LoginResponse {
     token: string;
@@ -58,6 +58,7 @@ export const api = {
     getHealth: () => fetchJson<HealthResponse>('/health'),
     getSessions: () => fetchJson<Session[]>(`${API_BASE}/sessions`),
     getSession: (id: string) => fetchJson<Session>(`${API_BASE}/sessions/${id}`),
+    getSessionDetails: (id: string) => fetchJson<SessionDetailsResponse>(`${API_BASE}/sessions/${id}/details`),
 
     // Template API
     getTemplates: () => fetchJson<Template[]>(`${API_BASE}/templates`),

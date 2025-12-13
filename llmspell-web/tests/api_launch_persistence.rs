@@ -197,6 +197,14 @@ async fn test_authenticated_template_launch_persistence() -> Result<()> {
             llmspell_config::env::EnvRegistry::new(),
         ));
 
+        // Create empty registries for AppState requirements
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory = Arc::new(llmspell_workflows::DefaultWorkflowFactory::new());
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+
         let state = AppState {
             kernel: handle_mutex,
             metrics_recorder: recorder_handle,
@@ -204,6 +212,11 @@ async fn test_authenticated_template_launch_persistence() -> Result<()> {
             runtime_config,
             config_store: None,
             static_config_path: None,
+            tool_registry: Some(tool_registry),
+            agent_registry: Some(agent_registry),
+            workflow_factory: Some(workflow_factory),
+            provider_manager: Some(provider_manager),
+            provider_config: Some(provider_config),
         };
         let app = WebServer::build_app(state);
         axum::serve(listener, app).await.unwrap();

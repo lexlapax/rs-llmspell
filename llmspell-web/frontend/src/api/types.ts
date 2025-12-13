@@ -90,11 +90,14 @@ export interface TemplateMetadata {
 export interface WorkflowNode {
     id: string;
     label: string;
-    type: 'agent' | 'tool' | 'process';
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    data?: any;
-    x?: number; // Force graph coordinates
-    y?: number;
+    type: string;
+    status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+    started_at?: string;
+    completed_at?: string;
+    duration_ms?: number;
+    output?: any;
+    error?: string;
+    position: { x: number; y: number };
 }
 
 export interface WorkflowLink {
@@ -106,17 +109,34 @@ export interface WorkflowLink {
 export interface WorkflowExecution {
     nodes: WorkflowNode[];
     links: WorkflowLink[];
+    status: string;
+    started_at: string;
+    completed_at?: string;
 }
 
-export interface SessionDetails {
+export interface ArtifactInfo {
     id: string;
-    template_id: string;
+    name: string;
+    type: string;
+    size: number;
     created_at: string;
-    status: string;
-    workflow: WorkflowExecution;
-    metadata: Record<string, any>;
-    logs: string[]; // Placeholder for logs
 }
+
+export interface SessionDetailsResponse {
+    id: string;
+    name: string;
+    template_id?: string;
+    template_name?: string;
+    created_at: string;
+    updated_at: string;
+    status: string;
+    metadata: Record<string, any>;
+    workflow?: WorkflowExecution;
+    logs: string[];
+    artifacts: ArtifactInfo[];
+}
+
+export interface SessionDetails extends SessionDetailsResponse { } // Alias for compatibility if needed
 
 
 export interface LaunchTemplateResponse {
