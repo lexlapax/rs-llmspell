@@ -598,6 +598,59 @@ git commit -m "refactor(crate): Improve code structure"
 
 ---
 
+## Frontend Development
+
+The web interface (Phase 14) is built with React, Vite, and embedded into the Rust binary.
+
+### Setup
+
+Prerequisites: Node.js 18+ and npm.
+
+```bash
+cd llmspell-web/frontend
+npm install
+```
+
+### Running Locally
+
+Start the Vite dev server with hot-reload and API proxy:
+
+```bash
+# 1. Start Rust backend in one terminal (API server)
+./target/debug/llmspell web start --port 3000
+
+# 2. Start Vite dev server in another terminal
+cd llmspell-web/frontend
+npm run dev
+# Access at http://localhost:5173 (Requests proxied to port 3000)
+```
+
+### Building for Release
+
+The frontend assets are embedded using `rust-embed`. You MUST build the frontend assets before building the Rust binary for UI changes to be reflected in the final executable.
+
+```bash
+# 1. Build frontend
+cd llmspell-web/frontend
+npm run build
+# Output generated in llmspell-web/frontend/dist/
+
+# 2. Build Rust binary (embeds dist/ folder)
+cd ../..
+cargo build --release -p llmspell-cli --bin llmspell
+```
+
+### Frontend Testing
+
+```bash
+cd llmspell-web/frontend
+npm run test      # Run unit tests (Vitest)
+npm run lint      # Run ESLint
+npm run typecheck # Run TypeScript checks
+```
+
+---
+
 ## Performance Validation
 
 ### Targets and Measurement

@@ -11,22 +11,24 @@ Complete user guide for all llmspell CLI commands.
    - [exec](#exec) - Execute inline code
    - [repl](#repl) - Interactive REPL
    - [debug](#debug) - Debug scripts
-4. [Kernel Management](#kernel-management)
+4. [Web Interface (Phase 14)](#web-interface)
+   - [web](#web) - Manage web interface
+5. [Kernel Management](#kernel-management)
    - [kernel](#kernel) - Manage kernel servers
-5. [State Management](#state-management)
+6. [State Management](#state-management)
    - [state](#state) - Persistent state operations
    - [session](#session) - Session management
-6. [Configuration](#configuration)
+7. [Configuration](#configuration)
    - [config](#config) - Configuration management
    - [keys](#keys) - API key management
    - [backup](#backup) - Backup/restore
    - [storage](#storage) - Storage export/import
-7. [Scripting Resources](#scripting-resources)
+8. [Scripting Resources](#scripting-resources)
    - [app](#app) - Application management
    - [tool](#tool) - Tool operations
    - [model](#model) - Model management
    - [template](#template) - Template execution (Phase 12)
-8. [Memory & Context (Phase 13)](#memory--context)
+9. [Memory & Context (Phase 13)](#memory--context)
    - [memory](#memory) - Memory operations
    - [context](#context) - Context assembly
 
@@ -260,6 +262,101 @@ llmspell debug script.lua --port 9229
 - Inspecting LLM responses
 - Finding script errors
 - IDE integration (VS Code, etc.)
+
+## Web Interface (Phase 14)
+
+### web
+
+Manage the full-stack web interface server.
+
+**Usage**:
+```bash
+llmspell web <SUBCOMMAND>
+```
+
+**Subcommands**:
+- `start` - Start the web server
+- `status` - Check if server is running
+- `stop` - Stop the server
+- `open` - Open web interface in browser
+
+#### START - Start the web server
+
+```bash
+llmspell web start [OPTIONS]
+```
+
+**Options**:
+- `-p, --port <PORT>` - Server port (default: 3000)
+- `--host <HOST>` - Bind address (default: 127.0.0.1)
+- `--daemon` - Run as background daemon
+- `--pid-file <PATH>` - Custom PID file path
+- `--log-file <PATH>` - Custom log file path (for daemon)
+
+**Examples**:
+```bash
+# Start on default port (http://localhost:3000)
+llmspell web start
+
+# Start on custom port and host
+llmspell web start --port 8080 --host 0.0.0.0
+
+# Start as daemon
+llmspell web start --daemon --log-file ./server.log
+
+# Use production profile
+llmspell -p openai-prod web start
+```
+
+#### STATUS - Check server status
+
+```bash
+llmspell web status
+```
+
+**Examples**:
+```bash
+# Check if running
+llmspell web status
+# Output: Web server is running (PID: 12345, PID file: /tmp/llmspell-kernel-web.pid)
+```
+
+#### STOP - Stop server
+
+```bash
+llmspell web stop
+```
+
+**Examples**:
+```bash
+# Stop running instance
+llmspell web stop
+```
+
+#### OPEN - Open in browser
+
+```bash
+llmspell web open [OPTIONS]
+```
+
+**Options**:
+- `-p, --port <PORT>` - Target port (default: 3000)
+- `--host <HOST>` - Target host (default: 127.0.0.1)
+
+**Examples**:
+```bash
+# Open default URL
+llmspell web open
+
+# Open custom deployment
+llmspell web open --host 192.168.1.50 --port 8080
+```
+
+**Use Cases**:
+- Developer dashboard ("Mission Control")
+- Real-time monitoring
+- Interactive script development
+- Template library exploration
 
 ## Kernel Management
 

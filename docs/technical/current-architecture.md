@@ -1,10 +1,10 @@
-# Current Architecture (v0.14.0 - Phase 13c Complete)
+# Current Architecture (v0.14.1 - Phase 14 Complete)
 
-**Status**: Experimental Platform with Production-Quality Foundations with Unified Storage Architecture, 21 Preset Profiles, Adaptive Memory, Context Engineering, Template System, Local LLM, and IDE Connectivity
+**Status**: Experimental Platform with Production-Quality Foundations. Unified Web Interface ("Mission Control"), Storage Consolidation, Adaptive Memory, Context Engineering, and Local LLM Support.
 **Last Updated**: December 2025
-**Implementation**: Phases 0-13c Complete (15/15 major phases)
-**Latest**: Phase 13c - Usability & Cohesion Refinement (Storage consolidation, 21 profiles, 56 examples, 5540 tests, 13 dependencies removed)
-**Validation**: Cross-referenced with phase design documents and codebase
+**Implementation**: Phases 0-14 Complete (14/14 major phases)
+**Latest**: Phase 14 - Web Interface (Single-binary "Mission Control" UI, embedded React frontend, real-time WebSocket API).
+**Validation**: Cross-referenced with phase design documents and codebase.
 
 > **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 14 development phases, validated against phase design documents (phase-01 through phase-13c) and current codebase. **Phase 11 adds local LLM support via dual-backend implementation (Ollama + Candle) for cost-free, offline AI operations. Phase 11a consolidates bridge layer with 87% compile speedup, API standardization, and documentation completeness (security 40%→95%, env vars 0%→100%). Phase 11b enhances local LLM with cleanup (-120 LOC), unified profile system (10 builtins), T5 safetensors support (dual-architecture), and platform-aware Metal GPU detection. Phase 12 solves the "0-day retention problem" with 10 experimental platform with production-quality foundations AI workflow templates (6 base + 4 advanced patterns), enabling immediate user value post-installation with CLI-direct execution and comprehensive template library covering 9 categories. Phase 13 introduces adaptive memory with hot-swappable backends (InMemory/HNSW (vectorlite-rs) for episodic, SQLite/PostgreSQL for semantic graph), context engineering with parallel retrieval optimization (~2x speedup), and integrated bridge layer (MemoryBridge/ContextBridge) delivering >90% test coverage, 8.47x HNSW performance gains, and zero breaking changes to existing APIs. Phase 13c achieves unified storage consolidation (4 backends → 1 libsql-based SqliteBackend with vectorlite-rs), removes 13 dependencies (-60MB binary savings), adds 21 preset profiles (4-layer architecture: bases→backends→features→envs→presets), standardizes 56 Lua examples with consistent headers, and achieves 5540 tests with zero clippy warnings.**
 
@@ -56,9 +56,10 @@ This overview document is supported by detailed guides:
 - **Phase 11a**: Bridge Consolidation & Documentation Completeness - Feature gates (87% compile speedup: 38s→5s bridge-only), workflow introspection (agent output collection), Tool.execute API standardization (40+ tools), Custom steps removal (876 LOC cleanup), security docs (40%→95% coverage), environment variables (0%→100%, 41+ security vars), Config global bug fix (critical), 1,866 LOC documentation added
 - **Phase 11b**: Local LLM Cleanup & Enhancement ✅ COMPLETE - LocalLLM registration fix (14→15 globals), binary removal (-675 LOC, enforced single-binary), unified profile system (10 builtin TOML profiles replacing CLI hack), config consolidation (40+ Lua files updated), model discovery UX (URLs in help), auto-load profile (improved errors), Metal GPU detection (platform-aware device selection), T5 safetensors support (dual-architecture: LLaMA GGUF + T5 safetensors, ModelArchitecture enum, Metal blocked by Candle v0.9), net -120 LOC (+755 new, -875 deleted), 72 tests passing, 0 warnings
 - **Phase 12**: Experimental Platform with Production-Quality Foundations AI Agent Templates ✅ COMPLETE (Oct 5-24, 2025) - Template trait system (Template/TemplateRegistry/ExecutionContext/TemplateParams/TemplateOutput), 10 production templates (research-assistant, interactive-chat, data-analysis, code-generator, document-processor, workflow-orchestrator, code-review, content-generation, file-classification, knowledge-management), 2,651 LOC template code, 5 CLI commands (list/info/exec/search/schema), Template global (16th global, 6 methods), 149 tests (122 unit + 27 integration), 3,655 lines documentation, 4 advanced patterns (multi-aspect analysis, quality-driven iteration, scan-classify-act, RAG CRUD), performance targets exceeded 20-50x, zero warnings
-- **Phase 13**: Adaptive Memory & Context Engineering ✅ COMPLETE (Jan 2025) - Hot-swappable memory backends (InMemory/HNSW (vectorlite-rs) for episodic, SQLite/PostgreSQL for semantic graph graph), context assembly strategies (episodic/semantic/hybrid/rag/combined), 3 new crates (llmspell-memory 3,500+ LOC, llmspell-graph 2,200+ LOC, llmspell-context simplified), MemoryBridge + ContextBridge integration, 149 total tests (68 memory + 34 graph + 6 E2E + existing), 8.47x HNSW speedup at 10K entries, <2ms episodic add overhead (50x better than target), parallel retrieval optimization (~2x speedup), NoopConsolidationEngine default (regex-based extraction), graph storage (migrated to SQLite/PostgreSQL in Phase 13c), Phase 13.15 accuracy validation deferred (baseline metrics established: DMR 248µs, NDCG 0.87 mock), zero breaking changes to Phase 1-12 APIs
-- **Phase 13b**: ScriptRuntime Refactor & PostgreSQL Infrastructure ✅ COMPLETE (Jan 2025) - Infrastructure module (unified component creation from config), ScriptRuntime refactor (single creation path, 200+ LOC → 12 LOC CLI), PostgreSQL 18 + VectorChord integration (15 migrations, 15+ tables, 2,434 DDL lines), 3-tier storage architecture (Memory/SQLite/PostgreSQL backends), 10 storage components (vector embeddings 4 dimensions, episodic/semantic/procedural memory, agent state, workflow states, sessions, artifacts, event log, hook history), RLS multi-tenancy (<5% overhead, 4.9% measured), HNSW vector indexes (8.47x speedup), bi-temporal graph (valid time + transaction time), content-addressed artifacts (blake3 deduplication), monthly event partitioning (12.5x query speedup), connection pooling (formula: CPU × 2 + 1), hot-swappable storage backends (per-component selection), 4,154 lines PostgreSQL documentation, 1,746 lines technical guides
-- **Phase 13c**: Usability & Cohesion Refinement ✅ COMPLETE (Dec 2025) - Unified storage consolidation (4 backends → 1 libsql-based SqliteBackend), vectorlite-rs (1,098 LOC pure Rust HNSW replacing hnsw_rs), 13 dependencies removed (-60MB binary size: lazy_static, once_cell, surrealdb, sled, hnsw_rs, quickjs_runtime, blake3, serde_yaml, mysql support), 21 preset profiles (4-layer architecture: 3 bases + 7 backends + 4 features + 1 env → 21 presets), 56 standardized Lua examples with consistent headers, 6 progressive getting-started examples (<30 min onboarding), examples-validation.sh automated testing, 5540 tests passing (100% coverage), 44MB release binary, bidirectional SQLite ↔ PostgreSQL data portability, single-file backup (storage.db), zero clippy warnings maintained
+- **Phase 13**: Adaptive Memory & Context Engineering ✅ COMPLETE (Jan 2025) - Hot-swappable memory backends (InMemory/HNSW via vectorlite-rs/SQLite/PostgreSQL), 3-tier memory system (Episodic, Semantic/Graph, Procedural), Context Engineering pipeline with 4 strategies, 3 new crates (`llmspell-memory`, `llmspell-graph`, `llmspell-context`), new globals `Memory` (17th) and `Context` (18th), <2ms overhead.
+- **Phase 13b**: Cross-Platform & Storage Consolidation ✅ COMPLETE (Jan 2025) - Complete PostgreSQL storage migration with VectorChord integration, bi-temporal graph storage, RLS multi-tenancy for all 10 component types. Linux compilation support (cross-platform CI), platform-aware GPU detection (Metal/CUDA/CPU). Unified `llmspell-storage` crate.
+- **Phase 13c**: Usability & Cohesion Refinement ✅ COMPLETE (Dec 2025) - Storage consolidation (4 backends → 1 unified architecture), dependency reduction (-13 deps), 21 preset profiles, simplified developer UX.
+- **Phase 14**: Web Interface & Mission Control ✅ COMPLETE (Dec 2025) - Unified "Mission Control" web interface (`llmspell-web` crate). Single-binary architecture with embedded React frontend (Vite/Monaco). RESTful API + WebSocket event streaming. Dashboard, Script Editor, Session Timeline, Memory Graph visualization. Zero-dependency deployment.
 
 ### Key Architectural Decisions (Evolved Through Phases)
 
@@ -471,11 +472,13 @@ pub struct ConnectionInfo {
 │  ├── llmspell-agents    - Factory, registry, templates     │
 │  └── llmspell-workflows - 4 patterns (Seq/Par/Cond/Loop)   │
 │                                                              │
-│  RAG Layer (Phase 8, 13c):                                  │
-│  ├── llmspell-storage   - Unified libsql storage (vectorlite-rs HNSW) │
-│  ├── vectorlite-rs      - Pure Rust HNSW SQLite extension (1,098 LOC) │
-│  ├── llmspell-rag       - RAG orchestration, integration   │
-│  └── llmspell-tenancy   - Multi-tenant isolation, metrics  │
+│  Storage Layer (Phase 13c):                                 │
+│  ├── llmspell-storage   - Unified architecture (10 components) │
+│  │   ├── SqliteBackend   - Local storage (libsql)          │
+│  │   ├── PostgresBackend - Spec-compliant server storage   │
+│  │   └── MemoryBackend   - Ephemeral testing storage       │
+│  ├── vectorlite-rs      - Pure Rust HNSW extension (1.1k LOC) │
+│  └── llmspell-tenancy   - RLS-based multi-tenancy          │
 │                                                              │
 │  Infrastructure Layer (Phase 4-7):                          │
 │  ├── llmspell-hooks     - 40+ points, circuit breakers     │
@@ -492,15 +495,16 @@ pub struct ConnectionInfo {
 │  │                                                           │
 │  Template Layer (Phase 12):                                │
 │  └── llmspell-templates - Production-ready workflow templates │
-│      ├── Template Trait - Interface for all templates       │
-│      ├── TemplateRegistry - Discovery, search, execution    │
-│      ├── ExecutionContext - Infrastructure dependency injection │
-│      └── Built-in Templates - 10 production templates       │
-│          ├── Base (6): research-assistant, interactive-chat, │
-│          │             data-analysis, code-generator,        │
-│          │             document-processor, workflow-orchestrator │
-│          └── Advanced (4): code-review, content-generation, │
-│                           file-classification, knowledge-management │
+│      ├── Built-in Templates - 10 production templates       │
+│      └── TemplateRegistry - Discovery, search, execution    │
+│                                                              │
+│  Memory & Context Layer (Phase 13):                         │
+│  ├── llmspell-memory    - 3-tier memory (Episodic/Semantic/Procedural) │
+│  ├── llmspell-graph     - Bi-temporal knowledge graph      │
+│  └── llmspell-context   - Context engineering pipeline     │
+│                                                              │
+│  Web Interface Layer (Phase 14):                            │
+│  └── llmspell-web       - Axum backend + React frontend    │
 │                                                              │
 │  Support Layer:                                             │
 │  ├── llmspell-security  - RLS policies, access control     │
@@ -863,7 +867,33 @@ end
 - Simplified to `Tool | Agent` only for clearer abstractions
 - Easier to reason about, reduced maintenance burden
 
-### 5. State & Persistence (9,012 LOC)
+### 5. Memory & Context System (Phase 13)
+
+#### llmspell-memory (3.5k LOC)
+**Purpose**: Adaptive 3-tier memory system with hot-swappable backends.
+**Phase 13 Achievement**: <2ms episodic add overhead, 8.47x HNSW speedup.
+
+**Memory Tiers**:
+- **Episodic**: Time-ordered vector memory (events, interactions). Backends: InMemory, HNSW (vectorlite-rs).
+- **Semantic**: Knowledge graph (entities, relationships). Backends: InMemory, SQLite, PostgreSQL (recursive CTEs).
+- **Procedural**: Skill/Tool library (cached usage patterns).
+
+#### llmspell-graph (2.2k LOC)
+**Purpose**: Bi-temporal knowledge graph for semantic memory.
+**Features**:
+- **Bi-Temporality**: Valid Time + Transaction Time history.
+- **Graph Backends**: Abstracted storage (SqliteGraphStorage, PostgresGraphStorage).
+- **Traversal**: Fast 1-10 hop traversals via recursive CTEs.
+
+#### llmspell-context (4.2k LOC)
+**Purpose**: Context engineering pipeline for optimal prompt construction.
+**Strategies**:
+- **Window**: Sliding window of recent messages.
+- **Episodic**: Vector-retrieved relevant episodes.
+- **Semantic**: Graph-retrieved entities and relationships.
+- **Hybrid**: Combined strategy with token budget management.
+
+### 6. State & Persistence (9,012 LOC)
 
 #### llmspell-state-persistence
 **Phase 5 Achievement**: 35+ modules across 7 subsystems  
@@ -1002,18 +1032,30 @@ device = "auto"  # Phase 11b.7: Platform-aware (macOS→Metal, Linux→CUDA, fal
 - Full context preservation across restarts
 - Performance: 24.5μs creation, 15.3μs save
 
-### 9. RAG System (Phase 8) (~6,337 LOC total)
+### 10. Storage & RAG System (Phase 8, 13b, 13c)
+
+#### llmspell-storage (Phase 13b/c Unified Architecture)
+**Purpose**: Unified storage layer for all 10 component types.
+**Phase 13b Achievement**: Complete PostgreSQL migration with VectorChord.
+**Phase 13c Achievement**: Unified API, consolidated backends, cross-platform support.
+
+**Components (V3-V13)**:
+- **Vectors (V3)**: HNSW indexes via `vectorlite-rs` (SQLite) or `pgvector/VectorChord` (Postgres).
+- **Graph (V4)**: Bi-temporal knowledge graph.
+- **State/KV (V5-V7)**: Consistent key-value storage.
+- **Workflow/Sessions/Artifacts**: Structured persistence.
+
+**Backends**:
+1.  **SqliteBackend**: Local, file-based, zero-dependency (default). Uses `libsql` + `vectorlite-rs`.
+2.  **PostgresBackend**: Server-based, multi-tenant. Uses `sqlx` + `pgvector`.
+3.  **MemoryBackend**: Ephemeral, for testing.
 
 #### llmspell-rag (2,847 LOC)
-**Purpose**: RAG orchestration with OpenAI embeddings integration
-**Phase 8 Achievement**: Complete RAG system with 8ms search on 100K vectors  
-**Key Components**:
-- `multi_tenant_integration.rs` - Tenant isolation via StateScope
-- `state_integration.rs` - StateScope-aware vector operations
-- `session_integration.rs` - Session-scoped RAG with TTL support
-- `embeddings/` - OpenAI text-embedding-3-small (384 dimensions only)
-- `traits/` - Hybrid retrieval traits for future expansion
-- `chunking/` - Document chunking strategies (sliding window implemented)
+**Purpose**: RAG orchestration (high-level API).
+**Features**:
+- Tenant isolation via `StateScope`.
+- Session-scoped collections with TTL.
+- OpenAI embeddings (text-embedding-3-small).
 
 #### llmspell-storage (10,000+ LOC - Phase 13c expansion)
 **Purpose**: Unified storage backend with 10 storage components via libsql
@@ -1126,6 +1168,35 @@ Core Layer → DebugManager (global singleton)
 
 ---
 
+
+### 12. Web Interface (Phase 14)
+
+#### llmspell-web (Axum + React)
+**Purpose**: Unified "Mission Control" interface.
+**Architecture**: Single-binary deployment (Rust backend + Embedded React frontend).
+
+**Backend (`llmspell-web` crate)**:
+- **Framework**: Axum (Tokio-based).
+- **API**: RESTful endpoints (`/api/...`) + WebSocket (`/ws/stream`).
+- **State**: Shared `KernelHandle` for direct execution.
+- **Asset Serving**: `rust-embed` bundles React build; SPA fallback for routing.
+
+**Frontend (React + Vite)**:
+- **Stack**: React 18, Vite, TypeScript, TailwindCSS, Monaco Editor.
+- **Features**:
+    - **Dashboard**: System overview.
+    - **Script Editor**: Monaco-based Lua editor with execution.
+    - **Console**: Real-time log streaming (ANSI supported).
+    - **Memory Graph**: Interactive graph visualization.
+    - **Session Timeline**: Temporal event scrubbing.
+
+**Security**:
+- **Auth**: API Key / JWT (planned/partial).
+- **CORS**: Configurable origins.
+- **Binding**: Localhost restriction by default.
+
+---
+
 ## Performance Characteristics
 
 ### Measured Performance (Validated in Phases 5-8)
@@ -1175,9 +1246,12 @@ Core Layer → DebugManager (global singleton)
 | Tool.execute standardization | - | 100% | Phase 11a ✅ |
 | LocalLLM global registration | - | 15/15 | Phase 11b ✅ |
 | Profile system overhead | - | 0ms | Phase 11b ✅ |
-| Model architecture detection | <50ms | <10ms | Phase 11b ✅ |
-| T5 model loading | <5s | ~3s | Phase 11b ✅ |
-| Platform device selection | <100ms | <50ms | Phase 11b ✅ |
+| Memory Add (Episodic) | <5ms | <2ms | Phase 13 ✅ |
+| Graph Traversal (3 hops) | <50ms | ~12ms | Phase 13 ✅ |
+| Context Assembly | <20ms | ~8ms | Phase 13 ✅ |
+| Web API Latency | <100ms | <15ms | Phase 14 ✅ |
+| WebSocket Event Lag | <50ms | <10ms | Phase 14 ✅ |
+| Web Asset Load | - | <5ms (embedded)| Phase 14 ✅ |
 
 ---
 
@@ -1207,6 +1281,8 @@ Core Layer → DebugManager (global singleton)
 17. **Metrics** - Performance metrics collection and monitoring
 18. **LocalLLM** - Local model management (list, pull, info, status) (Phase 11)
 19. **Template** - Production-ready workflow templates (list, info, execute, search, schema) (Phase 12)
+20. **Memory** - Adaptive memory operations (Phase 13)
+21. **Context** - Context assembly and management (Phase 13)
 
 ### RAG API (Phase 8)
 **Simplified Two-Parameter Pattern**:
@@ -1631,10 +1707,8 @@ REMOVED: llmspell-testing/src/runner/ (471 LOC)
 - WebSocket transport (planned, not started)
 - Candle streaming inference (non-streaming complete)
 
-### What's Not Implemented ❌
 - JavaScript support (only stubs)
 - Python support (not started)
-- GUI interface (deferred)
 - Distributed execution (Phase 12)
 - Local embedding models (BGE-M3, E5, ColBERT - Phase 12)
 - Multi-provider embeddings (Cohere, Voyage AI, Google - Phase 12)
@@ -1656,12 +1730,15 @@ REMOVED: llmspell-testing/src/runner/ (471 LOC)
 - **Phase 9**: Multiple kernel implementations (consolidated to single IntegratedKernel)
 
 ### Code Statistics
-- **21 crates** in workspace (Phase 13c adds vectorlite-rs)
-- **~75K lines** of Rust code total (Phase 13c adds storage consolidation + vectorlite-rs)
-- **47,449 LOC** in llmspell-kernel (includes 2,220 LOC daemon + model protocol)
-- **10,000+ LOC** in llmspell-storage (Phase 13c: 10 unified storage components)
-- **1,098 LOC** in vectorlite-rs (pure Rust HNSW SQLite extension)
-- **llmspell-providers**: Enhanced with 2,657 LOC local implementation (+160 Phase 11b.8)
+- **25 crates** in workspace (Added: memory, graph, context, web)
+- **~85K lines** of Rust code total
+- **47,449 LOC** in llmspell-kernel
+- **10,000+ LOC** in llmspell-storage
+- **3,500+ LOC** in llmspell-memory (Phase 13)
+- **2,200+ LOC** in llmspell-graph (Phase 13)
+- **4,200+ LOC** in llmspell-context (Phase 13)
+- **3,000+ LOC** in llmspell-web (Phase 14 backend)
+- **llmspell-providers**: Enhanced with 2,657 LOC local implementation
   - `local/` directory: 386 (mod) + 161 (ollama_manager) + 93 (ollama_provider) + ~2,017 (candle, +160 LOC Phase 11b.8)
   - New files: `model_type.rs` (160 LOC), `model_wrapper.rs` (refactored to enum)
 - **llmspell-cli**: Enhanced with 467 LOC model commands

@@ -2,9 +2,9 @@
 
 **Rapid AI Experimentation Platform** - Cast scripting spells to explore AI concepts, extract proven patterns to production-ready Rust
 
-**🚀 Version 0.14.0 - Usability & Cohesion Refinement**
+**🚀 Version 0.14.1 - Web Interface & Mission Control**
 
-**🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.14.0.md) | [🛠️ Examples](examples/) | [🔧 Contributing](CONTRIBUTING.md)
+**🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.14.1.md) | [🛠️ Examples](examples/) | [🔧 Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -24,7 +24,7 @@ rs-llmspell is an **experimental platform for rapid AI concept exploration**.
 
 Built with **production-quality engineering** (architecture, performance, testing, observability) to make the transition from experiment to production as painless as possible. We use Rust not because we're production-ready, but because proven patterns deserve solid foundations for extraction.
 
-**Current Status**: v0.14.0 complete. Usability & Cohesion Refinement with 21 preset profiles, 56 standardized Lua examples, and 5540 tests passing. Built on v0.13.1's production-ready PostgreSQL storage backend (10 unified backends), Row-Level Security multi-tenancy, and cross-platform support (Linux + macOS). Previous experimental features include adaptive memory (episodic/semantic/procedural), context engineering, 10 workflow templates, local LLM support (Ollama + Candle), and RAG with HNSW vector search. See [Documentation Hub](docs/) for comprehensive guides.
+**Current Status**: v0.14.1 complete. "Mission Control" Web Interface (Phase 14) now available with unified single-binary deployment. Includes embedded React frontend, Monaco script editor, real-time console, and visual memory/session exploration. Performance validated with <100ms API latency and <2ms overhead. Project retains v0.13.1's production foundations: 10 storage backends, RLS multi-tenancy, and 21 preset profiles with 5540+ passing tests.
 
 ---
 
@@ -257,7 +257,7 @@ export OPENAI_API_KEY="sk-..."  # Optional for cloud models
 
 ## 🎯 Development Phases (Experimental Infrastructure Evolution)
 
-**Completed (13/13 major phases)**:
+**Completed (14/14 major phases)**:
 - ✅ **Phase 0-6**: Foundation (traits, tools, hooks, state, sessions)
 - ✅ **Phase 7**: Infrastructure consolidation (536+ files refactored)
 - ✅ **Phase 8**: RAG system (HNSW vectors, multi-tenant)
@@ -268,9 +268,9 @@ export OPENAI_API_KEY="sk-..."  # Optional for cloud models
 - ✅ **Phase 11b**: LLM cleanup (unified profiles, T5 support)
 - ✅ **Phase 12**: Workflow templates (10 experimental templates)
 - ✅ **Phase 13**: Adaptive memory (3-tier, hot-swap backends, context engineering)
+- ✅ **Phase 14**: Web Interface (Unified Mission Control UI, single binary)
 
-**Upcoming Experimental Features** (Phases 14+):
-- **Phase 14**: Template composition (custom workflow building)
+**Upcoming Experimental Features** (Phases 15+):
 - **Phase 15**: Model Context Protocol (external tool integration)
 - **Phase 16**: Advanced orchestration patterns
 - **Phase 17-18**: Distributed execution, cloud platform
@@ -341,19 +341,19 @@ Apache License, Version 2.0. See [LICENSE-APACHE](LICENSE-APACHE) for details.
 
 ## 🚀 Latest Release
 
-**v0.14.0 - Usability & Cohesion Refinement**
+**v0.14.1 - Web Interface & Mission Control**
 
-Production-ready developer experience through consolidation and quality enhancement. Profile system standardization, example validation, and comprehensive quality infrastructure.
+Unified web interface for AI agent development and monitoring. Single-binary "Mission Control" with embedded React frontend.
 
 **Key Achievements**:
-- 🎯 21 Preset Profiles: Complete 4-layer architecture for any deployment scenario
-- 📚 56 Lua Examples: All standardized with consistent headers and profile recommendations
-- 🧪 5540 Tests: 100% passing across all crates with zero clippy warnings
-- 📖 6 Getting-Started Examples: Progressive <30 minute onboarding path
-- 🔧 Validation Scripts: examples-validation.sh, quality-check-minimal.sh, quality-check-fast.sh
-- 📦 44MB Release Binary: Optimized build with LTO
+- 🌐 Unified Web Interface: Dashboard, Editor, Sessions, Memory, Agents
+- 🚀 Single Binary: Embedded React frontend assets (no separate server)
+- ⚡ Real-Time: WebSocket streaming for console and events
+- 📊 Visualization: Interactive memory graph and session timeline
+- 🛠️ Editor: Monaco-based script editor with syntax highlighting
+- 🧘 Zero Config: `llmspell web start` works out of the box with defaults
 
-See [Release Notes](RELEASE_NOTES_v0.14.0.md) for complete details.
+See [Release Notes](RELEASE_NOTES_v0.14.1.md) for complete details.
 
 ---
 
