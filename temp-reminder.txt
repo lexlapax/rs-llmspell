@@ -17,3 +17,16 @@
 
   - replace libsql and sqlite with vector search and index with
   https://github.com/tursodatabase/turso after the vector indexing is ready.
+
+
+Take into account all the agent spec considerations and guidelines in @docs/rs-aikit-docs/final-agent-spec-recommendation.md, 
+the slightly older last attempt at rs-llmspell consolidation at @docs/rs-aikit-docs/rs-llmspell-consolidated-implementationplan.md
+and @docs/rs-aikit-docs/rs-llmspell-consolidated-design-doc.md and create a new @docs/rs-aikit-docs/master-architecture-vision.md 
+document. Take into account all that has been accomplished in current rs-llmspell implementation as documented in 
+@docs/technical/current-architecture.md, @docs/in-progress/implementation-plan.md, @docs/technical/master-architecture-vision.md
+and @docs/in-progess/PHASE*DONE.md files as reference.
+Make sure that the architecture includes things we have already accomplished, a kernel based architecture leveraging in process or daemon mode
+execution with zeromq based messaging, a way to add lua (or javascript) as wrapper for things implemented in rust, 
+the config system now needs to accomodate the full agent spec.. .. use sqlite as the default db, with postgres built for scalability, multi-tenancy
+from the get go, (the sqlite should have that too - but can default to current user as default tenant). Be very thorough. research on the web 
+if you need to. be thorough and make sure you cover all the bases. do not skip any steps. ultrathink.
