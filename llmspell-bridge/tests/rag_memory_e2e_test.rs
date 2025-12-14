@@ -4,7 +4,7 @@
 mod test_helpers;
 
 use async_trait::async_trait;
-use llmspell_bridge::ContextBridge;
+use llmspell_bridge::{ContextBridge, MemoryProvider};
 use llmspell_context::retrieval::{HybridRetriever, QueryPatternTracker, RetrievalWeights};
 use llmspell_core::state::StateScope;
 use llmspell_memory::{DefaultMemoryManager, EpisodicEntry, MemoryManager};
@@ -157,8 +157,10 @@ async fn test_rag_memory_hybrid_retrieval() {
     let rag_pipeline = Arc::new(MockRAGRetriever::with_rust_content()) as Arc<dyn RAGRetriever>;
 
     // Setup: Create ContextBridge with RAG pipeline
-    let context_bridge =
-        Arc::new(ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline.clone()));
+    let context_bridge = Arc::new(
+        ContextBridge::new(MemoryProvider::new_eager(memory.clone()))
+            .with_rag_pipeline(rag_pipeline.clone()),
+    );
 
     // Execute: Perform hybrid retrieval (RAG + Memory)
     info!("Executing hybrid retrieval with 'rag' strategy");
@@ -300,8 +302,10 @@ async fn test_rag_memory_session_isolation() {
 
     // Setup: Create ContextBridge with RAG
     let rag_pipeline = Arc::new(MockRAGRetriever::with_rust_content()) as Arc<dyn RAGRetriever>;
-    let context_bridge =
-        Arc::new(ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline));
+    let context_bridge = Arc::new(
+        ContextBridge::new(MemoryProvider::new_eager(memory.clone()))
+            .with_rag_pipeline(rag_pipeline),
+    );
 
     // Execute: Query Session A
     info!("Querying Session A");
@@ -379,7 +383,9 @@ async fn test_rag_memory_without_rag_pipeline() {
 
     // Setup: Create ContextBridge WITHOUT RAG pipeline
     info!("Creating ContextBridge without RAG pipeline");
-    let context_bridge = Arc::new(ContextBridge::new(memory.clone()));
+    let context_bridge = Arc::new(ContextBridge::new(MemoryProvider::new_eager(
+        memory.clone(),
+    )));
 
     // Execute: Try to use "rag" strategy without RAG pipeline
     info!("Executing 'rag' strategy without RAG pipeline (should fallback to hybrid)");
@@ -416,8 +422,10 @@ async fn test_rag_memory_token_budget_allocation() {
     // Setup
     let memory = create_memory_with_test_data(session_id).await;
     let rag_pipeline = Arc::new(MockRAGRetriever::with_rust_content()) as Arc<dyn RAGRetriever>;
-    let context_bridge =
-        Arc::new(ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline));
+    let context_bridge = Arc::new(
+        ContextBridge::new(MemoryProvider::new_eager(memory.clone()))
+            .with_rag_pipeline(rag_pipeline),
+    );
 
     // Test different token budgets
     for budget in [500, 1000, 2000, 4000] {

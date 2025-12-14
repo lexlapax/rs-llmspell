@@ -2255,6 +2255,7 @@ mod tests {
             session_manager,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap()

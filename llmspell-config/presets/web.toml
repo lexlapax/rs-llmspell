@@ -1,0 +1,4 @@
+[web]
+port = 3000
+host = "127.0.0.1"
+cors_origins = ["http://localhost:3000"]

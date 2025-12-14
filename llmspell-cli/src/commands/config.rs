@@ -251,6 +251,7 @@ async fn list_profiles(detailed: bool, output_format: OutputFormat) -> Result<()
                         "name": p.name,
                         "category": p.category,
                         "description": p.description,
+                        "layers": p.layers,
                         "use_cases": p.use_cases,
                         "features": p.features,
                     })
@@ -266,22 +267,32 @@ async fn list_profiles(detailed: bool, output_format: OutputFormat) -> Result<()
             > = std::collections::HashMap::new();
             for profile in &profiles {
                 by_category
-                    .entry(profile.category)
+                    .entry(profile.category.as_str())
                     .or_default()
                     .push(profile);
             }
 
-            println!("Available Builtin Profiles:");
+            println!("Available Builtin Profiles ({} total):", profiles.len());
+            println!();
+            println!("Syntax: llmspell -p PROFILE_NAME");
+            println!("        llmspell -p presets/PROFILE_NAME  (explicit)");
+            println!("        llmspell -p bases/X,features/Y,envs/Z  (multi-layer)");
             println!();
 
-            // Display in order: Core, Common Workflows, Local LLM, RAG
-            for category in &["Core", "Common Workflows", "Local LLM", "RAG"] {
+            // Display in order: Core, Development, Local LLM, Production, RAG
+            let category_order = ["Core", "Development", "Local LLM", "Production", "RAG"];
+
+            for category in &category_order {
                 if let Some(category_profiles) = by_category.get(category) {
                     println!("{}:", category);
                     for profile in category_profiles {
                         println!("  {} - {}", profile.name, profile.description);
 
                         if detailed {
+                            // Show layer composition
+                            if !profile.layers.is_empty() {
+                                println!("    Layers: {}", profile.layers.join(", "));
+                            }
                             println!("    Use Cases:");
                             for use_case in &profile.use_cases {
                                 println!("      • {}", use_case);
@@ -297,12 +308,30 @@ async fn list_profiles(detailed: bool, output_format: OutputFormat) -> Result<()
                 }
             }
 
-            if !detailed {
-                println!("Use --detailed/-d to see use cases and key features for each profile.");
-            }
+            println!(
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            );
             println!();
-            println!("Usage: llmspell -p PROFILE_NAME run script.lua");
+            if !detailed {
+                println!("💡 Use --detailed/-d to see:");
+                println!("   • Layer composition (bases/features/envs/backends)");
+                println!("   • Use cases for each profile");
+                println!("   • Key features and capabilities");
+                println!();
+            }
+            println!("📚 Production Presets (Full Features):");
+            println!("   gemini-prod, openai-prod, claude-prod");
+            println!("   → All include: Graph + RAG + Memory + Context + SQLite");
+            println!("   → Only differ in default LLM provider");
+            println!();
+            println!("🔧 Multi-Layer Composition:");
+            println!("   bases/*      - Deployment modes (cli, daemon, embedded, testing)");
+            println!("   features/*   - Capabilities (minimal, llm, rag, memory, full)");
+            println!("   envs/*       - Tuning (dev, staging, prod, perf)");
+            println!("   backends/*   - Storage (memory, sqlite, postgres)");
+            println!();
             println!("Example: llmspell -p rag-dev run my_script.lua");
+            println!("Example: llmspell -p bases/cli,features/full,envs/prod,backends/sqlite run app.lua");
         }
     }
 

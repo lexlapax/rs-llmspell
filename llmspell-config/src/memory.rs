@@ -1,10 +1,11 @@
 //! ABOUTME: Memory system configuration for adaptive memory with LLM consolidation
 //! ABOUTME: Handles episodic memory, semantic consolidation, and daemon scheduling
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Comprehensive memory system configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct MemoryConfig {
     /// Enable memory functionality
@@ -25,7 +26,7 @@ impl MemoryConfig {
 }
 
 /// LLM-driven consolidation configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct ConsolidationConfig {
     /// Provider name for LLM consolidation (falls back to global default_provider)
@@ -61,7 +62,7 @@ impl ConsolidationConfig {
 }
 
 /// Background daemon configuration for memory consolidation
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct DaemonConfig {
     /// Enable background consolidation daemon

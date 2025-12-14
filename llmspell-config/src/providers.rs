@@ -1,6 +1,7 @@
 //! ABOUTME: Provider configuration definitions for llmspell  
 //! ABOUTME: Manages LLM provider configurations and credentials
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -9,7 +10,7 @@ fn default_true() -> bool {
 }
 
 /// Provider manager configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct ProviderManagerConfig {
     /// Default provider to use
@@ -102,7 +103,7 @@ impl Default for ProviderManagerConfigBuilder {
 }
 
 /// Individual provider configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct ProviderConfig {
     /// Provider name identifier
@@ -321,7 +322,7 @@ impl Default for ProviderConfigBuilder {
 }
 
 /// Rate limiting configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct RateLimitConfig {
     /// Requests per minute
     pub requests_per_minute: u32,
@@ -342,7 +343,7 @@ impl Default for RateLimitConfig {
 }
 
 /// Retry configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct RetryConfig {
     /// Maximum number of retries
     pub max_retries: u32,

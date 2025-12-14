@@ -1,7 +1,7 @@
 //! Virtual table helper functions
 
 use crate::distance::DistanceMetric;
-use rusqlite::vtab::IndexInfo;
+
 use rusqlite::Result as SqliteResult;
 use std::str::from_utf8;
 
@@ -18,12 +18,12 @@ pub fn parse_dimension(args: &[&[u8]]) -> SqliteResult<usize> {
         if let Ok(s) = from_utf8(arg) {
             if let Some(dim_str) = s.strip_prefix("dimension=") {
                 if let Ok(dim) = dim_str.parse::<usize>() {
-                    if matches!(dim, 384 | 768 | 1536 | 3072) {
+                    if dim > 0 {
                         return Ok(dim);
                     }
                 }
                 return Err(rusqlite::Error::ModuleError(format!(
-                    "Invalid dimension {dim_str}, must be 384/768/1536/3072"
+                    "Invalid dimension {dim_str}, must be > 0"
                 )));
             }
         }
@@ -116,49 +116,6 @@ pub fn parse_m(args: &[&[u8]]) -> Option<usize> {
     None
 }
 
-/// Implement best_index for query optimization
-///
-/// This tells SQLite how to optimize queries:
-/// - If WHERE clause has `embedding MATCH ?`, use HNSW search (low cost)
-/// - Otherwise, full table scan (high cost)
-///
-/// # Errors
-///
-/// Returns error if index info cannot be set
-pub fn best_index(info: &mut IndexInfo) -> SqliteResult<()> {
-    use rusqlite::vtab::IndexConstraintOp;
-
-    // Check if there's a MATCH constraint on embedding column
-    let mut has_match = false;
-
-    for (constraint, mut constraint_usage) in info.constraints_and_usages() {
-        // Column 1 is embedding (0=rowid, 1=embedding, 2=distance)
-        // Check for MATCH operator on embedding column
-        if constraint.column() == 1
-            && constraint.operator() == IndexConstraintOp::SQLITE_INDEX_CONSTRAINT_MATCH
-        {
-            // Mark this constraint as usable
-            constraint_usage.set_argv_index(1);
-            constraint_usage.set_omit(true);
-            has_match = true;
-        }
-    }
-
-    if has_match {
-        // HNSW search: low cost
-        info.set_estimated_cost(1000.0);
-        info.set_estimated_rows(100);
-        info.set_idx_num(1); // 1 = HNSW search
-    } else {
-        // Full table scan: high cost
-        info.set_estimated_cost(1_000_000.0);
-        info.set_estimated_rows(100_000);
-        info.set_idx_num(0); // 0 = full scan
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,7 +128,8 @@ mod tests {
         let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table", b"dimension=1536"];
         assert_eq!(parse_dimension(args).unwrap(), 1536);
 
-        let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table", b"dimension=512"];
+        // Test dimension=0 (should fail)
+        let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table", b"dimension=0"];
         assert!(parse_dimension(args).is_err());
 
         let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table"];

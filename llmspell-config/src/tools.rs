@@ -1,6 +1,7 @@
 //! ABOUTME: Tool configuration definitions for llmspell
 //! ABOUTME: Manages tool-specific configurations including security settings
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -26,7 +27,7 @@ fn default_blocked_extensions() -> Vec<String> {
 }
 
 /// Tools configuration - Single source of truth for ALL tool settings
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct ToolsConfig {
     /// Enable tool system globally
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -160,7 +161,7 @@ impl Default for ToolsConfigBuilder {
 }
 
 /// Network configuration for tools
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct NetworkConfig {
     /// Default timeout for network operations in seconds
     pub timeout_seconds: u64,
@@ -171,7 +172,7 @@ pub struct NetworkConfig {
 }
 
 /// File operations tool configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct FileOperationsConfig {
     /// Whether file operations are enabled
@@ -387,7 +388,7 @@ impl Default for FileOperationsConfigBuilder {
 }
 
 /// Web search tool configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct WebSearchConfig {
     /// Rate limit requests per minute
@@ -525,7 +526,7 @@ impl Default for WebSearchConfigBuilder {
 }
 
 /// HTTP request tool configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct HttpRequestConfig {
     /// Allowed hosts (empty = all allowed)
@@ -677,7 +678,7 @@ impl Default for HttpRequestConfigBuilder {
 }
 
 /// Web tools configuration (scraping, monitoring, API testing)
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct WebToolsConfig {
     /// User agent string for web requests
     pub user_agent: Option<String>,
@@ -692,7 +693,7 @@ pub struct WebToolsConfig {
 }
 
 /// Media processing tools configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct MediaToolsConfig {
     /// Maximum file size for media processing
     pub max_file_size: Option<usize>,
@@ -707,7 +708,7 @@ pub struct MediaToolsConfig {
 }
 
 /// Database tools configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct DatabaseToolsConfig {
     /// Connection timeout in seconds
     pub connection_timeout_seconds: Option<u64>,
@@ -722,7 +723,7 @@ pub struct DatabaseToolsConfig {
 }
 
 /// Email tools configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct EmailToolsConfig {
     /// SMTP server host
     pub smtp_host: Option<String>,
@@ -742,7 +743,7 @@ pub struct EmailToolsConfig {
 }
 
 /// System tools configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct SystemToolsConfig {
     /// Allow process execution
     pub allow_process_execution: Option<bool>,
@@ -757,7 +758,7 @@ pub struct SystemToolsConfig {
 }
 
 /// Data processing tools configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct DataToolsConfig {
     /// Maximum CSV file size
     pub max_csv_size: Option<usize>,
@@ -772,7 +773,7 @@ pub struct DataToolsConfig {
 }
 
 /// Academic tools configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct AcademicToolsConfig {
     /// API key for citation services
     #[serde(skip_serializing)]
@@ -786,7 +787,7 @@ pub struct AcademicToolsConfig {
 }
 
 /// Document processing tools configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct DocumentToolsConfig {
     /// Maximum PDF file size
     pub max_pdf_size: Option<usize>,
@@ -801,7 +802,7 @@ pub struct DocumentToolsConfig {
 }
 
 /// Search tools configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub struct SearchToolsConfig {
     /// Default search engine
     pub default_engine: Option<String>,

@@ -1,6 +1,7 @@
 //! ABOUTME: Core memory bridge providing language-agnostic memory operations
 //! ABOUTME: Wraps `MemoryManager` for script access with async→blocking conversion
 
+use crate::MemoryProvider;
 use llmspell_memory::{
     ConsolidationMode, ConsolidationResult, Entity, EpisodicEntry, MemoryManager,
 };
@@ -22,8 +23,8 @@ use tracing::{debug, error, info, trace};
 /// })
 /// ```
 pub struct MemoryBridge {
-    /// Reference to the memory manager
-    memory_manager: Arc<dyn MemoryManager>,
+    /// Memory provider (supports lazy initialization)
+    provider: MemoryProvider,
 }
 
 impl MemoryBridge {
@@ -31,22 +32,27 @@ impl MemoryBridge {
     ///
     /// # Arguments
     ///
-    /// * `memory_manager` - The memory manager to wrap
+    /// * `provider` - The memory provider (eager or lazy)
     ///
     /// # Example
     ///
     /// ```ignore
-    /// use llmspell_memory::DefaultMemoryManager;
-    /// use llmspell_bridge::MemoryBridge;
-    /// use std::sync::Arc;
-    ///
-    /// let memory = Arc::new(DefaultMemoryManager::new_in_memory()?);
-    /// let bridge = MemoryBridge::new(memory);
+    /// // Eager
+    /// let provider = MemoryProvider::new_eager(memory);
+    /// let bridge = MemoryBridge::new(provider);
     /// ```
     #[must_use]
-    pub fn new(memory_manager: Arc<dyn MemoryManager>) -> Self {
+    pub fn new(provider: MemoryProvider) -> Self {
         info!("Creating MemoryBridge");
-        Self { memory_manager }
+        Self { provider }
+    }
+
+    /// Helper to get memory manager or return error string
+    async fn get_manager(&self) -> Result<Arc<dyn MemoryManager>, String> {
+        self.provider
+            .get()
+            .await
+            .map_err(|e| format!("Memory system unavailable: {e}"))
     }
 
     /// Log episodic add operation start
@@ -159,8 +165,8 @@ impl MemoryBridge {
         let mut entry = EpisodicEntry::new(session_id, role, content);
         entry.metadata = metadata;
 
-        let id = self
-            .memory_manager
+        let manager = self.get_manager().await?;
+        let id = manager
             .episodic()
             .add(entry)
             .await
@@ -206,7 +212,8 @@ impl MemoryBridge {
         query: &str,
         limit: usize,
     ) -> Result<Vec<EpisodicEntry>, String> {
-        self.memory_manager
+        self.get_manager()
+            .await?
             .episodic()
             .search(query, limit)
             .await
@@ -223,7 +230,8 @@ impl MemoryBridge {
         limit: usize,
     ) -> Result<Vec<EpisodicEntry>, String> {
         let session_entries = self
-            .memory_manager
+            .get_manager()
+            .await?
             .episodic()
             .get_session(session_id)
             .await
@@ -296,7 +304,8 @@ impl MemoryBridge {
     /// ```
     /// Query semantic memory backend
     async fn query_semantic_backend(&self) -> Result<Vec<Entity>, String> {
-        self.memory_manager
+        self.get_manager()
+            .await?
             .semantic()
             .query_by_type("")
             .await
@@ -373,7 +382,8 @@ impl MemoryBridge {
         session_id: &str,
         mode: ConsolidationMode,
     ) -> Result<ConsolidationResult, String> {
-        self.memory_manager
+        self.get_manager()
+            .await?
             .consolidate(session_id, mode, None)
             .await
             .map_err(|e| {
@@ -444,8 +454,8 @@ impl MemoryBridge {
 
         // Get episodic count by searching with large limit
         // TODO: Phase 13.9 - Add count() method to EpisodicMemory trait
-        let episodic_count = self
-            .memory_manager
+        let manager = self.get_manager().await?;
+        let episodic_count = manager
             .episodic()
             .search("", 10000)
             .await
@@ -453,8 +463,7 @@ impl MemoryBridge {
             .unwrap_or(0);
 
         // Get semantic count
-        let semantic_count = self
-            .memory_manager
+        let semantic_count = manager
             .semantic()
             .query_by_type("")
             .await
@@ -462,8 +471,7 @@ impl MemoryBridge {
             .unwrap_or(0);
 
         // Get unprocessed sessions
-        let sessions_with_unprocessed = self
-            .memory_manager
+        let sessions_with_unprocessed = manager
             .episodic()
             .list_sessions_with_unprocessed()
             .await
@@ -479,9 +487,9 @@ impl MemoryBridge {
             "episodic_count": episodic_count,
             "semantic_count": semantic_count,
             "sessions_with_unprocessed": sessions_with_unprocessed,
-            "has_episodic": self.memory_manager.has_episodic(),
-            "has_semantic": self.memory_manager.has_semantic(),
-            "has_consolidation": self.memory_manager.has_consolidation(),
+            "has_episodic": manager.has_episodic(),
+            "has_semantic": manager.has_semantic(),
+            "has_consolidation": manager.has_consolidation(),
         });
 
         Ok(stats)
@@ -503,7 +511,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = MemoryBridge::new(Arc::new(memory_manager));
+        let bridge = MemoryBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Test stats (should be empty)
         let stats = runtime
@@ -522,7 +530,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = MemoryBridge::new(Arc::new(memory_manager));
+        let bridge = MemoryBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Add entry
         let id = runtime
@@ -554,7 +562,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = MemoryBridge::new(Arc::new(memory_manager));
+        let bridge = MemoryBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Query semantic (should be empty)
         let results = runtime
@@ -574,7 +582,7 @@ mod tests {
                 .expect("Failed to create memory manager")
         });
 
-        let bridge = MemoryBridge::new(Arc::new(memory_manager));
+        let bridge = MemoryBridge::new(MemoryProvider::new_eager(Arc::new(memory_manager)));
 
         // Add entry
         runtime

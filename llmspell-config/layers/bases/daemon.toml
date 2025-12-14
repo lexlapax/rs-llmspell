@@ -1,6 +1,23 @@
 # Daemon Base Layer
 # Long-running service for production deployments
 
+[metadata]
+name = "daemon"
+category = "base"
+description = "Background daemon mode"
+use_cases = [
+    "Long-running background service",
+    "Production deployments",
+    "Multi-user server",
+    "24/7 operation"
+]
+features = [
+    "High concurrency (100 scripts)",
+    "Persistent state with backups",
+    "Structured JSON logging",
+    "Event tracking and export"
+]
+
 [profile]
 name = "Daemon Base"
 description = "Production daemon mode with persistence and monitoring"
@@ -76,3 +93,8 @@ emit_state_events = true
 
 [events.export]
 file = "/var/log/llmspell/events.jsonl"
+
+[storage]
+base_dir = "/var/lib/llmspell"
+database_path = "/var/lib/llmspell/data/llmspell.db"
+sessions_dir = "/var/lib/llmspell/sessions"

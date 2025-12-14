@@ -10,7 +10,7 @@
 
 > **📚 Central Hub**: Your starting point for AI experimentation with LLMSpell. Everything you need is organized into **11 numbered guides** plus a comprehensive appendix with complete API references. Master the essentials quickly, then explore advanced features at your own pace!
 
-**Version**: 0.13.1 | **Status**: Phase 13b Complete - Production Storage Infrastructure & Documentation Consolidation | **Last Updated**: 2025-11-08
+**Version**: 0.14.1 | **Status**: Phase 14 Complete - Web Interface & Mission Control | **Last Updated**: 2025-12-13
 
 ---
 
@@ -117,6 +117,15 @@
 - Automated migration pipelines
 - Cross-region and cross-environment migrations
 
+### [12. Web Interface](12-web-interface.md)
+**Browser-based "Mission Control" for AI agents**
+- Dashboard monitoring and quick actions
+- Embedded script editor with syntax highlighting
+- Visual session and memory graph exploration
+- Interactive template library and launch forms
+- Real-time agent monitoring and console streaming
+- Tool catalog and interactive execution
+
 ---
 
 ## 📚 Appendix: Complete API References
@@ -173,6 +182,17 @@ export OPENAI_API_KEY="sk-..."
 ```
 
 ---
+
+## 🆕 Phase 14 Features (Complete)
+
+### Web Interface & Mission Control
+- **Unified Web Interface**: Single-binary deployment with embedded React frontend
+- **Interactive Development**: Monaco-based script editor and real-time console
+- **Visual Exploration**: Force-directed graphs for memory, timeline views for sessions
+- **Template Library UI**: Browse, search, and launch workflows from the browser
+- **API & WebSocket**: RESTful endpoints and real-time event streaming
+- **CLI Command**: `llmspell web start` to launch mission control
+- **Performance**: <100ms API latency, real-time WebSocket updates
 
 ## 🆕 Phase 13 Features (Complete)
 

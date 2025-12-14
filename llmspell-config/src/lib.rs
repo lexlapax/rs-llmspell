@@ -3,6 +3,7 @@
 
 use anyhow::{Context, Result};
 use llmspell_core::error::LLMSpellError;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::env as std_env;
 use std::path::{Path, PathBuf};
@@ -21,18 +22,69 @@ pub use crate::rag::{
 };
 pub use crate::tools::{FileOperationsConfig, ToolsConfig};
 
+/// Storage configuration
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(default)]
+pub struct StorageConfig {
+    /// Base directory for all storage (defaults to ~/.llmspell)
+    pub base_dir: Option<PathBuf>,
+    /// Path to the main database file
+    pub database_path: Option<PathBuf>,
+    /// Path to the sessions directory
+    pub sessions_dir: Option<PathBuf>,
+    /// SQLite specific configuration
+    pub sqlite: Option<SqliteStorageConfig>,
+}
+
+/// SQLite specific storage configuration
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct SqliteStorageConfig {
+    /// Path override specific to SQLite backend
+    pub database_path: Option<PathBuf>,
+    /// SQLite journal mode (WAL, DELETE, etc.)
+    pub journal_mode: Option<String>,
+}
+
+impl Default for SqliteStorageConfig {
+    fn default() -> Self {
+        Self {
+            database_path: None,
+            journal_mode: Some("WAL".to_string()),
+        }
+    }
+}
+
 pub mod debug;
 pub mod engines;
 pub mod env;
 pub mod env_registry;
+pub mod layer_metadata;
 pub mod memory;
 pub mod merge;
+pub mod preset_metadata;
 pub mod profile_composer;
 pub mod profile_resolver;
 pub mod providers;
 pub mod rag;
 pub mod tools;
 pub mod validation;
+
+/// Helper to expand ~ in paths
+fn resolve_path(path: &Path, home_dir: Option<&PathBuf>) -> PathBuf {
+    if let Ok(stripped) = path.strip_prefix("~") {
+        if let Some(home) = home_dir {
+            return home.join(stripped);
+        }
+    } else if let Some(path_str) = path.to_str() {
+        if let Some(stripped) = path_str.strip_prefix("~/") {
+            if let Some(home) = home_dir {
+                return home.join(stripped);
+            }
+        }
+    }
+    path.to_path_buf()
+}
 
 use crate::env_registry::register_standard_vars;
 
@@ -49,22 +101,28 @@ const CONFIG_SEARCH_PATHS: &[&str] = &[
 const ENV_PREFIX: &str = "LLMSPELL_";
 
 /// Metadata describing a builtin configuration profile
+///
+/// This metadata is dynamically generated from layer composition.
+/// Each preset composes multiple layers (bases, features, envs, backends)
+/// and the metadata reflects the combined capabilities.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileMetadata {
     /// Profile name (e.g., "minimal", "rag-dev")
-    pub name: &'static str,
+    pub name: String,
     /// Category (e.g., "Core", "RAG", "Local LLM")
-    pub category: &'static str,
+    pub category: String,
     /// Short description
-    pub description: &'static str,
+    pub description: String,
     /// Common use cases
-    pub use_cases: Vec<&'static str>,
+    pub use_cases: Vec<String>,
     /// Key features
-    pub features: Vec<&'static str>,
+    pub features: Vec<String>,
+    /// Layer composition (e.g., ["bases/cli", "features/rag", "envs/dev"])
+    pub layers: Vec<String>,
 }
 
 /// Central LLMSpell configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct LLMSpellConfig {
     /// Default script engine to use
@@ -86,6 +144,8 @@ pub struct LLMSpellConfig {
     pub debug: DebugConfig,
     /// RAG (Retrieval-Augmented Generation) configuration
     pub rag: RAGConfig,
+    /// Storage configuration
+    pub storage: StorageConfig,
 }
 
 impl Default for LLMSpellConfig {
@@ -100,6 +160,7 @@ impl Default for LLMSpellConfig {
             events: EventsConfig::default(),
             debug: DebugConfig::default(),
             rag: RAGConfig::default(),
+            storage: StorageConfig::default(),
         }
     }
 }
@@ -126,6 +187,7 @@ impl LLMSpellConfig {
 
         // Use registry for environment overrides
         config.apply_env_registry()?;
+        config.resolve_storage_paths()?;
         config.validate()?;
 
         Ok(config)
@@ -151,6 +213,76 @@ impl LLMSpellConfig {
         self.merge_from_json_impl(&env_config)?;
 
         Ok(())
+    }
+
+    /// Resolve all storage paths, expanding ~ and handling defaults
+    pub fn resolve_storage_paths(&mut self) -> Result<(), ConfigError> {
+        // Helper to get home directory
+        let home_dir = std_env::var("HOME")
+            .or_else(|_| std_env::var("USERPROFILE"))
+            .ok()
+            .map(PathBuf::from);
+
+        // 1. Resolve base_dir
+        let base_dir = if let Some(base) = &self.storage.base_dir {
+            resolve_path(base, home_dir.as_ref())
+        } else if let Some(home) = &home_dir {
+            home.join(".llmspell")
+        } else {
+            // Fallback to current directory if no home
+            PathBuf::from(".llmspell")
+        };
+        self.storage.base_dir = Some(base_dir.clone());
+
+        // 2. Resolve database_path
+        if let Some(db_path) = &self.storage.database_path {
+            self.storage.database_path = Some(resolve_path(db_path, home_dir.as_ref()));
+        } else {
+            // Default: base_dir/data/llmspell.db
+            self.storage.database_path = Some(base_dir.join("data").join("llmspell.db"));
+        }
+
+        // 3. Resolve sessions_dir
+        if let Some(sessions_path) = &self.storage.sessions_dir {
+            self.storage.sessions_dir = Some(resolve_path(sessions_path, home_dir.as_ref()));
+        } else {
+            // Default: base_dir/sessions
+            self.storage.sessions_dir = Some(base_dir.join("sessions"));
+        }
+
+        // 4. Resolve sqlite specific path if set
+        if let Some(sqlite) = &mut self.storage.sqlite {
+            if let Some(db_path) = &sqlite.database_path {
+                sqlite.database_path = Some(resolve_path(db_path, home_dir.as_ref()));
+            }
+        }
+
+        // Ensure directories exist
+        if let Some(db_path) = &self.storage.database_path {
+            if let Some(parent) = db_path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| ConfigError::FileSystem {
+                    path: parent.to_path_buf(),
+                    message: format!("Failed to create database directory: {}", e),
+                })?;
+            }
+        }
+
+        if let Some(sessions_dir) = &self.storage.sessions_dir {
+            std::fs::create_dir_all(sessions_dir).map_err(|e| ConfigError::FileSystem {
+                path: sessions_dir.clone(),
+                message: format!("Failed to create sessions directory: {}", e),
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Helper to get resolved database path
+    pub fn database_path(&self) -> PathBuf {
+        self.storage.database_path.clone().unwrap_or_else(|| {
+            // This should generally not be hit if resolve_storage_paths is called
+            PathBuf::from("llmspell.db")
+        })
     }
 
     /// Merge values from JSON config (from registry) - exposed for testing
@@ -924,6 +1056,34 @@ impl LLMSpellConfig {
             }
         }
 
+        // Merge storage configuration
+        if let Some(storage) = json.get("storage").and_then(|v| v.as_object()) {
+            if let Some(base_dir) = storage.get("base_dir").and_then(|v| v.as_str()) {
+                debug!("Overriding storage.base_dir from env: {}", base_dir);
+                self.storage.base_dir = Some(PathBuf::from(base_dir));
+            }
+            if let Some(db_path) = storage.get("database_path").and_then(|v| v.as_str()) {
+                debug!("Overriding storage.database_path from env: {}", db_path);
+                self.storage.database_path = Some(PathBuf::from(db_path));
+            }
+            if let Some(sessions_dir) = storage.get("sessions_dir").and_then(|v| v.as_str()) {
+                debug!("Overriding storage.sessions_dir from env: {}", sessions_dir);
+                self.storage.sessions_dir = Some(PathBuf::from(sessions_dir));
+            }
+
+            if let Some(sqlite) = storage.get("sqlite").and_then(|v| v.as_object()) {
+                let sqlite_config = self
+                    .storage
+                    .sqlite
+                    .get_or_insert(SqliteStorageConfig::default());
+                if let Some(db_path) = sqlite.get("database_path").and_then(|v| v.as_str()) {
+                    sqlite_config.database_path = Some(PathBuf::from(db_path));
+                }
+                if let Some(journal) = sqlite.get("journal_mode").and_then(|v| v.as_str()) {
+                    sqlite_config.journal_mode = Some(journal.to_string());
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1111,7 +1271,7 @@ impl LLMSpellConfig {
     /// # Errors
     ///
     /// Returns `ConfigError::NotFound` if the profile name is not recognized.
-    fn load_builtin_profile(name: &str) -> Result<Self, ConfigError> {
+    pub fn load_builtin_profile(name: &str) -> Result<Self, ConfigError> {
         use crate::profile_composer::ProfileComposer;
         use crate::profile_resolver::resolve_profile_spec;
 
@@ -1120,7 +1280,12 @@ impl LLMSpellConfig {
 
         // Use ProfileComposer to load and compose the layers
         let mut composer = ProfileComposer::new();
-        let config = composer.load_multi(&layers)?;
+        let mut config = composer.load_multi(&layers)?;
+
+        // Apply environment variable overrides and resolve paths
+        config.apply_env_registry()?;
+        config.resolve_storage_paths()?;
+        config.validate()?;
 
         Ok(config)
     }
@@ -1170,24 +1335,24 @@ impl LLMSpellConfig {
 
     /// Get metadata for a specific builtin profile
     ///
-    /// Returns structured information about a profile including category,
-    /// description, use cases, and key features.
+    /// Returns metadata dynamically composed from the profile's layer configuration.
+    /// This ensures metadata always matches the actual layer composition.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use llmspell_config::LLMSpellConfig;
     ///
-    /// // TODO(13c.4): Profile system rearchitecture in progress
-    /// let metadata = LLMSpellConfig::get_profile_metadata("providers");
-    /// assert!(metadata.is_none()); // Temporarily None during rearchitecture
+    /// let metadata = LLMSpellConfig::get_profile_metadata("rag-dev");
+    /// assert!(metadata.is_some());
+    /// let meta = metadata.unwrap();
+    /// assert_eq!(meta.name, "rag-dev");
+    /// assert_eq!(meta.category, "RAG");
+    /// assert!(!meta.layers.is_empty());
     /// ```
     #[must_use]
-    pub fn get_profile_metadata(_name: &str) -> Option<ProfileMetadata> {
-        // TODO(13c.4): Profile system rearchitecture in progress
-        // Old monolithic profile metadata removed
-        // Layer-based metadata coming in 13c.4.2+
-        None
+    pub fn get_profile_metadata(name: &str) -> Option<ProfileMetadata> {
+        crate::preset_metadata::compose_preset_metadata(name).ok()
     }
 
     /// List metadata for all builtin profiles
@@ -1200,13 +1365,11 @@ impl LLMSpellConfig {
     /// ```rust
     /// use llmspell_config::LLMSpellConfig;
     ///
-    /// // TODO(13c.4): Profile system rearchitecture in progress
     /// let all_metadata = LLMSpellConfig::list_profile_metadata();
-    /// assert_eq!(all_metadata.len(), 0); // Temporarily empty during rearchitecture
+    /// assert_eq!(all_metadata.len(), 20); // All 20 profiles have metadata
     /// ```
     #[must_use]
     pub fn list_profile_metadata() -> Vec<ProfileMetadata> {
-        // Automatically returns empty vec since list_builtin_profiles() is empty
         Self::list_builtin_profiles()
             .iter()
             .filter_map(|name| Self::get_profile_metadata(name))
@@ -1311,7 +1474,7 @@ impl Default for LLMSpellConfigBuilder {
 }
 
 /// Global runtime configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct GlobalRuntimeConfig {
     /// Maximum concurrent scripts
@@ -1430,7 +1593,7 @@ impl Default for GlobalRuntimeConfigBuilder {
 }
 
 /// Security configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct SecurityConfig {
     /// Allow file system access
@@ -1458,7 +1621,7 @@ impl Default for SecurityConfig {
 }
 
 /// State persistence configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct StatePersistenceConfig {
     /// Enable state persistence (flattened from flags.core.enabled)
@@ -1480,7 +1643,7 @@ pub struct StatePersistenceConfig {
 }
 
 /// Backup configuration for state persistence
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct BackupConfig {
     /// Directory for backup storage
     pub backup_dir: Option<String>,
@@ -1528,7 +1691,7 @@ impl Default for BackupConfig {
 }
 
 /// Hook system configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct HookConfig {
     /// Enable hook system
@@ -1553,7 +1716,7 @@ impl Default for HookConfig {
 }
 
 /// Session management configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct SessionConfig {
     /// Enable session management
@@ -1584,7 +1747,7 @@ impl Default for SessionConfig {
 }
 
 /// Event system configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct EventsConfig {
     /// Enable event system globally
@@ -1621,7 +1784,7 @@ impl Default for EventsConfig {
 }
 
 /// Event filtering configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct EventFilterConfig {
     /// Event types to include (glob patterns)
@@ -1646,7 +1809,7 @@ impl Default for EventFilterConfig {
 }
 
 /// Event export configuration
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, JsonSchema)]
 #[serde(default)]
 pub struct EventExportConfig {
     /// Export events to stdout (for debugging)
@@ -1664,6 +1827,12 @@ pub struct EventExportConfig {
 pub enum ConfigError {
     #[error("Configuration file not found: {path} - {message}")]
     NotFound { path: String, message: String },
+
+    #[error("Filesystem error at {path:?}: {message}")]
+    FileSystem {
+        path: std::path::PathBuf,
+        message: String,
+    },
 
     #[error("Configuration validation failed in field '{field:?}': {message}")]
     Validation {

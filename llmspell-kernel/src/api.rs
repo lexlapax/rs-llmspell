@@ -37,32 +37,77 @@ pub struct KernelServiceConfig {
     pub script_executor: Arc<dyn ScriptExecutor>,
 }
 
+/// Execution mode for kernel handle
+///
+/// Determines how the kernel is used and what resources are allocated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KernelExecutionMode {
+    /// Direct execution mode (CLI)
+    ///
+    /// - Kernel available via `into_kernel()`
+    /// - No background spawn
+    /// - Use `execute_direct_with_args()` on kernel
+    Direct,
+
+    /// Transport-based execution mode (Web)
+    ///
+    /// - Kernel spawned in background
+    /// - Use `execute()` via transport
+    /// - `into_kernel()` returns error
+    Transport,
+}
+
+/// Internal mode data for `KernelHandle`
+///
+/// Stores mode-specific resources without duplication.
+enum KernelModeData {
+    /// Direct mode: kernel available for direct execution
+    Direct {
+        kernel: Box<IntegratedKernel<JupyterProtocol>>,
+    },
+    /// Transport mode: kernel spawned, only Arc refs stored
+    Transport {
+        transport: Arc<InProcessTransport>,
+        session_manager: Arc<crate::sessions::SessionManager>,
+        memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+        #[allow(dead_code)] // Reserved for future use (direct script execution via handle)
+        script_executor: Arc<dyn ScriptExecutor>,
+    },
+}
+
 /// Handle for an embedded kernel running in-process
+///
+/// The handle's behavior depends on the execution mode it was created with:
+/// - `Direct` mode: Use `into_kernel()` for direct execution
+/// - `Transport` mode: Use `execute()` for transport-based execution
 pub struct KernelHandle {
-    kernel: IntegratedKernel<JupyterProtocol>,
     kernel_id: String,
-    transport: Arc<InProcessTransport>,
     protocol: JupyterProtocol,
+    mode: KernelModeData,
 }
 
 impl KernelHandle {
-    /// Run the kernel until shutdown
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the kernel fails to run
-    pub async fn run(self) -> Result<()> {
-        info!("Running embedded kernel {}", self.kernel_id);
-        self.kernel.run().await
+    /// Get transport (only available in Transport mode)
+    fn get_transport(&self) -> Result<&Arc<InProcessTransport>> {
+        match &self.mode {
+            KernelModeData::Transport { transport, .. } => Ok(transport),
+            KernelModeData::Direct { .. } => {
+                Err(anyhow::anyhow!("Transport not available in Direct mode"))
+            }
+        }
     }
 
-    /// Execute code and return result
+    /// Execute code and return result (Transport mode only)
     ///
     /// # Errors
     ///
-    /// Returns an error if the execution fails or communication with kernel fails
+    /// Returns an error if the execution fails, communication with kernel fails,
+    /// or if called in Direct mode
+    #[allow(clippy::too_many_lines)]
     pub async fn execute(&mut self, code: &str) -> Result<String> {
         debug!("Executing code in kernel {}", self.kernel_id);
+
+        let transport = self.get_transport()?;
 
         // Create execute_request message
         let content = serde_json::json!({
@@ -76,34 +121,197 @@ impl KernelHandle {
         let request = self.protocol.create_request("execute_request", content)?;
 
         // Send request through transport
-        self.transport.send("shell", vec![request]).await?;
+        transport.send("shell", vec![request]).await?;
 
-        // Wait for execute_reply
+        let mut output_buffer = String::new();
+
+        // Wait for execution completion
+        // The correct termination condition is receiving 'status: idle' on iopub channel.
+        // execute_reply on shell channel provides the execution result metadata.
+        let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(30));
+        tokio::pin!(timeout);
+        let mut kernel_is_idle = false;
+
         loop {
-            if let Some(reply_parts) = self.transport.recv("shell").await? {
-                if let Some(first_part) = reply_parts.first() {
-                    // Parse reply and extract result
-                    let reply_msg = self.protocol.parse_message(first_part)?;
-                    if let Some(content) = reply_msg.get("content") {
-                        // Extract execution result
-                        return Ok(format!("Result: {content:?}"));
+            // Check termination condition at start of loop (in case we updated state)
+            if kernel_is_idle {
+                // Optional: could break here if we used idle as signal, but we use execute_reply now
+            }
+
+            tokio::select! {
+                () = &mut timeout => {
+                    return Err(anyhow::anyhow!("Timeout waiting for execution completion"));
+                }
+
+                // Shell channel for execute_reply
+                shell_res = transport.recv("shell") => {
+                    if let Ok(Some(reply_parts)) = shell_res {
+                         if let Some(first_part) = reply_parts.first() {
+                             if let Ok(reply_msg) = self.protocol.parse_message(first_part) {
+                                 if let Some(header) = reply_msg.get("header") {
+                                     if let Some(msg_type) = header.as_object().and_then(|h| h.get("msg_type")).and_then(|v| v.as_str()) {
+                                          if msg_type == "execute_reply" {
+                                              if let Some(_content) = reply_msg.get("content") {
+                                                  // Optional: check execution count
+                                              }
+                                              // We received the execution reply, so the kernel is done.
+                                              // We don't need to wait for 'status: idle' because the kernel
+                                              // flushes output before sending execute_reply.
+                                              break;
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                     }
+                 }
+
+                 // IOPub channel for stream/display_data and status
+                 iopub_res = transport.recv("iopub") => {
+                     if let Ok(Some(msg_parts)) = iopub_res {
+                         if let Some(first_part) = msg_parts.first() {
+                             if let Ok(msg) = self.protocol.parse_message(first_part) {
+                                 if let Some(header) = msg.get("header") {
+                                     if let Some(msg_type) = header.as_object().and_then(|h| h.get("msg_type")).and_then(|v| v.as_str()) {
+                                         match msg_type {
+                                             "status" => {
+                                                  // Optional: track status for debug, but don't control loop
+                                                 if let Some(content) = msg.get("content") {
+                                                     if let Some(execution_state) = content.get("execution_state").and_then(|s| s.as_str()) {
+                                                         if execution_state == "idle" {
+                                                             kernel_is_idle = true;
+                                                         }
+                                                     }
+                                                 }
+                                             },
+                                            "stream" => {
+                                                if let Some(content) = msg.get("content") {
+                                                    if let Some(text) = content.get("text").and_then(|t| t.as_str()) {
+                                                        output_buffer.push_str(text);
+                                                    }
+                                                }
+                                            },
+                                            "error" => {
+                                                if let Some(content) = msg.get("content") {
+                                                    if let Some(ename) = content.get("ename").and_then(|e| e.as_str()) {
+                                                        if let Some(evalue) = content.get("evalue").and_then(|e| e.as_str()) {
+                                                            use std::fmt::Write;
+                                                            let _ = write!(output_buffer, "\nError {ename}: {evalue}\n");
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                             "display_data" | "execute_result" => {
+                                                if let Some(content) = msg.get("content") {
+                                                    if let Some(data) = content.get("data") {
+                                                        if let Some(plain) = data.get("text/plain").and_then(|t| t.as_str()) {
+                                                            output_buffer.push_str(plain);
+                                                            output_buffer.push('\n');
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
+
+        // Drain any remaining IOPub messages that might have arrived after execute_reply
+        // or were in the channel but not processed due to select! fairness.
+        loop {
+            // Very short timeout to peek for messages
+            let drain_res = tokio::time::timeout(
+                tokio::time::Duration::from_millis(50),
+                transport.recv("iopub"),
+            )
+            .await;
+
+            match drain_res {
+                Ok(Ok(Some(msg_parts))) => {
+                    if let Some(first_part) = msg_parts.first() {
+                        if let Ok(msg) = self.protocol.parse_message(first_part) {
+                            if let Some(header) = msg.get("header") {
+                                if let Some(msg_type) = header
+                                    .as_object()
+                                    .and_then(|h| h.get("msg_type"))
+                                    .and_then(|v| v.as_str())
+                                {
+                                    match msg_type {
+                                        "stream" => {
+                                            if let Some(content) = msg.get("content") {
+                                                if let Some(text) =
+                                                    content.get("text").and_then(|t| t.as_str())
+                                                {
+                                                    output_buffer.push_str(text);
+                                                }
+                                            }
+                                        }
+                                        "error" => {
+                                            if let Some(content) = msg.get("content") {
+                                                if let Some(ename) =
+                                                    content.get("ename").and_then(|e| e.as_str())
+                                                {
+                                                    if let Some(evalue) = content
+                                                        .get("evalue")
+                                                        .and_then(|e| e.as_str())
+                                                    {
+                                                        use std::fmt::Write;
+                                                        let _ = write!(
+                                                            output_buffer,
+                                                            "\nError {ename}: {evalue}\n"
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        "display_data" | "execute_result" => {
+                                            if let Some(content) = msg.get("content") {
+                                                if let Some(data) = content.get("data") {
+                                                    if let Some(plain) = data
+                                                        .get("text/plain")
+                                                        .and_then(|t| t.as_str())
+                                                    {
+                                                        output_buffer.push_str(plain);
+                                                        output_buffer.push('\n');
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => break, // Timeout or error or empty -> done
+            }
+        }
+
+        let final_output = output_buffer;
+
+        Ok(final_output)
     }
 
-    /// Send a tool request to the kernel and return the response
+    /// Send a tool request to the kernel and return the response (Transport mode only)
     ///
     /// # Errors
     ///
-    /// Returns an error if the request fails or communication with kernel fails
+    /// Returns an error if the request fails, communication with kernel fails,
+    /// or if called in Direct mode
     pub async fn send_tool_request(
         &mut self,
         content: serde_json::Value,
     ) -> Result<serde_json::Value> {
         debug!("Sending tool request to kernel {}", self.kernel_id);
+
+        let transport = self.get_transport()?;
 
         // Create tool_request message
         let request = self.protocol.create_request("tool_request", content)?;
@@ -114,7 +322,7 @@ impl KernelHandle {
         );
 
         // Send request through transport
-        self.transport.send("shell", vec![request]).await?;
+        transport.send("shell", vec![request]).await?;
 
         // Wait for tool_reply
         let start_time = std::time::Instant::now();
@@ -125,7 +333,7 @@ impl KernelHandle {
                 return Err(anyhow::anyhow!("Timeout waiting for tool_reply"));
             }
 
-            if let Some(reply_parts) = self.transport.recv("shell").await? {
+            if let Some(reply_parts) = transport.recv("shell").await? {
                 trace!(
                     "Client received {} parts on shell channel",
                     reply_parts.len()
@@ -183,16 +391,19 @@ impl KernelHandle {
         }
     }
 
-    /// Send a template request to the kernel and return the response
+    /// Send a template request to the kernel and return the response (Transport mode only)
     ///
     /// # Errors
     ///
-    /// Returns an error if the request fails or communication with kernel fails
+    /// Returns an error if the request fails, communication with kernel fails,
+    /// or if called in Direct mode
     pub async fn send_template_request(
         &mut self,
         content: serde_json::Value,
     ) -> Result<serde_json::Value> {
         debug!("Sending template request to kernel {}", self.kernel_id);
+
+        let transport = self.get_transport()?;
 
         // Create template_request message
         let request = self.protocol.create_request("template_request", content)?;
@@ -203,7 +414,7 @@ impl KernelHandle {
         );
 
         // Send request through transport
-        self.transport.send("shell", vec![request]).await?;
+        transport.send("shell", vec![request]).await?;
 
         // Wait for template_reply
         let start_time = std::time::Instant::now();
@@ -214,7 +425,7 @@ impl KernelHandle {
                 return Err(anyhow::anyhow!("Timeout waiting for template_reply"));
             }
 
-            if let Some(reply_parts) = self.transport.recv("shell").await? {
+            if let Some(reply_parts) = transport.recv("shell").await? {
                 trace!(
                     "Client received {} parts on shell channel",
                     reply_parts.len()
@@ -272,16 +483,19 @@ impl KernelHandle {
         }
     }
 
-    /// Send a model management request to the kernel and return the response
+    /// Send a model management request to the kernel and return the response (Transport mode only)
     ///
     /// # Errors
     ///
-    /// Returns an error if the request fails or communication with kernel fails
+    /// Returns an error if the request fails, communication with kernel fails,
+    /// or if called in Direct mode
     pub async fn send_model_request(
         &mut self,
         content: serde_json::Value,
     ) -> Result<serde_json::Value> {
         debug!("Sending model request to kernel {}", self.kernel_id);
+
+        let transport = self.get_transport()?;
 
         // Create model_request message
         let request = self.protocol.create_request("model_request", content)?;
@@ -292,7 +506,7 @@ impl KernelHandle {
         );
 
         // Send request through transport
-        self.transport.send("shell", vec![request]).await?;
+        transport.send("shell", vec![request]).await?;
 
         // Wait for model_reply
         let start_time = std::time::Instant::now();
@@ -303,7 +517,7 @@ impl KernelHandle {
                 return Err(anyhow::anyhow!("Timeout waiting for model_reply"));
             }
 
-            if let Some(reply_parts) = self.transport.recv("shell").await? {
+            if let Some(reply_parts) = transport.recv("shell").await? {
                 trace!(
                     "Client received {} parts on shell channel",
                     reply_parts.len()
@@ -361,7 +575,7 @@ impl KernelHandle {
         }
     }
 
-    /// Send memory request and wait for response (Phase 13.12.1)
+    /// Send memory request and wait for response (Phase 13.12.1) (Transport mode only)
     ///
     /// This sends a memory operation request to the kernel and waits for the reply.
     /// Used by CLI memory commands to interact with the memory system via the kernel.
@@ -373,12 +587,14 @@ impl KernelHandle {
     /// The memory reply content as JSON value
     ///
     /// # Errors
-    /// Returns error if transport fails or response is invalid
+    /// Returns error if transport fails, response is invalid, or called in Direct mode
     pub async fn send_memory_request(
         &mut self,
         content: serde_json::Value,
     ) -> Result<serde_json::Value> {
         debug!("Sending memory request to kernel {}", self.kernel_id);
+
+        let transport = self.get_transport()?;
 
         // Create memory_request message
         let request = self.protocol.create_request("memory_request", content)?;
@@ -389,7 +605,7 @@ impl KernelHandle {
         );
 
         // Send request through transport
-        self.transport.send("shell", vec![request]).await?;
+        transport.send("shell", vec![request]).await?;
 
         // Wait for memory_reply
         let start_time = std::time::Instant::now();
@@ -400,7 +616,7 @@ impl KernelHandle {
                 return Err(anyhow::anyhow!("Timeout waiting for memory_reply"));
             }
 
-            if let Some(reply_parts) = self.transport.recv("shell").await? {
+            if let Some(reply_parts) = transport.recv("shell").await? {
                 trace!(
                     "Client received {} parts on shell channel",
                     reply_parts.len()
@@ -458,7 +674,7 @@ impl KernelHandle {
         }
     }
 
-    /// Send context request and wait for response (Phase 13.12.3)
+    /// Send context request and wait for response (Phase 13.12.3) (Transport mode only)
     ///
     /// This sends a context operation request to the kernel and waits for the reply.
     /// Used by CLI context commands to interact with the context assembly system.
@@ -470,12 +686,14 @@ impl KernelHandle {
     /// The context reply content as JSON value
     ///
     /// # Errors
-    /// Returns error if transport fails or response is invalid
+    /// Returns error if transport fails, response is invalid, or called in Direct mode
     pub async fn send_context_request(
         &mut self,
         content: serde_json::Value,
     ) -> Result<serde_json::Value> {
         debug!("Sending context request to kernel {}", self.kernel_id);
+
+        let transport = self.get_transport()?;
 
         // Create context_request message
         let request = self.protocol.create_request("context_request", content)?;
@@ -486,7 +704,7 @@ impl KernelHandle {
         );
 
         // Send request through transport
-        self.transport.send("shell", vec![request]).await?;
+        transport.send("shell", vec![request]).await?;
 
         // Wait for context_reply
         let start_time = std::time::Instant::now();
@@ -497,7 +715,7 @@ impl KernelHandle {
                 return Err(anyhow::anyhow!("Timeout waiting for context_reply"));
             }
 
-            if let Some(reply_parts) = self.transport.recv("shell").await? {
+            if let Some(reply_parts) = transport.recv("shell").await? {
                 trace!(
                     "Client received {} parts on shell channel",
                     reply_parts.len()
@@ -560,14 +778,70 @@ impl KernelHandle {
         &self.kernel_id
     }
 
-    /// Get the transport for client connections
-    pub fn transport(&self) -> Arc<InProcessTransport> {
-        self.transport.clone()
+    /// Get the transport for client connections (Transport mode only)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if called in Direct mode
+    pub fn transport(&self) -> Result<Arc<InProcessTransport>> {
+        match &self.mode {
+            KernelModeData::Transport { transport, .. } => Ok(transport.clone()),
+            KernelModeData::Direct { .. } => {
+                Err(anyhow::anyhow!("Transport not available in Direct mode"))
+            }
+        }
     }
 
-    /// Convert handle into the underlying kernel
-    pub fn into_kernel(self) -> IntegratedKernel<JupyterProtocol> {
-        self.kernel
+    /// Convert handle into the underlying kernel (Direct mode only)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if called in Transport mode
+    pub fn into_kernel(self) -> Result<IntegratedKernel<JupyterProtocol>> {
+        match self.mode {
+            KernelModeData::Direct { kernel } => Ok(*kernel),
+            KernelModeData::Transport { .. } => Err(anyhow::anyhow!(
+                "into_kernel() not available in Transport mode - kernel is spawned in background"
+            )),
+        }
+    }
+
+    /// Get the session manager
+    pub fn session_manager(&self) -> &Arc<crate::sessions::SessionManager> {
+        match &self.mode {
+            KernelModeData::Direct { kernel } => kernel.get_session_manager(),
+            KernelModeData::Transport {
+                session_manager, ..
+            } => session_manager,
+        }
+    }
+
+    /// Get the memory manager
+    pub fn memory_manager(&self) -> Option<&Arc<dyn llmspell_memory::MemoryManager>> {
+        match &self.mode {
+            KernelModeData::Direct { kernel } => kernel.get_memory_manager(),
+            KernelModeData::Transport { memory_manager, .. } => memory_manager.as_ref(),
+        }
+    }
+
+    /// Get the component registry
+    pub fn component_registry(
+        &self,
+    ) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
+        match &self.mode {
+            KernelModeData::Direct { kernel } => kernel.get_component_registry(),
+            KernelModeData::Transport {
+                script_executor, ..
+            } => script_executor.component_registry(),
+        }
+    }
+
+    /// Get the execution mode
+    pub fn execution_mode(&self) -> KernelExecutionMode {
+        match &self.mode {
+            KernelModeData::Direct { .. } => KernelExecutionMode::Direct,
+            KernelModeData::Transport { .. } => KernelExecutionMode::Transport,
+        }
     }
 }
 
@@ -1087,12 +1361,18 @@ impl ServiceHandle {
 /// This is used when the caller wants to provide a specific script executor
 /// implementation, such as a real `ScriptRuntime` from llmspell-bridge.
 ///
+/// # Arguments
+/// * `config` - `LLMSpell` configuration
+/// * `script_executor` - Script executor implementation
+/// * `mode` - Execution mode (Direct for CLI, Transport for Web)
+///
 /// # Errors
 ///
 /// Returns an error if the kernel fails to start or transport setup fails
 pub async fn start_embedded_kernel_with_executor(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
+    mode: KernelExecutionMode,
 ) -> Result<KernelHandle> {
     // Phase 13b.16.5: Extract infrastructure from ScriptExecutor (already created by ScriptRuntime)
     // ScriptExecutor is self-contained - it has SessionManager via Infrastructure module
@@ -1114,6 +1394,7 @@ pub async fn start_embedded_kernel_with_executor(
         script_executor,
         Some(provider_manager),
         session_manager,
+        mode,
     )
     .await
 }
@@ -1188,64 +1469,29 @@ pub async fn create_provider_manager(
 /// This is the internal function that actually creates the kernel.
 /// External callers should use `start_embedded_kernel()` instead.
 ///
+/// # Mode Behavior
+/// - `Direct`: Creates kernel without spawning. Use `into_kernel()` for direct execution.
+/// - `Transport`: Spawns kernel in background. Use `execute()` for transport-based execution.
+///
 /// # Errors
 ///
 /// Returns an error if the kernel fails to start or transport setup fails
+#[allow(clippy::too_many_lines)]
 async fn start_embedded_kernel_with_executor_and_provider_internal(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
     provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
     session_manager: Arc<crate::sessions::SessionManager>,
+    mode: KernelExecutionMode,
 ) -> Result<KernelHandle> {
     let kernel_id = format!("embedded-{}", Uuid::new_v4());
     let session_id = format!("session-{}", Uuid::new_v4());
 
-    info!("Starting embedded kernel {}", kernel_id);
+    info!("Starting embedded kernel {} in {:?} mode", kernel_id, mode);
     debug!("start_embedded_kernel_with_executor called");
 
     // Create Jupyter protocol
     let protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
-
-    // Create bidirectional in-process transport pair
-    // Important: We must use create_pair() to ensure transports can communicate
-    let (mut kernel_transport, mut client_transport) = InProcessTransport::create_pair();
-
-    trace!(
-        "Created transport pair - kernel: {:p}, client: {:p}",
-        &raw const kernel_transport,
-        &raw const client_transport
-    );
-
-    // Setup Jupyter 5-channel configuration
-    let mut transport_config = TransportConfig {
-        transport_type: "inprocess".to_string(),
-        base_address: String::new(),
-        channels: HashMap::new(),
-        auth_key: None,
-    };
-
-    // Setup required Jupyter channels
-    for channel in &["shell", "iopub", "stdin", "control", "heartbeat"] {
-        transport_config.channels.insert(
-            (*channel).to_string(),
-            ChannelConfig {
-                endpoint: String::new(),
-                pattern: String::new(),
-                options: HashMap::new(),
-            },
-        );
-    }
-
-    // Setup paired channels for bidirectional communication
-    // This is crucial - we MUST set up the channels BEFORE passing the transports
-    for channel_name in transport_config.channels.keys() {
-        InProcessTransport::setup_paired_channel(
-            &mut kernel_transport,
-            &mut client_transport,
-            channel_name,
-        );
-        trace!("Setup paired channel: {}", channel_name);
-    }
 
     // Build execution config from LLMSpellConfig
     let exec_config = build_execution_config(&config);
@@ -1267,63 +1513,119 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
 
     let _session_id_obj = session_manager.create_session(session_options).await?;
 
-    // Use the provided script executor (clone it for sharing between kernels)
-    let script_executor_clone = script_executor.clone();
-    let provider_manager_clone = provider_manager.clone();
-    let session_manager_clone = session_manager.clone();
+    // Mode-specific kernel creation
+    let mode_data = match mode {
+        KernelExecutionMode::Direct => {
+            // Direct mode: Create kernel for direct execution (CLI)
+            // No background spawn, no transport setup
+            debug!("Creating kernel in Direct mode (no spawn)");
 
-    // Create integrated kernel with the provided executor and shared SessionManager
-    let mut kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
-        protocol: protocol.clone(),
-        config: exec_config.clone(),
-        session_id: session_id.clone(),
-        script_executor,
-        provider_manager: Some(provider_manager),
-        session_manager,
-        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
-        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
-    })
-    .await?;
+            let kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
+                protocol: protocol.clone(),
+                config: exec_config,
+                session_id,
+                script_executor,
+                provider_manager: Some(provider_manager),
+                session_manager,
+                memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+                hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+                event_bus: None,
+            })
+            .await?;
 
-    // Set kernel transport for kernel message processing
-    kernel.set_transport(Box::new(kernel_transport));
-
-    // Spawn the kernel to run in background and process messages
-    let kernel_id_clone = kernel_id.clone();
-    tokio::spawn(async move {
-        debug!("Starting embedded kernel {} event loop", kernel_id_clone);
-        if let Err(e) = kernel.run().await {
-            error!(
-                "Embedded kernel {} event loop failed: {}",
-                kernel_id_clone, e
-            );
-        } else {
-            debug!("Embedded kernel {} event loop completed", kernel_id_clone);
+            KernelModeData::Direct {
+                kernel: Box::new(kernel),
+            }
         }
-    });
+        KernelExecutionMode::Transport => {
+            // Transport mode: Spawn kernel in background (Web)
+            // Create transport pair and spawn kernel
+            debug!("Creating kernel in Transport mode (with spawn)");
 
-    // For embedded mode, create a minimal kernel handle that only contains what's needed for message sending
-    // The actual kernel is running in the background spawn
-    // IMPORTANT: Use the same shared SessionManager - DO NOT create a new one!
-    let dummy_kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
-        protocol: protocol.clone(),
-        config: exec_config.clone(),
-        session_id: format!("dummy-{session_id}"),
-        script_executor: script_executor_clone,
-        provider_manager: Some(provider_manager_clone),
-        session_manager: session_manager_clone,
-        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
-        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
-    })
-    .await?;
+            // Create bidirectional in-process transport pair
+            let (mut kernel_transport, mut client_transport) = InProcessTransport::create_pair();
 
-    let transport_arc = Arc::new(client_transport);
+            trace!(
+                "Created transport pair - kernel: {:p}, client: {:p}",
+                &raw const kernel_transport,
+                &raw const client_transport
+            );
+
+            // Setup Jupyter 5-channel configuration
+            let mut transport_config = TransportConfig {
+                transport_type: "inprocess".to_string(),
+                base_address: String::new(),
+                channels: HashMap::new(),
+                auth_key: None,
+            };
+
+            // Setup required Jupyter channels
+            for channel in &["shell", "iopub", "stdin", "control", "heartbeat"] {
+                transport_config.channels.insert(
+                    (*channel).to_string(),
+                    ChannelConfig {
+                        endpoint: String::new(),
+                        pattern: String::new(),
+                        options: HashMap::new(),
+                    },
+                );
+            }
+
+            // Setup paired channels for bidirectional communication
+            for channel_name in transport_config.channels.keys() {
+                InProcessTransport::setup_paired_channel(
+                    &mut kernel_transport,
+                    &mut client_transport,
+                    channel_name,
+                );
+                trace!("Setup paired channel: {}", channel_name);
+            }
+
+            // Create integrated kernel for background execution
+            let mut kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
+                protocol: protocol.clone(),
+                config: exec_config,
+                session_id,
+                script_executor: script_executor.clone(),
+                provider_manager: Some(provider_manager),
+                session_manager: session_manager.clone(),
+                memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+                hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+                event_bus: None,
+            })
+            .await?;
+
+            // Set kernel transport for kernel message processing
+            kernel.set_transport(Box::new(kernel_transport));
+
+            // Spawn the kernel to run in background and process messages
+            let kernel_id_clone = kernel_id.clone();
+            tokio::spawn(async move {
+                debug!("Starting embedded kernel {} event loop", kernel_id_clone);
+                if let Err(e) = kernel.run().await {
+                    error!(
+                        "Embedded kernel {} event loop failed: {}",
+                        kernel_id_clone, e
+                    );
+                } else {
+                    debug!("Embedded kernel {} event loop completed", kernel_id_clone);
+                }
+            });
+
+            // Store only Arc refs - NO dummy kernel!
+            KernelModeData::Transport {
+                transport: Arc::new(client_transport),
+                session_manager,
+                memory_manager: None, // Phase 13.7.1 - opt-in
+                script_executor,
+            }
+        }
+    };
 
     let handle = KernelHandle {
-        kernel: dummy_kernel, // This won't be used for embedded mode - only transport and protocol matter
         kernel_id: kernel_id.clone(),
-        transport: transport_arc, // CLI uses client transport
         protocol,
+        mode: mode_data,
     };
     debug!("Created KernelHandle with kernel_id: {}", kernel_id);
     Ok(handle)
@@ -1500,6 +1802,7 @@ pub async fn start_kernel_service_with_config(
         session_manager,
         memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
         hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+        event_bus: None,
     })
     .await?;
 

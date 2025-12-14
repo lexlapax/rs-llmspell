@@ -1,6 +1,20 @@
 # Development Environment Layer
 # Debug logging, strict validation, helpful error messages
 
+[metadata]
+name = "dev"
+category = "env"
+description = "Development environment"
+use_cases = [
+    "Local development",
+    "Debugging",
+    "Rapid iteration",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Development Environment"
 description = "Debug logging with strict validation for development"

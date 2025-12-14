@@ -1,0 +1,46 @@
+
+> frontend@0.0.0 lint
+> eslint .
+
+
+/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-web/frontend/src/api/types.ts
+   3:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  13:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-web/frontend/src/hooks/useWebSocket.ts
+  35:17  error    Error: Cannot access variable before it is declared
+
+`attemptReconnect` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-web/frontend/src/hooks/useWebSocket.ts:35:17
+  33 |                 wsRef.current = null;
+  34 |                 console.log('WebSocket closed');
+> 35 |                 attemptReconnect();
+     |                 ^^^^^^^^^^^^^^^^ `attemptReconnect` accessed before it is declared
+  36 |             };
+  37 |
+  38 |             ws.onerror = (error) => {
+
+/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-web/frontend/src/hooks/useWebSocket.ts:60:5
+  58 |     }, [url]);
+  59 |
+> 60 |     const attemptReconnect = useCallback(() => {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 61 |         if (reconnectTimer.current) {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 62 |             clearTimeout(reconnectTimer.current);
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 75 |         }
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 76 |     }, [connect]);
+     | ^^^^^^^^^^^^^^^^^^^ `attemptReconnect` is declared here
+  77 |
+  78 |     useEffect(() => {
+  79 |         connect();  react-hooks/immutability
+  48:26  error    'e' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  58:8   warning  React Hook useCallback has a missing dependency: 'attemptReconnect'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/exhaustive-deps
+  90:36  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-explicit-any
+
+✖ 6 problems (5 errors, 1 warning)
+

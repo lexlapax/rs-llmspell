@@ -16,7 +16,7 @@
 mod stress_tests {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_kernel::api::{start_embedded_kernel_with_executor, KernelExecutionMode};
     use serde_json::json;
     use std::sync::Arc;
     use std::time::{Duration, Instant};
@@ -32,9 +32,10 @@ mod stress_tests {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        let mut kernel_handle = start_embedded_kernel_with_executor(config, executor)
-            .await
-            .expect("Failed to start kernel");
+        let mut kernel_handle =
+            start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
+                .await
+                .expect("Failed to start kernel");
 
         const ITERATIONS: usize = 1000;
         let start = Instant::now();
@@ -98,9 +99,10 @@ mod stress_tests {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        let mut kernel_handle = start_embedded_kernel_with_executor(config, executor)
-            .await
-            .expect("Failed to start kernel");
+        let mut kernel_handle =
+            start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
+                .await
+                .expect("Failed to start kernel");
 
         // First, get list of all tools
         let list_request = json!({"command": "list"});
@@ -186,9 +188,10 @@ mod stress_tests {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        let mut kernel_handle = start_embedded_kernel_with_executor(config, executor)
-            .await
-            .expect("Failed to start kernel");
+        let mut kernel_handle =
+            start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
+                .await
+                .expect("Failed to start kernel");
 
         const ITERATIONS: usize = 500;
         let start = Instant::now();
@@ -249,9 +252,10 @@ mod stress_tests {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        let mut kernel_handle = start_embedded_kernel_with_executor(config, executor)
-            .await
-            .expect("Failed to start kernel");
+        let mut kernel_handle =
+            start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
+                .await
+                .expect("Failed to start kernel");
 
         // Create large payload (1MB of JSON)
         let large_string = "x".repeat(1_000_000);
@@ -301,9 +305,10 @@ mod stress_tests {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        let mut kernel_handle = start_embedded_kernel_with_executor(config, executor)
-            .await
-            .expect("Failed to start kernel");
+        let mut kernel_handle =
+            start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
+                .await
+                .expect("Failed to start kernel");
 
         const ITERATIONS: usize = 200;
         let mut valid_success = 0;
@@ -380,9 +385,10 @@ mod stress_tests {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        let mut kernel_handle = start_embedded_kernel_with_executor(config, executor)
-            .await
-            .expect("Failed to start kernel");
+        let mut kernel_handle =
+            start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
+                .await
+                .expect("Failed to start kernel");
 
         const ITERATIONS: usize = 10_000;
         const SAMPLE_INTERVAL: usize = 1000;
@@ -438,9 +444,10 @@ mod stress_tests {
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
-        let mut kernel_handle = start_embedded_kernel_with_executor(config, executor)
-            .await
-            .expect("Failed to start kernel");
+        let mut kernel_handle =
+            start_embedded_kernel_with_executor(config, executor, KernelExecutionMode::Transport)
+                .await
+                .expect("Failed to start kernel");
 
         const ITERATIONS: usize = 500;
         let search_queries = ["calc", "file", "time", "uuid", "text", "data", "web", "sys"];

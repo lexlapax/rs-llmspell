@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use llmspell_core::traits::storage::WorkflowStateStorage;
 use llmspell_core::types::storage::{WorkflowState, WorkflowStatus};
+use rusqlite::params;
 use std::sync::Arc;
 
 /// SQLite-backed workflow state storage
@@ -85,7 +86,7 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
         let now = Utc::now().timestamp();
 
         // Use UPSERT to handle both insert and update
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "INSERT INTO workflow_states
                  (tenant_id, workflow_id, workflow_name, state_data, current_step, status, started_at, completed_at, last_updated, created_at)
@@ -99,10 +100,9 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
                    completed_at = COALESCE(excluded.completed_at, workflow_states.completed_at),
                    last_updated = excluded.last_updated",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare workflow state save: {}", e)))?;
 
-        stmt.execute(libsql::params![
+        stmt.execute(params![
             tenant_id,
             workflow_id,
             state.workflow_name.clone(),
@@ -114,7 +114,6 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
             now,
             now
         ])
-        .await
         .map_err(|e| SqliteError::Query(format!("Failed to save workflow state: {}", e)))?;
 
         Ok(())
@@ -124,23 +123,21 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "SELECT workflow_name, state_data, current_step, status, started_at, completed_at
                  FROM workflow_states
                  WHERE tenant_id = ?1 AND workflow_id = ?2",
             )
-            .await
             .map_err(|e| {
                 SqliteError::Query(format!("Failed to prepare workflow state load: {}", e))
             })?;
 
         let mut rows = stmt
-            .query(libsql::params![tenant_id, workflow_id])
-            .await
+            .query(params![tenant_id, workflow_id])
             .map_err(|e| SqliteError::Query(format!("Failed to load workflow state: {}", e)))?;
 
-        let row = match rows.next().await {
+        let row = match rows.next() {
             Ok(Some(row)) => row,
             Ok(None) => return Ok(None),
             Err(e) => return Err(SqliteError::Query(format!("Failed to fetch row: {}", e)).into()),
@@ -203,23 +200,16 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
 
         // Update status with lifecycle timestamp handling
         // Note: Triggers will automatically set started_at and completed_at
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "UPDATE workflow_states
                  SET status = ?1, last_updated = ?2
                  WHERE tenant_id = ?3 AND workflow_id = ?4",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare status update: {}", e)))?;
 
         let rows_affected = stmt
-            .execute(libsql::params![
-                status.to_string(),
-                now,
-                tenant_id,
-                workflow_id
-            ])
-            .await
+            .execute(params![status.to_string(), now, tenant_id, workflow_id])
             .map_err(|e| SqliteError::Query(format!("Failed to update workflow status: {}", e)))?;
 
         if rows_affected == 0 {
@@ -236,34 +226,30 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let (query, params): (String, Vec<libsql::Value>) = match status_filter {
-            Some(status) => (
-                "SELECT workflow_id FROM workflow_states WHERE tenant_id = ?1 AND status = ?2 ORDER BY created_at DESC".to_string(),
-                vec![
-                    tenant_id.to_string().into(),
-                    status.to_string().into(),
-                ],
-            ),
-            None => (
-                "SELECT workflow_id FROM workflow_states WHERE tenant_id = ?1 ORDER BY created_at DESC".to_string(),
-                vec![tenant_id.to_string().into()],
-            ),
-        };
+        // Building query dynamically
+        // Use rusqlite::params_from_iter to handle dynamic params
+        let mut query = "SELECT workflow_id FROM workflow_states WHERE tenant_id = ?1".to_string();
+        let mut params: Vec<Box<dyn rusqlite::ToSql + Send + Sync>> =
+            vec![Box::new(tenant_id.to_string())];
 
-        let stmt = conn
+        if let Some(status) = status_filter {
+            query.push_str(" AND status = ?2");
+            params.push(Box::new(status.to_string()));
+        }
+
+        query.push_str(" ORDER BY created_at DESC");
+
+        let mut stmt = conn
             .prepare(&query)
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare list query: {}", e)))?;
 
         let mut rows = stmt
-            .query(libsql::params_from_iter(params))
-            .await
+            .query(rusqlite::params_from_iter(params.iter()))
             .map_err(|e| SqliteError::Query(format!("Failed to list workflows: {}", e)))?;
 
         let mut workflow_ids = Vec::new();
         while let Some(row) = rows
             .next()
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to fetch row: {}", e)))?
         {
             let workflow_id: String = row
@@ -279,13 +265,11 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("DELETE FROM workflow_states WHERE tenant_id = ?1 AND workflow_id = ?2")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare delete: {}", e)))?;
 
-        stmt.execute(libsql::params![tenant_id, workflow_id])
-            .await
+        stmt.execute(params![tenant_id, workflow_id])
             .map_err(|e| SqliteError::Query(format!("Failed to delete workflow state: {}", e)))?;
 
         Ok(())
@@ -311,21 +295,8 @@ mod tests {
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
 
         // Run migrations manually (V1, V8 for workflow_state tests)
-        let conn = backend.get_connection().await.unwrap();
-
-        // V1: Initial setup
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V1__initial_setup.sql"
-        ))
-        .await
-        .unwrap();
-
-        // V8: Workflow states
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V8__workflow_states.sql"
-        ))
-        .await
-        .unwrap();
+        // using NEW synchronous implementation
+        backend.run_migrations().await.unwrap();
 
         // Create unique tenant ID
         let tenant_id = format!("test-tenant-{}", uuid::Uuid::new_v4());
@@ -481,17 +452,7 @@ mod tests {
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
 
         // Run migrations manually
-        let conn = backend.get_connection().await.unwrap();
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V1__initial_setup.sql"
-        ))
-        .await
-        .unwrap();
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V8__workflow_states.sql"
-        ))
-        .await
-        .unwrap();
+        backend.run_migrations().await.unwrap();
 
         // Create storage for two different tenants
         let storage1 =

@@ -101,6 +101,8 @@ impl Default for ExecutionConfig {
     }
 }
 
+use llmspell_events::EventBus;
+
 /// Parameters for creating an `IntegratedKernel`
 pub struct IntegratedKernelParams<P: Protocol> {
     pub protocol: P,
@@ -111,6 +113,7 @@ pub struct IntegratedKernelParams<P: Protocol> {
     pub session_manager: Arc<SessionManager>,
     pub memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
     pub hook_system: Option<Arc<crate::hooks::KernelHookSystem>>,
+    pub event_bus: Option<EventBus>,
 }
 
 /// Integrated kernel that runs `ScriptRuntime` without spawning
@@ -175,6 +178,8 @@ pub struct IntegratedKernel<P: Protocol> {
     )>,
     /// Hook system for kernel execution events (Phase 13.7.3a)
     hook_system: Option<Arc<crate::hooks::KernelHookSystem>>,
+    /// `IOPub` receiver (optional, used if not consumed by spawn)
+    iopub_receiver: Option<tokio::sync::mpsc::Receiver<crate::io::manager::IOPubMessage>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -200,8 +205,24 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             session_manager,
             memory_manager,
             hook_system,
+            event_bus,
         } = params;
         info!("Creating IntegratedKernel for session {}", session_id);
+
+        // Create message router
+        let message_router = Arc::new(MessageRouter::new(config.max_history));
+
+        // Use provided event bus or fallback to SessionManager's bus (Phase 14.6 fix)
+        // This ensures WebSocket subscribers (who use SessionManager bus) receive events
+        let effective_event_bus =
+            event_bus.unwrap_or_else(|| (**session_manager.event_bus()).clone());
+
+        // Create event correlator
+        let event_correlator = Arc::new(KernelEventCorrelator::new(
+            message_router.clone(),
+            session_id.clone(),
+            Some(effective_event_bus),
+        ));
 
         // Create I/O manager
         let io_config = crate::io::manager::IOConfig {
@@ -213,50 +234,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let mut io_manager = EnhancedIOManager::new(io_config, session_id.clone());
 
         // Create IOPub channel for output streaming
-        let (iopub_sender, mut iopub_receiver) =
-            mpsc::channel::<crate::io::manager::IOPubMessage>(100);
+        let (iopub_sender, iopub_receiver) = mpsc::channel::<crate::io::manager::IOPubMessage>(100);
         io_manager.set_iopub_sender(iopub_sender);
 
-        // Spawn task to route IOPub messages to stdout/stderr
-        // This will be properly connected to transport in subtask 9.4.6.4
-        tokio::spawn(async move {
-            while let Some(msg) = iopub_receiver.recv().await {
-                // For now, just log the messages - will be sent through transport later
-                match msg.header.msg_type.as_str() {
-                    "stream" => {
-                        if let Some(stream_type) = msg.content.get("name").and_then(|v| v.as_str())
-                        {
-                            if let Some(text) = msg.content.get("text").and_then(|v| v.as_str()) {
-                                match stream_type {
-                                    "stdout" => print!("{text}"),
-                                    "stderr" => eprint!("{text}"),
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                    "execute_result" | "display_data" => {
-                        if let Some(data) = msg.content.get("data") {
-                            if let Some(text) = data.get("text/plain").and_then(|v| v.as_str()) {
-                                println!("{text}");
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        });
+        // Inject event correlator for direct broadcasting (fixes blocking IO issue)
+        io_manager.set_event_correlator(event_correlator.clone());
+
+        // Initial log
+        debug!("IntegratedKernel initialized with IOPub channel and EventCorrelator");
 
         let io_manager = Arc::new(io_manager);
-
-        // Create message router
-        let message_router = Arc::new(MessageRouter::new(config.max_history));
-
-        // Create event correlator
-        let event_correlator = Arc::new(KernelEventCorrelator::new(
-            message_router.clone(),
-            session_id.clone(),
-        ));
 
         // Create tracing instrumentation
         let tracing =
@@ -289,6 +276,45 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             debug!("Wiring debug context to script executor");
             script_executor.set_debug_context(Some(execution_manager.clone()));
         }
+
+        // Output Streaming Hook (Crucial for avoiding missing output)
+        // We set a callback that writes directly to io_manager
+        // io_manager.write_stdout is async, so we use a channel or blocking (for now, simply logging via debug first to verified)
+        // Wait, callback is Sync/Send closure. io_manager is Arc.
+        let io_mgr_clone = io_manager.clone();
+        script_executor.set_output_callback(Box::new(move |text| {
+            // We need to write to async io_manager from sync callback
+            // Best approach: Use futures::executor::block_on since write_stdout just buffers locally
+            // (Note: io_manager.write_stdout uses parking_lot::RwLock, so it blocking_on it is safe?
+            //  Yes, it pushes to string buffer. flush_stream might use await to send to channel.
+            //  Sending to channel is async (mpsc::Sender::send).
+            //  But EnhancedIOManager::publish_stream uses `try_send` for status, but `send` for stream.
+            //  If channel is full, `send` awaits.
+            //  If we block_on in callback, we might block Lua thread.
+            //  Better: spawn a task or use try_send if possible.
+            //  Standard output shouldn't block kernel logic.
+
+            // For now, let's use a fire-and-forget spawn via tokio handle if available
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                let io = io_mgr_clone.clone();
+                // Append newline to ensure EnhancedIOManager flushes immediately
+                // otherwise strictly non-newline output sits in buffer
+                let text = format!("{text}\n");
+                handle.spawn(async move {
+                    if let Err(e) = io.write_stdout(&text).await {
+                        tracing::warn!("Failed to capture stdout from script: {}", e);
+                    }
+                });
+            } else {
+                // Fallback if no runtime (e.g. unit tests or daemon init?)
+                // Try blocking as last resort
+                let io = io_mgr_clone.clone();
+                let text = format!("{text}\n");
+                futures::executor::block_on(async move {
+                    let _ = io.write_stdout(&text).await;
+                });
+            }
+        }));
 
         // Note: SessionManager wiring to script_executor is now done ONCE in api.rs
         // before creating any kernel instances, to avoid duplicate wiring
@@ -425,6 +451,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             memory_manager,
             consolidation_daemon,
             hook_system,
+            iopub_receiver: Some(iopub_receiver),
         })
     }
 
@@ -596,6 +623,18 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         &self.session_manager
     }
 
+    /// Get the memory manager
+    pub fn get_memory_manager(&self) -> Option<&Arc<dyn llmspell_memory::MemoryManager>> {
+        self.memory_manager.as_ref()
+    }
+
+    /// Get the component registry
+    pub fn get_component_registry(
+        &self,
+    ) -> Option<Arc<dyn llmspell_core::traits::component_lookup::ComponentLookup>> {
+        self.script_executor.component_registry()
+    }
+
     /// Check if hooks are enabled in session manager configuration
     pub fn are_hooks_enabled(&self) -> bool {
         // Session manager always has hooks registry and built-in hooks registered
@@ -621,6 +660,53 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Get the event correlator
     pub fn event_correlator(&self) -> Arc<KernelEventCorrelator> {
         self.event_correlator.clone()
+    }
+
+    /// Process pending `IOPub` messages from the receiver
+    /// This handles captured stdout/stderr and broadcasts them
+    async fn process_iopub_messages(&mut self) -> Result<()> {
+        if let Some(ref mut receiver) = self.iopub_receiver {
+            while let Ok(msg) = receiver.try_recv() {
+                // 1. Always print to process stdout/stderr (for CLI/Logs visibility)
+                match msg.header.msg_type.as_str() {
+                    "stream" => {
+                        if let Some(text) = msg.content.get("text").and_then(|v| v.as_str()) {
+                            if msg.content.get("name").and_then(|v| v.as_str()) == Some("stderr") {
+                                eprint!("{text}");
+                            } else {
+                                print!("{text}");
+                            }
+                            // Ensure flush
+                            std::io::Write::flush(&mut std::io::stdout()).ok();
+                        }
+                    }
+                    "execute_result" | "display_data" => {
+                        if let Some(data) = msg.content.get("data") {
+                            if let Some(text) = data.get("text/plain").and_then(|v| v.as_str()) {
+                                println!("{text}");
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                // 2. Forward to transport if available
+                if let Some(ref mut transport) = self.transport {
+                    // Serialize message to JSON bytes (simplified protocol format supported by api.rs)
+                    if let Ok(msg_bytes) = serde_json::to_vec(&msg) {
+                        // Send as single part message
+                        if let Err(e) = transport.send("iopub", vec![msg_bytes]).await {
+                            warn!("Failed to forward iopub message to transport: {}", e);
+                        }
+                    }
+                }
+
+                // 3. Broadcast to EventBus is now handled by EnhancedIOManager directly!
+                // We do NOT track_event again here to avoid duplicates.
+                // This loop now serves primarily to print output to the server logs.
+            }
+        }
+        Ok(())
     }
 
     /// Run the kernel in the current context (NO SPAWNING)
@@ -689,6 +775,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
             }
 
+            // Process IOPub messages (Output)
+            // This handles captured stdout/stderr and other kernel outputs
+            // We do this every loop iteration to ensure outputs are flushed
+            self.process_iopub_messages().await?;
+
+            // Process messages from transport if available
+
             // Process messages from transport if available
             let has_transport = self.transport.is_some();
             trace!("Transport polling check: has_transport={}", has_transport);
@@ -702,9 +795,18 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // First, check Control channel (priority)
                 trace!("Checking control channel");
                 let control_msg = if let Some(ref mut transport) = self.transport {
-                    let result = transport.recv("control").await;
-                    trace!("Control recv result: {:?}", result.is_ok());
-                    result.ok().flatten()
+                    // Use timeout to prevent blocking if no message is available
+                    let result =
+                        tokio::time::timeout(Duration::from_millis(1), transport.recv("control"))
+                            .await;
+
+                    match result {
+                        Ok(inner_res) => {
+                            trace!("Control recv result: {:?}", inner_res.is_ok());
+                            inner_res.ok().flatten()
+                        }
+                        Err(_) => None, // Timeout
+                    }
                 } else {
                     trace!("No transport for control channel");
                     None
@@ -790,16 +892,25 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // Process Shell channel for execution requests
                 trace!("Checking shell channel");
                 let shell_msg = if let Some(ref mut transport) = self.transport {
-                    let result = transport.recv("shell").await;
-                    match &result {
-                        Ok(Some(parts)) => {
-                            trace!("Shell recv SUCCESS: {} parts", parts.len());
-                            trace!("Kernel received shell message: {} parts", parts.len());
+                    // Use timeout to prevent blocking
+                    let result =
+                        tokio::time::timeout(Duration::from_millis(1), transport.recv("shell"))
+                            .await;
+
+                    match result {
+                        Ok(inner_res) => {
+                            match &inner_res {
+                                Ok(Some(parts)) => {
+                                    trace!("Shell recv SUCCESS: {} parts", parts.len());
+                                    trace!("Kernel received shell message: {} parts", parts.len());
+                                }
+                                Ok(None) => trace!("Shell recv: no message"),
+                                Err(e) => trace!("Shell recv ERROR: {}", e),
+                            }
+                            inner_res.ok().flatten()
                         }
-                        Ok(None) => trace!("Shell recv: no message"),
-                        Err(e) => trace!("Shell recv ERROR: {}", e),
+                        Err(_) => None, // Timeout
                     }
-                    result.ok().flatten()
                 } else {
                     trace!("No transport for shell channel");
                     None
@@ -929,9 +1040,17 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     }
                 }
 
-                // Process Stdin channel for input requests (kernel → frontend)
+                // Process Stdin channel for input replies
                 let stdin_msg = if let Some(ref mut transport) = self.transport {
-                    transport.recv("stdin").await.ok().flatten()
+                    // Use timeout to prevent blocking
+                    let result =
+                        tokio::time::timeout(Duration::from_millis(1), transport.recv("stdin"))
+                            .await;
+
+                    match result {
+                        Ok(inner_res) => inner_res.ok().flatten(),
+                        Err(_) => None, // Timeout
+                    }
                 } else {
                     None
                 };
@@ -989,7 +1108,15 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
                 // Process heartbeat separately (simple echo)
                 let hb_data = if let Some(ref mut transport) = self.transport {
-                    transport.recv("heartbeat").await.ok().flatten()
+                    // Use timeout to prevent blocking
+                    let result =
+                        tokio::time::timeout(Duration::from_millis(1), transport.recv("heartbeat"))
+                            .await;
+
+                    match result {
+                        Ok(inner_res) => inner_res.ok().flatten(),
+                        Err(_) => None, // Timeout
+                    }
                 } else {
                     None
                 };
@@ -1537,6 +1664,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     .publish_execute_result(exec_count.try_into().unwrap_or(i32::MAX), data)
                     .await?;
 
+                // CRITICAL: Ensure all side-effect IOPub messages (stdout/stderr/result) are processed
+                // and forwarded to transport/EventBus BEFORE sending execute_reply.
+                // This prevents race conditions where reply arrives before output.
+                self.process_iopub_messages().await?;
+
                 // Send execute_reply message through protocol
                 let execute_reply = self.protocol.create_response(
                     "execute_reply",
@@ -1547,9 +1679,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     }),
                 )?;
 
-                // TODO: Send execute_reply through transport once integrated
-                // For now, just create the response
-                let _ = execute_reply;
+                // Send execute_reply through transport
+                if let Some(ref mut transport) = self.transport {
+                    if let Err(e) = transport.send("shell", vec![execute_reply]).await {
+                        error!("Failed to send execute_reply: {}", e);
+                    }
+                }
 
                 // Track successful execute_reply event
                 let execute_reply_event = KernelEvent::ExecuteReply {
@@ -1572,24 +1707,33 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     Ok(())
                 })?;
 
+                // Publish error
                 self.io_manager
                     .write_stderr(&format!("Error: {e}\n"))
                     .await?;
 
-                // Send error execute_reply message through protocol
-                let error_reply = self.protocol.create_response(
+                // CRITICAL: Ensure all side-effect IOPub messages (stdout/stderr/error) are processed
+                // and forwarded to transport/EventBus BEFORE sending execute_reply.
+                self.process_iopub_messages().await?;
+
+                // Send execute_reply with error status
+                let execute_reply = self.protocol.create_response(
                     "execute_reply",
                     serde_json::json!({
                         "status": "error",
                         "execution_count": exec_count,
-                        "ename": "ExecutionError",
+                        "ename": "RuntimeError",
                         "evalue": e.to_string(),
-                        "traceback": vec![e.to_string()],
+                        "traceback": [],
                     }),
                 )?;
 
-                // TODO: Send execute_reply through transport once integrated
-                let _ = error_reply;
+                // Send execute_reply through transport
+                if let Some(ref mut transport) = self.transport {
+                    if let Err(e) = transport.send("shell", vec![execute_reply]).await {
+                        error!("Failed to send execute_reply: {}", e);
+                    }
+                }
 
                 // Track error execute_reply event
                 let error_info = crate::events::correlation::ErrorInfo {
@@ -1629,8 +1773,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     }),
                 )?;
 
-                // TODO: Send execute_reply through transport once integrated
-                let _ = timeout_reply;
+                // Send execute_reply through transport
+                if let Some(ref mut transport) = self.transport {
+                    if let Err(e) = transport.send("shell", vec![timeout_reply]).await {
+                        error!("Failed to send timeout execute_reply: {}", e);
+                    }
+                }
 
                 // Track timeout execute_reply event
                 let error_info = crate::events::correlation::ErrorInfo {
@@ -1659,6 +1807,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Publish idle status
         self.io_manager.publish_status("idle").await?;
+
+        // CRITICAL: Flush "idle" status immediately so KernelHandle sees it
+        self.process_iopub_messages().await?;
 
         // Track status change back to idle
         let idle_status_event = KernelEvent::StatusChange {
@@ -1700,10 +1851,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .await
             .map_err(|e| anyhow::anyhow!("Script execution failed: {e}"))?;
 
-        // Route console output through I/O manager
-        for line in &script_output.console_output {
-            self.io_manager.write_stdout(line).await?;
-        }
+        // Note: Console output is streamed in real-time via the output callback (set at kernel creation).
+        // We do NOT re-send script_output.console_output here to avoid duplicate output.
 
         // Send result as display_data if available
         if script_output.output != serde_json::Value::Null {
@@ -3132,11 +3281,50 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // Handle model commands
         match command {
             "list" => self.handle_model_list(content).await,
+            "list_providers" => self.handle_list_providers(content).await,
             "pull" => self.handle_model_pull(content).await,
             "status" => self.handle_model_status(content).await,
             "info" => self.handle_model_info(content).await,
             _ => self.handle_unknown_model_command(command).await,
         }
+    }
+
+    /// Handle list providers command
+    async fn handle_list_providers(&mut self, _content: &Value) -> Result<()> {
+        debug!("Listing available providers");
+
+        let response = if let Some(provider) = self.provider_manager.as_ref() {
+            // List detailed providers including capabilities
+            let mut providers = Vec::new();
+            let available = provider.list_providers().await;
+
+            for name in available {
+                if let Ok(caps) = provider.query_capabilities(Some(&name)).await {
+                    providers.push(json!({
+                        "name": name,
+                        "capabilities": caps
+                    }));
+                }
+            }
+
+            json!({
+                "status": "ok",
+                "providers": providers
+            })
+        } else {
+            // Fallback if no provider manager
+            json!({
+                "status": "ok",
+                "providers": []
+            })
+        };
+
+        // Send reply
+        let full_response = json!({
+            "msg_type": "model_reply",
+            "content": response
+        });
+        self.send_model_reply(full_response).await
     }
 
     /// Handle model list command
@@ -4242,6 +4430,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await;
 
@@ -4266,6 +4455,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4313,6 +4503,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4385,6 +4576,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4433,6 +4625,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4503,6 +4696,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4578,6 +4772,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4632,6 +4827,7 @@ mod tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4704,6 +4900,7 @@ async fn test_message_handling_performance() -> Result<()> {
         session_manager: create_test_session_manager().await,
         memory_manager: None,
         hook_system: None,
+        event_bus: None,
     })
     .await?;
 
@@ -4817,6 +5014,7 @@ mod daemon_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4848,6 +5046,7 @@ mod daemon_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4885,6 +5084,7 @@ mod daemon_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -4972,6 +5172,7 @@ mod daemon_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5006,6 +5207,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5049,6 +5251,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5093,6 +5296,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5106,6 +5310,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5135,6 +5340,7 @@ mod multi_protocol_tests {
                 session_manager: create_test_session_manager().await,
                 memory_manager: None,
                 hook_system: None,
+                event_bus: None,
             })
             .await
             .unwrap(),
@@ -5189,6 +5395,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5227,6 +5434,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5269,6 +5477,7 @@ mod multi_protocol_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5310,6 +5519,7 @@ mod performance_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5405,6 +5615,7 @@ mod performance_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5453,6 +5664,7 @@ mod performance_tests {
                 session_manager: create_test_session_manager().await,
                 memory_manager: None,
                 hook_system: None,
+                event_bus: None,
             })
             .await
             .unwrap(),
@@ -5511,6 +5723,7 @@ mod performance_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5556,6 +5769,7 @@ mod performance_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5659,6 +5873,7 @@ mod security_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5806,6 +6021,7 @@ mod security_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5864,6 +6080,7 @@ mod security_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();
@@ -5919,6 +6136,7 @@ mod security_tests {
             session_manager: create_test_session_manager().await,
             memory_manager: None,
             hook_system: None,
+            event_bus: None,
         })
         .await
         .unwrap();

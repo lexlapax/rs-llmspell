@@ -1,6 +1,20 @@
 # Memory Feature Layer
 # Adaptive memory with LLM consolidation and daemon scheduling
 
+[metadata]
+name = "memory"
+category = "feature"
+description = "Adaptive memory system"
+use_cases = [
+    "Conversation memory",
+    "Knowledge accumulation",
+    "Context-aware responses",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Memory Features"
 description = "Episodic memory with semantic consolidation"

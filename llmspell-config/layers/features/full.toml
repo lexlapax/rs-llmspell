@@ -1,6 +1,20 @@
 # Full Features Layer
 # All capabilities enabled via layer composition
 
+[metadata]
+name = "full"
+category = "feature"
+description = "All features enabled"
+use_cases = [
+    "Full-featured workflows",
+    "Production deployments",
+    "Enterprise use",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Full Features"
 description = "Complete feature set - LLM, state, RAG, and memory"

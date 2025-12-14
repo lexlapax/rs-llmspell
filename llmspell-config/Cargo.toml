@@ -23,3 +23,5 @@ anyhow.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+schemars = { version = "0.8", features = ["derive"] }
+

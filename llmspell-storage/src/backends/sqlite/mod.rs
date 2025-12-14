@@ -57,7 +57,7 @@ pub use config::SqliteConfig;
 pub use error::{Result, SqliteError};
 pub use event_log::{EventStorageStats, SqliteEventLogStorage};
 pub use graph::SqliteGraphStorage;
-pub use hook_history::{HookHistoryStats, SerializedHookExecution, SqliteHookHistoryStorage};
+pub use hook_history::SqliteHookHistoryStorage;
 pub use kv_store::SqliteKVStorage;
 pub use pool::{PoolStats, SqlitePool};
 pub use procedural::{SqliteProceduralStorage, StoredPattern};

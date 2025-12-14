@@ -18,12 +18,18 @@ fn main() -> Result<()> {
     // Initialize tracing based on --trace flag
     setup_tracing(cli.trace);
 
-    // Check if this is a kernel start command with daemon mode
-    // We need to handle daemon mode BEFORE creating any tokio runtime
-    if let llmspell_cli::cli::Commands::Kernel {
-        command: llmspell_cli::cli::KernelCommands::Start { daemon: true, .. },
-    } = cli.command
-    {
+    // Check for daemon mode in both Kernel and Web commands
+    // Check for daemon mode in both Kernel and Web commands
+    let is_daemon = matches!(
+        &cli.command,
+        llmspell_cli::cli::Commands::Kernel {
+            command: llmspell_cli::cli::KernelCommands::Start { daemon: true, .. },
+        } | llmspell_cli::cli::Commands::Web {
+            command: llmspell_cli::cli::WebCommands::Start { daemon: true, .. },
+        }
+    );
+
+    if is_daemon {
         // Handle daemon mode specially - fork BEFORE creating tokio runtime
         return handle_daemon_mode(cli);
     }
@@ -37,7 +43,7 @@ fn main() -> Result<()> {
         let runtime_config = load_runtime_config(config_path.as_deref(), profile).await?;
 
         // Execute the command with new architecture
-        execute_command(cli.command, runtime_config, cli.output).await
+        execute_command(cli.command, runtime_config, cli.output, config_path).await
     })
 }
 
@@ -47,29 +53,43 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
     use std::path::PathBuf;
 
     // Extract daemon-specific parameters
-    let (port, id, _connection_file, log_file, pid_file) =
-        if let llmspell_cli::cli::Commands::Kernel {
+    let (port, id, log_file, pid_file, host) = match &cli.command {
+        llmspell_cli::cli::Commands::Kernel {
             command:
                 llmspell_cli::cli::KernelCommands::Start {
                     port,
                     id,
-                    connection_file,
                     log_file,
                     pid_file,
                     ..
                 },
-        } = &cli.command
-        {
-            (
-                *port,
-                id.clone(),
-                connection_file.clone(),
-                log_file.clone(),
-                pid_file.clone(),
-            )
-        } else {
-            unreachable!("Already checked this is a daemon kernel start command");
-        };
+        } => (
+            *port,
+            id.clone(),
+            log_file.clone(),
+            pid_file.clone(),
+            "127.0.0.1".to_string(),
+        ),
+
+        llmspell_cli::cli::Commands::Web {
+            command:
+                llmspell_cli::cli::WebCommands::Start {
+                    port,
+                    log_file,
+                    pid_file,
+                    host,
+                    ..
+                },
+        } => (
+            *port,
+            Some("web".to_string()),
+            log_file.clone(),
+            pid_file.clone(),
+            host.clone(),
+        ),
+
+        _ => unreachable!("Already checked this is a daemon start command"),
+    };
 
     // Set up daemon configuration
     let default_pid_path = || {
@@ -122,13 +142,44 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
         umask: Some(0o027),
     };
 
+    // Pre-flight check: Load config and print API keys if in production mode
+    // We do this BEFORE daemonizing so stdout is still attached to the terminal
+    {
+        // Use a temporary runtime for config loading
+        if let Ok(rt) = tokio::runtime::Runtime::new() {
+            let config_path = cli.config_path();
+            let profile = cli.profile.as_deref();
+            if let Ok(_config) = rt.block_on(load_runtime_config(config_path.as_deref(), profile)) {
+                // Get Web Service API keys (what the server actually uses)
+                // Note: Currently web command uses default config, so we mirror that here
+                let web_config = llmspell_web::config::WebConfig::default();
+                let api_keys = web_config.api_keys;
+
+                if !api_keys.is_empty() {
+                    println!("\n┌──────────────────────────────────────────────────┐");
+                    println!("│                🔐 Access Control                 │");
+                    println!("│        (Process will run in background)          │");
+                    println!("├──────────────────────────────────────────────────┤");
+                    let url = format!("http://{}:{}", host, port);
+                    println!("│ Access URL: {:<36} │", url); // aligned for box width
+                    println!("│                                                  │");
+                    println!("│ Use one of the following API keys to log in:     │");
+                    for key in &api_keys {
+                        println!("│ • {:<46} │", key);
+                    }
+                    println!("└──────────────────────────────────────────────────┘\n");
+                }
+            }
+        }
+    }
+
     // Create DaemonManager and daemonize BEFORE creating tokio runtime
     let mut daemon_manager = DaemonManager::new(daemon_config.clone());
 
     // Check if already running
     if daemon_manager.is_running()? {
         return Err(anyhow::anyhow!(
-            "Kernel daemon already running with PID file {:?}",
+            "Process already running with PID file {:?}",
             daemon_config.pid_file
         ));
     }
@@ -146,7 +197,7 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
         let runtime_config = load_runtime_config(config_path.as_deref(), profile).await?;
 
         // Execute the command (now in daemon mode with fresh runtime)
-        execute_command(cli.command, runtime_config, cli.output).await
+        execute_command(cli.command, runtime_config, cli.output, config_path).await
     })
 }
 
@@ -157,22 +208,53 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
 /// This allows: `llmspell exec "code" > output.txt 2> debug.log`
 fn setup_tracing(trace_level: llmspell_cli::cli::TraceLevel) {
     use std::io;
-    use tracing::Level;
-    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::{fmt, EnvFilter};
+
+    // Define noisy crates to suppress (keep them at WARN even if level is INFO/DEBUG)
+    // Detailed debug of these crates should be done via explicit RUST_LOG env var
+    const NOISY_CRATES: &[&str] = &[
+        "rig_core", "hyper", "h2", "reqwest", "rustls", "want", "mio",
+    ];
 
     // Check if RUST_LOG is set
-    if std::env::var("RUST_LOG").is_ok() {
+    if let Ok(env_filter) = std::env::var("RUST_LOG") {
         // Use RUST_LOG environment variable with EnvFilter
-        tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::from_default_env())
+        fmt()
+            .with_env_filter(EnvFilter::new(env_filter))
             .with_writer(io::stderr) // Explicitly use stderr for tracing
             .with_target(false)
             .init();
     } else {
-        // Use --trace flag
-        let level: Level = trace_level.into();
-        tracing_subscriber::fmt()
-            .with_max_level(level)
+        // Construct filter based on trace level
+        // Map enum to string because EnvFilter parses strings nicely for directives
+        let level_str = match trace_level {
+            llmspell_cli::cli::TraceLevel::Off => "error",
+            llmspell_cli::cli::TraceLevel::Error => "error",
+            llmspell_cli::cli::TraceLevel::Warn => "warn",
+            llmspell_cli::cli::TraceLevel::Info => "info",
+            llmspell_cli::cli::TraceLevel::Debug => "debug",
+            llmspell_cli::cli::TraceLevel::Trace => "trace",
+        };
+
+        // Start with the base level
+        let mut filter_str = level_str.to_string();
+
+        // If the user requested INFO or higher (DEBUG/TRACE), suppress noisy dependencies to WARN
+        // This ensures application logs are visible but raw network/library noise is hidden
+        // User can still override this by setting RUST_LOG explicitly
+        if matches!(
+            trace_level,
+            llmspell_cli::cli::TraceLevel::Info
+                | llmspell_cli::cli::TraceLevel::Debug
+                | llmspell_cli::cli::TraceLevel::Trace
+        ) {
+            for krate in NOISY_CRATES {
+                filter_str.push_str(&format!(",{}=warn", krate));
+            }
+        }
+
+        fmt()
+            .with_env_filter(EnvFilter::new(filter_str))
             .with_writer(io::stderr) // Explicitly use stderr for tracing
             .with_target(false)
             .init();

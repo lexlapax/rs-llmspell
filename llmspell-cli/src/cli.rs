@@ -148,7 +148,7 @@ pub struct Cli {
     /// Use 'llmspell config list-profiles' for detailed information.
     ///
     /// Precedence: --profile > -c > discovery > default
-    #[arg(short = 'p', long, global = true)]
+    #[arg(short = 'p', long, global = true, verbatim_doc_comment)]
     pub profile: Option<String>,
 
     /// Trace level (replaces --debug/--verbose)
@@ -618,6 +618,21 @@ EXAMPLES:
     llmspell version --client           # Show client version only
     llmspell version --output json      # Output as JSON")]
     Version(crate::commands::version::VersionCommand),
+
+    /// Web server management
+    ///
+    /// Start and manage the LLMSpell web interface.
+    #[command(long_about = "Start and manage the LLMSpell web interface.
+
+EXAMPLES:
+    llmspell web start                        # Start web server in foreground
+    llmspell web start --daemon               # Start web server in background
+    llmspell web start --port 8080            # Start on specific port
+")]
+    Web {
+        #[command(subcommand)]
+        command: WebCommands,
+    },
 }
 
 /// Application management subcommands
@@ -1728,6 +1743,67 @@ EXAMPLES:
         /// Dry run (validation only, no data modification)
         #[arg(long)]
         dry_run: bool,
+    },
+}
+
+/// Web server management subcommands
+#[derive(Subcommand, Debug)]
+pub enum WebCommands {
+    /// Start the web server
+    #[command(long_about = "Start the web server.
+
+EXAMPLES:
+    llmspell web start                        # Start in foreground
+    llmspell web start --daemon               # Start in background
+    llmspell web start --port 8080            # Start on port 8080")]
+    Start {
+        /// Port to listen on (default: 3000)
+        #[arg(long, default_value = "3000")]
+        port: u16,
+
+        /// Host to bind to (default: 127.0.0.1)
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+
+        /// Run in daemon (background) mode
+        #[arg(long, short = 'd')]
+        daemon: bool,
+
+        /// Path to PID file for daemon mode
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+
+        /// Path to log file for daemon mode
+        #[arg(long)]
+        log_file: Option<PathBuf>,
+    },
+
+    /// Stop the web server daemon
+    #[command(long_about = "Stop the background web server process.")]
+    Stop {
+        /// PID file path (optional, tries default location)
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+    },
+
+    /// Check status of web server daemon
+    #[command(long_about = "Check if the web server daemon is running.")]
+    Status {
+        /// PID file path (optional, tries default location)
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+    },
+
+    /// Open the web interface in the default browser
+    #[command(long_about = "Open the web interface in the default browser.")]
+    Open {
+        /// Port to connect to (default: 3000)
+        #[arg(long, default_value = "3000")]
+        port: u16,
+
+        /// Host to connect to (default: 127.0.0.1)
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
     },
 }
 

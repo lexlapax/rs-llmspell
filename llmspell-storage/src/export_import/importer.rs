@@ -2,11 +2,17 @@
 //!
 //! Handles JSON import with type conversion, validation, and transaction safety.
 
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use super::converters::TypeConverters;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use super::format::*;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use anyhow::{anyhow, Context, Result};
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use base64::Engine;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::collections::HashMap;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 use std::sync::Arc;
 
 #[cfg(feature = "postgres")]
@@ -675,88 +681,73 @@ impl SqliteImporter {
             ));
         }
 
-        let conn = self.backend.get_connection().await?;
+        let mut conn = self.backend.get_connection().await?;
 
-        // Start transaction
-        conn.execute("BEGIN TRANSACTION", libsql::params![])
-            .await
-            .context("Failed to start transaction")?;
+        // Start transaction (synchronous)
+        let tx = conn.transaction()?;
 
         let mut stats = ImportStats::default();
 
         // Import in dependency order (using match to handle errors and rollback)
-        let import_result = async {
+        // Note: Code block is synchronous because we use rusqlite sync API.
+        // We wrap in a closure to catch errors before commit.
+        let import_result = (|| {
             // 1. Vector embeddings (no dependencies)
-            stats.vectors = self
-                .import_vector_embeddings(&conn, &export.data.vector_embeddings)
-                .await?;
+            stats.vectors = self.import_vector_embeddings(&tx, &export.data.vector_embeddings)?;
 
             // 2. Knowledge graph entities (no dependencies)
             if let Some(kg) = &export.data.knowledge_graph {
-                stats.entities = self.import_entities(&conn, &kg.entities).await?;
-                stats.relationships = self.import_relationships(&conn, &kg.relationships).await?;
+                stats.entities = self.import_entities(&tx, &kg.entities)?;
+                stats.relationships = self.import_relationships(&tx, &kg.relationships)?;
             }
 
             // 3. Procedural memory (no dependencies)
-            stats.patterns = self
-                .import_procedural_memory(&conn, &export.data.procedural_memory)
-                .await?;
+            stats.patterns = self.import_procedural_memory(&tx, &export.data.procedural_memory)?;
 
             // 4. Agent state (no dependencies)
-            stats.agent_states = self
-                .import_agent_state(&conn, &export.data.agent_state)
-                .await?;
+            stats.agent_states = self.import_agent_state(&tx, &export.data.agent_state)?;
 
             // 5. KV store (no dependencies)
-            stats.kv_entries = self.import_kv_store(&conn, &export.data.kv_store).await?;
+            stats.kv_entries = self.import_kv_store(&tx, &export.data.kv_store)?;
 
             // 6. Workflow states (no dependencies)
-            stats.workflow_states = self
-                .import_workflow_states(&conn, &export.data.workflow_states)
-                .await?;
+            stats.workflow_states =
+                self.import_workflow_states(&tx, &export.data.workflow_states)?;
 
             // 7. Sessions (no dependencies)
-            stats.sessions = self.import_sessions(&conn, &export.data.sessions).await?;
+            stats.sessions = self.import_sessions(&tx, &export.data.sessions)?;
 
             // 8. Artifacts (depends on sessions for session_id FK)
             if let Some(artifacts) = &export.data.artifacts {
-                let (content_count, artifact_count) =
-                    self.import_artifacts(&conn, artifacts).await?;
+                let (content_count, artifact_count) = self.import_artifacts(&tx, artifacts)?;
                 stats.artifact_content = content_count;
                 stats.artifacts = artifact_count;
             }
 
             // 9. Event log (no dependencies)
-            stats.events = self.import_event_log(&conn, &export.data.event_log).await?;
+            stats.events = self.import_event_log(&tx, &export.data.event_log)?;
 
             // 10. Hook history (no dependencies)
-            stats.hooks = self
-                .import_hook_history(&conn, &export.data.hook_history)
-                .await?;
+            stats.hooks = self.import_hook_history(&tx, &export.data.hook_history)?;
 
             Ok::<(), anyhow::Error>(())
-        }
-        .await;
+        })();
 
         match import_result {
             Ok(_) => {
-                conn.execute("COMMIT", libsql::params![])
-                    .await
-                    .context("Failed to commit import transaction")?;
+                tx.commit().context("Failed to commit import transaction")?;
                 Ok(stats)
             }
             Err(e) => {
-                conn.execute("ROLLBACK", libsql::params![])
-                    .await
-                    .context("Failed to rollback import transaction")?;
+                // Rollback happens automatically when tx is dropped
                 Err(e)
             }
         }
     }
 
-    async fn import_vector_embeddings(
+    fn import_vector_embeddings(
         &self,
-        conn: &libsql::Connection,
+        tx: &rusqlite::Transaction<'_>,
         embeddings: &HashMap<usize, Vec<VectorEmbeddingExport>>,
     ) -> Result<usize> {
         let mut count = 0;
@@ -784,9 +775,9 @@ impl SqliteImporter {
                     table
                 );
 
-                conn.execute(
+                tx.execute(
                     &query,
-                    libsql::params![
+                    rusqlite::params![
                         vec_export.id.clone(),
                         vec_export.tenant_id.clone(),
                         vec_export.scope.clone(),
@@ -796,7 +787,6 @@ impl SqliteImporter {
                         updated_at_sec,
                     ],
                 )
-                .await
                 .context("Failed to import vector embedding")?;
 
                 count += 1;
@@ -806,9 +796,9 @@ impl SqliteImporter {
         Ok(count)
     }
 
-    async fn import_entities(
+    fn import_entities(
         &self,
-        conn: &libsql::Connection,
+        conn: &rusqlite::Transaction<'_>,
         entities: &[EntityExport],
     ) -> Result<usize> {
         for entity in entities {
@@ -828,7 +818,7 @@ impl SqliteImporter {
                    properties = excluded.properties,
                    valid_time_end = excluded.valid_time_end,
                    transaction_time_end = excluded.transaction_time_end",
-                libsql::params![
+                rusqlite::params![
                     entity.entity_id.clone(),
                     entity.tenant_id.clone(),
                     entity.entity_type.clone(),
@@ -841,16 +831,15 @@ impl SqliteImporter {
                     created_sec,
                 ],
             )
-            .await
             .context("Failed to import entity")?;
         }
 
         Ok(entities.len())
     }
 
-    async fn import_relationships(
+    fn import_relationships(
         &self,
-        conn: &libsql::Connection,
+        conn: &rusqlite::Transaction<'_>,
         relationships: &[RelationshipExport],
     ) -> Result<usize> {
         for rel in relationships {
@@ -870,7 +859,7 @@ impl SqliteImporter {
                    properties = excluded.properties,
                    valid_time_end = excluded.valid_time_end,
                    transaction_time_end = excluded.transaction_time_end",
-                libsql::params![
+                rusqlite::params![
                     rel.relationship_id.clone(),
                     rel.tenant_id.clone(),
                     rel.source_entity_id.clone(),
@@ -884,16 +873,15 @@ impl SqliteImporter {
                     created_sec,
                 ],
             )
-            .await
             .context("Failed to import relationship")?;
         }
 
         Ok(relationships.len())
     }
 
-    async fn import_procedural_memory(
+    fn import_procedural_memory(
         &self,
-        conn: &libsql::Connection,
+        conn: &rusqlite::Transaction<'_>,
         patterns: &[PatternExport],
     ) -> Result<usize> {
         for pattern in patterns {
@@ -910,7 +898,7 @@ impl SqliteImporter {
                    frequency = excluded.frequency,
                    last_seen = excluded.last_seen,
                    updated_at = excluded.updated_at",
-                libsql::params![
+                rusqlite::params![
                     pattern.pattern_id.clone(),
                     pattern.tenant_id.clone(),
                     pattern.scope.clone(),
@@ -923,16 +911,15 @@ impl SqliteImporter {
                     updated_sec,
                 ],
             )
-            .await
             .context("Failed to import procedural pattern")?;
         }
 
         Ok(patterns.len())
     }
 
-    async fn import_agent_state(
+    fn import_agent_state(
         &self,
-        conn: &libsql::Connection,
+        conn: &rusqlite::Transaction<'_>,
         states: &[AgentStateExport],
     ) -> Result<usize> {
         for state in states {
@@ -949,7 +936,7 @@ impl SqliteImporter {
                    data_version = excluded.data_version,
                    checksum = excluded.checksum,
                    updated_at = excluded.updated_at",
-                libsql::params![
+                rusqlite::params![
                     state.state_id.clone(),
                     state.tenant_id.clone(),
                     state.agent_id.clone(),
@@ -962,16 +949,15 @@ impl SqliteImporter {
                     updated_sec,
                 ],
             )
-            .await
             .context("Failed to import agent state")?;
         }
 
         Ok(states.len())
     }
 
-    async fn import_kv_store(
+    fn import_kv_store(
         &self,
-        conn: &libsql::Connection,
+        conn: &rusqlite::Transaction<'_>,
         entries: &[KVEntryExport],
     ) -> Result<usize> {
         for entry in entries {
@@ -989,7 +975,7 @@ impl SqliteImporter {
                    value = excluded.value,
                    metadata = excluded.metadata,
                    updated_at = excluded.updated_at",
-                libsql::params![
+                rusqlite::params![
                     entry.kv_id.clone(),
                     entry.tenant_id.clone(),
                     entry.key.clone(),
@@ -999,16 +985,15 @@ impl SqliteImporter {
                     updated_sec,
                 ],
             )
-            .await
             .context("Failed to import KV entry")?;
         }
 
         Ok(entries.len())
     }
 
-    async fn import_workflow_states(
+    fn import_workflow_states(
         &self,
-        conn: &libsql::Connection,
+        tx: &rusqlite::Transaction<'_>,
         workflows: &[WorkflowStateExport],
     ) -> Result<usize> {
         for wf in workflows {
@@ -1018,7 +1003,7 @@ impl SqliteImporter {
             let started_at_sec = wf.started_at.map(|ts| ts / 1_000_000);
             let completed_at_sec = wf.completed_at.map(|ts| ts / 1_000_000);
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO workflow_states
                  (tenant_id, workflow_id, workflow_name, state_data, current_step, status, started_at, completed_at, last_updated, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
@@ -1028,7 +1013,7 @@ impl SqliteImporter {
                    status = excluded.status,
                    completed_at = excluded.completed_at,
                    last_updated = excluded.last_updated",
-                libsql::params![
+                rusqlite::params![
                     wf.tenant_id.clone(),
                     wf.workflow_id.clone(),
                     wf.workflow_name.clone(),
@@ -1041,16 +1026,16 @@ impl SqliteImporter {
                     created_sec,
                 ],
             )
-            .await
+
             .context("Failed to import workflow state")?;
         }
 
         Ok(workflows.len())
     }
 
-    async fn import_sessions(
+    fn import_sessions(
         &self,
-        conn: &libsql::Connection,
+        tx: &rusqlite::Transaction<'_>,
         sessions: &[SessionExport],
     ) -> Result<usize> {
         for session in sessions {
@@ -1060,7 +1045,7 @@ impl SqliteImporter {
             let updated_sec = session.updated_at / 1_000_000;
             let expires_at_sec = session.expires_at.map(|ts| ts / 1_000_000);
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO sessions
                  (id, tenant_id, session_id, session_data, status, created_at, last_accessed_at, expires_at, artifact_count, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
@@ -1070,7 +1055,7 @@ impl SqliteImporter {
                    last_accessed_at = excluded.last_accessed_at,
                    artifact_count = excluded.artifact_count,
                    updated_at = excluded.updated_at",
-                libsql::params![
+                rusqlite::params![
                     session.id.clone(),
                     session.tenant_id.clone(),
                     session.session_id.clone(),
@@ -1083,16 +1068,16 @@ impl SqliteImporter {
                     updated_sec,
                 ],
             )
-            .await
+
             .context("Failed to import session")?;
         }
 
         Ok(sessions.len())
     }
 
-    async fn import_artifacts(
+    fn import_artifacts(
         &self,
-        conn: &libsql::Connection,
+        tx: &rusqlite::Transaction<'_>,
         artifacts: &ArtifactsExport,
     ) -> Result<(usize, usize)> {
         // Import content first (no dependencies)
@@ -1110,14 +1095,14 @@ impl SqliteImporter {
             let created_sec = content.created_at / 1_000_000;
             let last_accessed_sec = content.last_accessed_at / 1_000_000;
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO artifact_content
                  (tenant_id, content_hash, data, size_bytes, is_compressed, original_size_bytes, reference_count, created_at, last_accessed_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
                  ON CONFLICT (tenant_id, content_hash) DO UPDATE SET
                    reference_count = excluded.reference_count,
                    last_accessed_at = excluded.last_accessed_at",
-                libsql::params![
+                rusqlite::params![
                     content.tenant_id.clone(),
                     content.content_hash.clone(),
                     data_bytes,
@@ -1129,7 +1114,7 @@ impl SqliteImporter {
                     last_accessed_sec,
                 ],
             )
-            .await
+
             .context("Failed to import artifact content")?;
         }
 
@@ -1144,7 +1129,7 @@ impl SqliteImporter {
             let tags_json =
                 serde_json::to_string(&artifact.tags).context("Failed to serialize tags")?;
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO artifacts
                  (tenant_id, artifact_id, session_id, sequence, content_hash, metadata, name, artifact_type, mime_type, size_bytes, created_at, created_by, version, parent_artifact_id, tags, stored_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
@@ -1152,7 +1137,7 @@ impl SqliteImporter {
                    metadata = excluded.metadata,
                    version = excluded.version,
                    updated_at = excluded.updated_at",
-                libsql::params![
+                rusqlite::params![
                     artifact.tenant_id.clone(),
                     artifact.artifact_id.clone(),
                     artifact.session_id.clone(),
@@ -1172,28 +1157,28 @@ impl SqliteImporter {
                     updated_sec,
                 ],
             )
-            .await
+
             .context("Failed to import artifact")?;
         }
 
         Ok((artifacts.content.len(), artifacts.artifacts.len()))
     }
 
-    async fn import_event_log(
+    fn import_event_log(
         &self,
-        conn: &libsql::Connection,
+        tx: &rusqlite::Transaction<'_>,
         events: &[EventExport],
     ) -> Result<usize> {
         for event in events {
             let payload_str = event.payload.to_string();
             let timestamp_sec = event.timestamp / 1_000_000;
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO event_log
                  (id, tenant_id, event_id, event_type, correlation_id, timestamp, sequence, language, payload)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
                  ON CONFLICT (id) DO NOTHING",
-                libsql::params![
+                rusqlite::params![
                     event.id.clone(),
                     event.tenant_id.clone(),
                     event.event_id.clone(),
@@ -1205,16 +1190,16 @@ impl SqliteImporter {
                     payload_str,
                 ],
             )
-            .await
+
             .context("Failed to import event")?;
         }
 
         Ok(events.len())
     }
 
-    async fn import_hook_history(
+    fn import_hook_history(
         &self,
-        conn: &libsql::Connection,
+        tx: &rusqlite::Transaction<'_>,
         hooks: &[HookExport],
     ) -> Result<usize> {
         for hook in hooks {
@@ -1224,12 +1209,12 @@ impl SqliteImporter {
             let result_str = hook.result_data.to_string();
             let timestamp_sec = hook.timestamp / 1_000_000;
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO hook_history
                  (id, execution_id, tenant_id, hook_id, hook_type, correlation_id, hook_context, result_data, timestamp, duration_ms)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                  ON CONFLICT (id) DO NOTHING",
-                libsql::params![
+                rusqlite::params![
                     hook.id.clone(),
                     hook.execution_id.clone(),
                     hook.tenant_id.clone(),
@@ -1242,7 +1227,7 @@ impl SqliteImporter {
                     hook.duration_ms,
                 ],
             )
-            .await
+
             .context("Failed to import hook history entry")?;
         }
 

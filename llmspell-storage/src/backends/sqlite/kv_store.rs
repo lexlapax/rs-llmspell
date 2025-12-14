@@ -6,6 +6,7 @@ use super::error::SqliteError;
 use async_trait::async_trait;
 use llmspell_core::traits::storage::StorageBackend;
 use llmspell_core::types::storage::{StorageBackendType, StorageCharacteristics};
+use rusqlite::params;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -65,17 +66,15 @@ impl StorageBackend for SqliteKVStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("SELECT value FROM kv_store WHERE tenant_id = ?1 AND key = ?2")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare get query: {}", e)))?;
 
         let mut rows = stmt
-            .query(libsql::params![tenant_id, key])
-            .await
+            .query(params![tenant_id, key])
             .map_err(|e| SqliteError::Query(format!("Failed to execute get: {}", e)))?;
 
-        match rows.next().await {
+        match rows.next() {
             Ok(Some(row)) => {
                 let value: Vec<u8> = row
                     .get(0)
@@ -93,7 +92,7 @@ impl StorageBackend for SqliteKVStorage {
         let now = chrono::Utc::now().timestamp();
 
         // UPSERT: insert if not exists, update if exists
-        let stmt = conn
+        let mut stmt = conn
             .prepare(
                 "INSERT INTO kv_store (tenant_id, key, value, created_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5)
@@ -101,11 +100,9 @@ impl StorageBackend for SqliteKVStorage {
                    value = excluded.value,
                    updated_at = excluded.updated_at",
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare set query: {}", e)))?;
 
-        stmt.execute(libsql::params![tenant_id, key, value, now, now])
-            .await
+        stmt.execute(params![tenant_id, key, value, now, now])
             .map_err(|e| SqliteError::Query(format!("Failed to execute set: {}", e)))?;
 
         Ok(())
@@ -115,13 +112,11 @@ impl StorageBackend for SqliteKVStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("DELETE FROM kv_store WHERE tenant_id = ?1 AND key = ?2")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare delete query: {}", e)))?;
 
-        stmt.execute(libsql::params![tenant_id, key])
-            .await
+        stmt.execute(params![tenant_id, key])
             .map_err(|e| SqliteError::Query(format!("Failed to execute delete: {}", e)))?;
 
         Ok(())
@@ -131,19 +126,16 @@ impl StorageBackend for SqliteKVStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("SELECT 1 FROM kv_store WHERE tenant_id = ?1 AND key = ?2 LIMIT 1")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare exists query: {}", e)))?;
 
         let mut rows = stmt
-            .query(libsql::params![tenant_id, key])
-            .await
+            .query(params![tenant_id, key])
             .map_err(|e| SqliteError::Query(format!("Failed to execute exists: {}", e)))?;
 
         Ok(rows
             .next()
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to check exists: {}", e)))?
             .is_some())
     }
@@ -155,20 +147,17 @@ impl StorageBackend for SqliteKVStorage {
         // Use LIKE with prefix for prefix scanning
         let pattern = format!("{}%", prefix);
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("SELECT key FROM kv_store WHERE tenant_id = ?1 AND key LIKE ?2 ORDER BY key")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare list_keys query: {}", e)))?;
 
         let mut rows = stmt
-            .query(libsql::params![tenant_id, pattern])
-            .await
+            .query(params![tenant_id, pattern])
             .map_err(|e| SqliteError::Query(format!("Failed to execute list_keys: {}", e)))?;
 
         let mut keys = Vec::new();
         while let Some(row) = rows
             .next()
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to fetch key row: {}", e)))?
         {
             let key: String = row
@@ -210,13 +199,11 @@ impl StorageBackend for SqliteKVStorage {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
-        let stmt = conn
+        let mut stmt = conn
             .prepare("DELETE FROM kv_store WHERE tenant_id = ?1")
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare clear: {}", e)))?;
 
-        stmt.execute(libsql::params![tenant_id])
-            .await
+        stmt.execute(params![tenant_id])
             .map_err(|e| SqliteError::Query(format!("Failed to execute clear: {}", e)))?;
 
         Ok(())
@@ -270,19 +257,16 @@ mod tests {
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
 
         // Run migrations manually (V1, V7 for kv_store tests)
-        let conn = backend.get_connection().await.unwrap();
+        // Using synchronous migration
+        backend.run_migrations().await.unwrap();
 
-        // V1: Initial setup
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V1__initial_setup.sql"
-        ))
-        .await
-        .unwrap();
+        // Load V7 specifically? run_migrations runs all.
+        // But for test setup we might want to be explicit if run_migrations logic was partial?
+        // backend.run_migrations() handles checking/running all pending.
 
-        // V7: KV store
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V7__kv_store.sql"))
-            .await
-            .unwrap();
+        // But the original code manually ran V1 and V7.
+        // run_migrations should be enough if it includes all.
+        // Let's rely on run_migrations() which uses embedded migrations.
 
         // Create unique tenant ID
         let tenant_id = format!("test-tenant-{}", uuid::Uuid::new_v4());
@@ -441,15 +425,7 @@ mod tests {
         let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
 
         // Run migrations manually
-        let conn = backend.get_connection().await.unwrap();
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V1__initial_setup.sql"
-        ))
-        .await
-        .unwrap();
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V7__kv_store.sql"))
-            .await
-            .unwrap();
+        backend.run_migrations().await.unwrap();
 
         let storage1 = SqliteKVStorage::new(Arc::clone(&backend), "tenant-1".to_string());
         let storage2 = SqliteKVStorage::new(Arc::clone(&backend), "tenant-2".to_string());

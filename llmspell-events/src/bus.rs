@@ -14,7 +14,7 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 /// Event bus for publishing and subscribing to events
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EventBus {
     /// Pattern-based subscriptions
     subscriptions: Arc<DashMap<String, Vec<Subscription>>>,
@@ -191,6 +191,11 @@ impl EventBus {
     /// Get a broadcast receiver for all events
     pub fn subscribe_all(&self) -> broadcast::Receiver<UniversalEvent> {
         self.broadcast_tx.subscribe()
+    }
+
+    /// Get the number of active broadcast receivers
+    pub fn receiver_count(&self) -> usize {
+        self.broadcast_tx.receiver_count()
     }
 
     /// Route an event to matching subscriptions

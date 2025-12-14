@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tracing::{debug, instrument, trace};
 
 use crate::traits::transport::BoundPorts;
@@ -17,7 +17,7 @@ use crate::traits::{Transport, TransportConfig};
 /// Channel pair for bidirectional communication
 pub struct ChannelPair {
     pub sender: mpsc::UnboundedSender<Vec<Vec<u8>>>,
-    pub receiver: Arc<RwLock<mpsc::UnboundedReceiver<Vec<Vec<u8>>>>>,
+    pub receiver: Arc<Mutex<mpsc::UnboundedReceiver<Vec<Vec<u8>>>>>,
 }
 
 /// In-process transport using tokio channels
@@ -98,7 +98,7 @@ impl InProcessTransport {
         let (tx, rx) = mpsc::unbounded_channel();
         let channel = Arc::new(ChannelPair {
             sender: tx,
-            receiver: Arc::new(RwLock::new(rx)),
+            receiver: Arc::new(Mutex::new(rx)),
         });
 
         trace!(
@@ -114,7 +114,7 @@ impl InProcessTransport {
         let (rev_tx, rev_rx) = mpsc::unbounded_channel();
         let reverse_channel = Arc::new(ChannelPair {
             sender: rev_tx,
-            receiver: Arc::new(RwLock::new(rev_rx)),
+            receiver: Arc::new(Mutex::new(rev_rx)),
         });
 
         trace!(
@@ -139,14 +139,14 @@ impl InProcessTransport {
         let (tx1, rx1) = mpsc::unbounded_channel();
         let pair1 = Arc::new(ChannelPair {
             sender: tx1,
-            receiver: Arc::new(RwLock::new(rx1)),
+            receiver: Arc::new(Mutex::new(rx1)),
         });
 
         // Pair 2: transport2 sends -> transport1 receives
         let (tx2, rx2) = mpsc::unbounded_channel();
         let pair2 = Arc::new(ChannelPair {
             sender: tx2,
-            receiver: Arc::new(RwLock::new(rx2)),
+            receiver: Arc::new(Mutex::new(rx2)),
         });
 
         // Transport1 (kernel): sends via pair1, receives via pair2
@@ -192,12 +192,12 @@ impl InProcessTransport {
 
         trace!("Setup paired channel '{}' between transports", name);
         trace!(
-            "  T1 sends via {:p}, receives via Arc<RwLock> at {:p}",
+            "  T1 sends via {:p}, receives via Arc<Mutex> at {:p}",
             &raw const pair1.sender,
             Arc::as_ptr(&pair2.receiver)
         );
         trace!(
-            "  T2 sends via {:p}, receives via Arc<RwLock> at {:p}",
+            "  T2 sends via {:p}, receives via Arc<Mutex> at {:p}",
             &raw const pair2.sender,
             Arc::as_ptr(&pair1.receiver)
         );
@@ -264,43 +264,34 @@ impl Transport for InProcessTransport {
         );
 
         // Receive from the reverse channel (what was sent to us)
-        let channels = self.reverse_channels.read();
+        let channel_pair = {
+            let channels = self.reverse_channels.read();
+            channels.get(channel).cloned()
+        };
 
-        if let Some(channel_pair) = channels.get(channel) {
-            let receiver_ptr = Arc::as_ptr(&channel_pair.receiver);
-            trace!(
-                "Receiving from channel {} via receiver: {:p}",
-                channel,
-                receiver_ptr
-            );
+        if let Some(channel_pair) = channel_pair {
+            trace!("Receiving from channel {}", channel);
 
-            let mut receiver = channel_pair.receiver.write();
+            let mut receiver = channel_pair.receiver.lock().await;
 
-            match receiver.try_recv() {
-                Ok(message) => {
-                    debug!(
-                        "InProcessTransport::recv() received message on channel {}: {} parts",
-                        channel,
-                        message.len()
-                    );
-                    trace!(
-                        "Received message on channel {}: {} parts",
-                        channel,
-                        message.len()
-                    );
-                    Ok(Some(message))
-                }
-                Err(mpsc::error::TryRecvError::Empty) => {
-                    // Only log at trace level to avoid spam
-                    trace!("No message available on channel {}", channel);
-                    Ok(None)
-                }
-                Err(mpsc::error::TryRecvError::Disconnected) => {
-                    debug!("Channel {} disconnected!", channel);
-                    Err(anyhow::anyhow!("Channel {channel} disconnected"))
-                }
+            if let Some(message) = receiver.recv().await {
+                debug!(
+                    "InProcessTransport::recv() received message on channel {}: {} parts",
+                    channel,
+                    message.len()
+                );
+                trace!(
+                    "Received message on channel {}: {} parts",
+                    channel,
+                    message.len()
+                );
+                Ok(Some(message))
+            } else {
+                debug!("Channel {} disconnected!", channel);
+                Ok(None) // or error?
             }
         } else {
+            let channels = self.reverse_channels.read();
             debug!(
                 "Channel {} not found in reverse_channels! Available: {:?}",
                 channel,

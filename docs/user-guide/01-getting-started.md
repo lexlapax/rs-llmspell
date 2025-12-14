@@ -37,6 +37,31 @@ export LLMSPELL_TOOLS_ALLOWED_PATHS="/tmp,/workspace"
 ./target/release/llmspell exec 'print("LLMSpell ready!")'
 ```
 
+## Web Interface Quickstart ⭐ **Phase 14**
+
+For a visual, browser-based experience, use the web interface:
+
+```bash
+# Start the web server
+./target/release/llmspell web start
+
+# Server starts on http://localhost:3000
+# Access in your browser or run:
+./target/release/llmspell web open
+```
+
+**Web Interface Features**:
+- **Script Editor**: Write and execute scripts with syntax highlighting
+- **Sessions**: Visual session management and history
+- **Templates**: Browse and launch templates with parameter forms
+- **Memory Browser**: Explore episodic memory and knowledge graph
+- **Agents**: Monitor active agents and workflows
+- **Tools**: Execute tools with interactive forms
+- **Configuration**: Edit configuration and manage profiles
+- **Real-time Updates**: WebSocket streaming for live execution monitoring
+
+**See**: [Web Interface Guide](12-web-interface.md) for complete documentation.
+
 ## First Script
 
 ### Option 1: One-liner (Basic)
@@ -364,6 +389,10 @@ export OPENAI_API_KEY="sk-..."  # or ANTHROPIC_API_KEY
 - `providers` - OpenAI/Anthropic providers (requires API keys)
 - `state` - State persistence enabled
 - `memory` - Phase 13 memory system + RAG
+- **Production presets** (full features: Graph + RAG + Memory + Context + SQLite):
+  - `gemini-prod` - Google Gemini (requires `GEMINI_API_KEY`)
+  - `openai-prod` - OpenAI GPT (requires `OPENAI_API_KEY`)
+  - `claude-prod` - Anthropic Claude (requires `ANTHROPIC_API_KEY`)
 - See all 21 profiles: [Profile Guide](profile-layers-guide.md)
 
 ## Quick Examples

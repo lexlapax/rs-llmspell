@@ -1,9 +1,30 @@
 # SQLite Backend Layer
 # libsql-based persistence with WAL mode and vectorlite-rs
 
+[metadata]
+name = "sqlite"
+category = "backend"
+description = "SQLite local storage"
+use_cases = [
+    "Single-machine deployment",
+    "Local persistence",
+    "Embedded database",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "SQLite Backend"
 description = "Persistent storage using libsql with vectorlite-rs integration"
+
+[storage]
+# Defaults to ~/.llmspell if not set
+# base_dir will be resolved relative to home
+
+[storage.sqlite]
+journal_mode = "WAL"
 
 [runtime.state_persistence]
 enabled = true

@@ -6,7 +6,7 @@ mod test_helpers;
 
 use llmspell_bridge::lua::globals::memory::inject_memory_global;
 use llmspell_bridge::{
-    globals::types::GlobalContext, ComponentRegistry, MemoryBridge, ProviderManager,
+    globals::types::GlobalContext, ComponentRegistry, MemoryBridge, MemoryProvider, ProviderManager,
 };
 use llmspell_config::ProviderManagerConfig;
 use llmspell_memory::DefaultMemoryManager;
@@ -33,7 +33,9 @@ fn test_memory_global_injection() {
     });
 
     // Create bridge
-    let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+    let memory_bridge = Arc::new(MemoryBridge::new(MemoryProvider::new_eager(Arc::new(
+        memory_manager,
+    ))));
 
     // Create Lua runtime
     let lua = Lua::new();
@@ -76,7 +78,9 @@ fn test_memory_episodic_add() {
                 .await
                 .expect("Failed to create memory manager")
         });
-        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let memory_bridge = Arc::new(MemoryBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -107,7 +111,9 @@ fn test_memory_episodic_search() {
                 .await
                 .expect("Failed to create memory manager")
         });
-        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let memory_bridge = Arc::new(MemoryBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -139,7 +145,9 @@ fn test_memory_semantic_query() {
                 .await
                 .expect("Failed to create memory manager")
         });
-        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let memory_bridge = Arc::new(MemoryBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -170,7 +178,9 @@ fn test_memory_consolidate() {
                 .await
                 .expect("Failed to create memory manager")
         });
-        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let memory_bridge = Arc::new(MemoryBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 
@@ -199,7 +209,9 @@ fn test_memory_stats() {
                 .await
                 .expect("Failed to create memory manager")
         });
-        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let memory_bridge = Arc::new(MemoryBridge::new(MemoryProvider::new_eager(Arc::new(
+            memory_manager,
+        ))));
         let lua = Lua::new();
         let context = create_test_context();
 

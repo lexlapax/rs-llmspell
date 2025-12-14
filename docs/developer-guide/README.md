@@ -1,7 +1,7 @@
 # Developer Guide
 
-✅ **CURRENT**: Phase 13 Complete - Experimental Memory & Context Engineering
-**Version**: 0.13.0 | **Crates**: 21 | **Tools**: 40+ | **Templates**: 10 | **Examples**: 60+
+✅ **CURRENT**: Phase 14 Complete - Web Interface & Mission Control
+**Version**: 0.14.1 | **Crates**: 22 | **Tools**: 40+ | **Templates**: 10 | **Examples**: 60+
 
 **Build experimental AI components with production-quality patterns for painless extraction**
 
@@ -119,6 +119,17 @@
 
 **Time**: 2-4 hours (reference) | **Prerequisites**: 01, 02, 05
 
+### [09. Web Architecture](09-web-architecture.md) 🌐
+**Architecture of the unified web interface**
+- Unified architecture (Rust backend + Embedded React)
+- API design (axum handlers, WebSocket EventBus integration)
+- Frontend architecture (Vite, React, Monaco Editor integration, graph visualization)
+- Asset embedding strategy (rust-embed)
+- Security model (CORS, API keys, session validation)
+- Extension patterns (adding endpoints, UI pages)
+
+**Time**: 1-2 hours | **Prerequisites**: 01, 02
+
 ---
 
 ## 📚 API Reference (Rust Crate Documentation)
@@ -148,9 +159,16 @@ cargo doc --package llmspell-core --all-features --open
 
 ---
 
-## 🆕 What's New in Phase 13
+## 🆕 What's New in Phase 14
 
-### Experimental Memory & Context Engineering (Complete) ⭐
+### Web Interface & Mission Control (Complete) ⭐
+- **Unified Crate**: `llmspell-web` (Axum + Tokio + RustEmbed)
+- **Mission Control UI**: Dashboard, Editor, Sessions, Memory, Agents
+- **Embedded Frontend**: React + Vite + Monaco Editor, single binary deployment
+- **Real-Time API**: REST + WebSocket streaming for events and console
+- **Visualizations**: Interactive memory graph, session timeline, activity metrics
+
+### Experimental Memory & Context Engineering (Phase 13 Complete) ⭐
 - **3-Tier Memory System**: Episodic (HNSW), Semantic (SQLite/PostgreSQL graph), Procedural (patterns)
 - **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SQLite/PostgreSQL (bi-temporal graph)
 - **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
@@ -369,9 +387,14 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 - Bridge Consolidation (87% compile speedup)
 - API Standardization (Tool.execute consistency)
 
-### Phase 14+ (Vision)
-- Advanced Memory Consolidation (A-TKG)
-- Model Context Protocol (MCP) integration
+### Phase 14 (✅ Complete)
+- **Web Interface**: Unified "Mission Control" UI
+- **Single Binary**: Embedded React frontend
+- **Real-Time API**: HTTP + WebSocket streaming
+- **Interactive Tools**: Memory graph, script editor, session replay
+
+### Phase 15+ (Vision)
+- **Model Context Protocol (MCP)**: System tool integration
 - Language Server Protocol (LSP)
 - Agent-to-Agent (A2A) communication
 - Plugin marketplace
@@ -389,7 +412,7 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 
 ## Summary
 
-**Phase 13 Complete** with consolidated developer documentation:
+**Phase 14 Complete** with consolidated developer documentation:
 
 ✅ **8 Numbered Guides** from setup to production (linear learning path)
 ✅ **21 Crates** with Memory, Graph, Context, Templates, Kernel, RAG, and multi-tenancy

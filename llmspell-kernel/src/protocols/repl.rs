@@ -657,6 +657,7 @@ mod tests {
                 session_manager: create_test_session_manager().await,
                 memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
                 hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+                event_bus: None,
             })
             .await
             .unwrap(),

@@ -205,7 +205,7 @@ async fn create_state_manager(
 /// Returns an error if session manager initialization fails
 fn create_session_manager(
     state_manager: Arc<llmspell_kernel::state::StateManager>,
-    _config: &LLMSpellConfig,
+    config: &LLMSpellConfig,
 ) -> Result<Arc<llmspell_kernel::sessions::SessionManager>, LLMSpellError> {
     debug!("Creating session manager");
 
@@ -222,8 +222,8 @@ fn create_session_manager(
     // Create event bus
     let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
 
-    // Use default session config
-    let session_config = llmspell_kernel::sessions::SessionManagerConfig::default();
+    // Create session config from LLMSpellConfig (Task 14.6.7)
+    let session_config = llmspell_kernel::sessions::SessionManagerConfig::from_llm_config(config);
 
     // Create session manager
     let manager = llmspell_kernel::sessions::SessionManager::new(

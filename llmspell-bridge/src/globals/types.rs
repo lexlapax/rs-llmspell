@@ -113,7 +113,7 @@ pub trait GlobalObject: Send + Sync {
     #[cfg(feature = "javascript")]
     fn inject_javascript(&self, ctx: &mut Context, context: &GlobalContext) -> Result<()>;
 
-    /// Clean up any resources when the global is removed
+    /// Cleanup resources used by this bridge
     ///
     /// # Errors
     ///
@@ -122,6 +122,31 @@ pub trait GlobalObject: Send + Sync {
         Ok(())
     }
 }
+
+/// Type alias for lazy memory manager initializer
+pub type LazyMemoryInitializer = Box<
+    dyn Fn() -> futures::future::BoxFuture<'static, Option<Arc<dyn llmspell_memory::MemoryManager>>>
+        + Send
+        + Sync,
+>;
+
+/// Error returned when lazy initialization fails
+#[derive(Debug)]
+pub enum LazyInitializationError {
+    InitializationFailed,
+    NotAvailable,
+}
+
+impl std::fmt::Display for LazyInitializationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InitializationFailed => write!(f, "Failed to initialize memory manager"),
+            Self::NotAvailable => write!(f, "Memory manager not available"),
+        }
+    }
+}
+
+impl std::error::Error for LazyInitializationError {}
 
 /// Performance metrics for global injection
 #[derive(Debug, Default)]

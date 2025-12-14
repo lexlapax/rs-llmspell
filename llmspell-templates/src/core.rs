@@ -115,6 +115,7 @@ impl std::fmt::Display for TemplateCategory {
 
 /// Template parameters (input values)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(transparent)]
 pub struct TemplateParams {
     /// Parameter values
     pub values: HashMap<String, serde_json::Value>,
@@ -393,6 +394,52 @@ impl CostEstimate {
             estimated_cost_usd: Some(cost_usd),
             estimated_duration_ms: Some(duration_ms),
             confidence,
+        }
+    }
+}
+
+/// Event emitted during template execution steps (Task 14.6.9)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StepEvent {
+    /// Unique ID for the step execution
+    pub step_id: String,
+
+    /// Type of step (agent, tool, etc)
+    pub step_type: String,
+
+    /// Human readable label
+    pub label: String,
+
+    /// Status: running, completed, failed
+    pub status: String,
+
+    /// Optional output
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<serde_json::Value>,
+
+    /// Optional error
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+
+    /// Timestamp
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+impl StepEvent {
+    pub fn new(
+        step_id: impl Into<String>,
+        step_type: impl Into<String>,
+        label: impl Into<String>,
+        status: impl Into<String>,
+    ) -> Self {
+        Self {
+            step_id: step_id.into(),
+            step_type: step_type.into(),
+            label: label.into(),
+            status: status.into(),
+            output: None,
+            error: None,
+            timestamp: chrono::Utc::now(),
         }
     }
 }

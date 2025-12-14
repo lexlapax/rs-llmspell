@@ -1,6 +1,20 @@
 # Embedded Base Layer
 # Library/programmatic integration for embedding in applications
 
+[metadata]
+name = "embedded"
+category = "base"
+description = "Embedded library mode"
+use_cases = [
+    "Library integration",
+    "Embedded applications",
+    "Custom runtime control",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Embedded Base"
 description = "Embedded library usage with minimal footprint"

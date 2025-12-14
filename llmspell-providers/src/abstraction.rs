@@ -342,8 +342,14 @@ impl ProviderManager {
         let registry = self.registry.read().await;
         let provider = registry.create(config)?;
 
-        // Validate the provider
-        provider.validate().await?;
+        // Validate the provider (best effort)
+        if let Err(e) = provider.validate().await {
+            tracing::warn!(
+                "Provider validation failed for '{}' (continuing anyway): {}",
+                instance_name,
+                e
+            );
+        }
 
         let mut instances = self.instances.write().await;
         instances.insert(instance_name.clone(), Arc::new(provider));

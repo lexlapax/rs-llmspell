@@ -849,6 +849,11 @@ impl ScriptExecutor for ScriptRuntime {
         Ok(output)
     }
 
+    /// Set output callback for streaming (Phase 13.12.fix)
+    fn set_output_callback(&self, callback: Box<dyn Fn(&str) + Send + Sync>) {
+        self.engine.set_output_callback(callback);
+    }
+
     async fn execute_script_with_args(
         &self,
         script: &str,

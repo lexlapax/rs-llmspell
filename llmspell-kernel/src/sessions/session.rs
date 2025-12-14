@@ -51,6 +51,7 @@ impl Session {
         if let Some(parent_id) = options.parent_session_id {
             metadata.parent_session_id = Some(parent_id);
         }
+        metadata.custom_metadata = options.metadata;
 
         Self {
             metadata: Arc::new(RwLock::new(metadata)),

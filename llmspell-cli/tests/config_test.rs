@@ -30,7 +30,11 @@ async fn test_default_config() {
     assert_eq!(config.runtime.security.max_memory_bytes, Some(50_000_000));
 }
 #[tokio::test]
+#[serial]
 async fn test_create_config_file() {
+    // Clean env vars to ensure default values
+    clean_env_vars();
+
     let dir = tempdir().unwrap();
     let config_path = dir.path().join("test.toml");
 

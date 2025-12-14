@@ -45,8 +45,8 @@ async fn start_embedded_repl(
     _engine: ScriptEngine,
     _output_format: OutputFormat,
 ) -> Result<()> {
-    // Create interactive session
-    let kernel = handle.into_kernel();
+    // Create interactive session (Direct mode)
+    let kernel = handle.into_kernel()?;
     let mut session = InteractiveSession::new(kernel, session_config).await?;
 
     // Run REPL loop

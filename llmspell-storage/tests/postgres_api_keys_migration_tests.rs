@@ -25,6 +25,10 @@ const APP_CONNECTION_STRING: &str =
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 
 /// Ensure migrations run once before all tests
+///
+/// This function drops and recreates the llmspell schema to ensure a clean state
+/// before running migrations. This handles cases where migration files have been
+/// modified during development.
 async fn ensure_migrations_run_once() {
     MIGRATION_INIT
         .get_or_init(|| async {
@@ -33,6 +37,31 @@ async fn ensure_migrations_run_once() {
                 .await
                 .expect("Failed to create backend for migration init");
 
+            // Get a raw client to drop/recreate schema
+            let client = backend.get_client().await.expect("Failed to get client");
+
+            // Drop and recreate llmspell schema to clear migration history
+            // This allows tests to run even if migration files have changed
+            client
+                .execute("DROP SCHEMA IF EXISTS llmspell CASCADE", &[])
+                .await
+                .expect("Failed to drop llmspell schema");
+
+            client
+                .execute("CREATE SCHEMA llmspell", &[])
+                .await
+                .expect("Failed to create llmspell schema");
+
+            // Set search_path to include public schema for pgcrypto functions
+            client
+                .execute(
+                    "ALTER DATABASE llmspell_dev SET search_path TO llmspell, public",
+                    &[],
+                )
+                .await
+                .expect("Failed to set search_path");
+
+            // Now run migrations on clean schema
             backend
                 .run_migrations()
                 .await

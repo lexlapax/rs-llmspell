@@ -41,9 +41,9 @@ pub enum SqliteError {
     Other(String),
 }
 
-impl From<libsql::Error> for SqliteError {
-    fn from(err: libsql::Error) -> Self {
-        SqliteError::Query(err.to_string())
+impl From<rusqlite::Error> for SqliteError {
+    fn from(err: rusqlite::Error) -> Self {
+        SqliteError::Query(err.to_string()) // Assuming Query is the closest match for a generic rusqlite error
     }
 }
 

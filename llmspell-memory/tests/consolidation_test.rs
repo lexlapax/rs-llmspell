@@ -64,7 +64,8 @@ async fn test_episodic_to_semantic_flow() {
         result.entities_added > 0,
         "Should extract at least one entity (Rust)"
     );
-    assert!(result.duration_ms > 0, "Should track duration");
+    // Duration might be 0ms on fast machines
+    // assert!(result.duration_ms >= 0); // Always true for u64
 
     // Verify entities were added to semantic memory
     // (We can't easily query by name without implementing a search method,

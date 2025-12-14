@@ -1,15 +1,8 @@
-//! SQLite event log storage (Phase 13c.2.7)
+// ABOUTME: SQLite event log storage (Phase 13c.2.7)
+//! ABOUTME: SQLite event log storage with time-series optimization
 //!
 //! Time-series event storage with hybrid schema for efficient querying.
 //! Mirrors EventStorage API from llmspell-events without depending on it.
-//!
-//! # Integration with llmspell-events
-//!
-//! Applications using llmspell-events can use SqliteEventLogStorage directly:
-//! ```rust,ignore
-//! let event_storage = SqliteEventLogStorage::new(sqlite_backend);
-//! event_storage.store_event(&event_json).await?;
-//! ```
 
 use super::backend::SqliteBackend;
 use super::error::SqliteError;
@@ -37,16 +30,7 @@ pub struct EventStorageStats {
 }
 
 /// SQLite event log storage with time-series optimization
-///
-/// Mirrors EventStorage trait API with:
-/// - Hybrid schema (extracted columns + JSON payload)
-/// - Application-level tenant isolation
-/// - Optimized indexes for pattern/correlation/time queries
-///
-/// # Performance Targets
-/// - store_event: <10ms
-/// - get_events_by_correlation_id: <50ms
-/// - get_events_by_pattern: <100ms
+#[derive(Debug, Clone)]
 pub struct SqliteEventLogStorage {
     backend: Arc<SqliteBackend>,
     tenant_id: String,
@@ -59,15 +43,6 @@ impl SqliteEventLogStorage {
     }
 
     /// Store event in log
-    ///
-    /// Event JSON must contain:
-    /// - id: UUID string
-    /// - event_type: string
-    /// - timestamp: ISO8601 string or Unix timestamp
-    /// - metadata.correlation_id: UUID string
-    /// - language: string (rust/lua/javascript/python)
-    ///
-    /// Note: sequence is auto-generated per tenant (not extracted from payload)
     pub async fn store_event(&self, event_payload: &Value) -> anyhow::Result<()> {
         let conn = self.backend.get_connection().await?;
         let tenant_id = self.tenant_id.clone();
@@ -98,23 +73,13 @@ impl SqliteEventLogStorage {
         };
 
         // Auto-generate sequence number per tenant
-        let mut rows = conn
-            .query(
-                "SELECT COALESCE(MAX(sequence), -1) + 1 FROM event_log WHERE tenant_id = ?1",
-                vec![libsql::Value::Text(tenant_id.clone())],
-            )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to get next sequence: {}", e)))?;
+        let mut stmt = conn
+            .prepare("SELECT COALESCE(MAX(sequence), -1) + 1 FROM event_log WHERE tenant_id = ?1")
+            .map_err(|e| SqliteError::Query(format!("Failed to prepare sequence query: {}", e)))?;
 
-        let sequence: i64 = if let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to fetch sequence: {}", e)))?
-        {
-            row.get(0).unwrap_or(0)
-        } else {
-            0
-        };
+        let sequence: i64 = stmt
+            .query_row(rusqlite::params![tenant_id], |row| row.get(0))
+            .map_err(|e| SqliteError::Query(format!("Failed to get next sequence: {}", e)))?;
 
         // Serialize full payload
         let payload_json =
@@ -125,49 +90,41 @@ impl SqliteEventLogStorage {
             "INSERT INTO event_log
              (tenant_id, event_id, event_type, correlation_id, timestamp, sequence, language, payload)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            vec![
-                libsql::Value::Text(tenant_id),
-                libsql::Value::Text(event_id.to_string()),
-                libsql::Value::Text(event_type.to_string()),
-                libsql::Value::Text(correlation_id.to_string()),
-                libsql::Value::Integer(timestamp),
-                libsql::Value::Integer(sequence),
-                libsql::Value::Text(language.to_string()),
-                libsql::Value::Text(payload_json),
+            rusqlite::params![
+                tenant_id,
+                event_id,
+                event_type,
+                correlation_id,
+                timestamp,
+                sequence,
+                language,
+                payload_json
             ],
         )
-        .await
         .map_err(|e| SqliteError::Query(format!("Failed to insert event: {}", e)))?;
 
         Ok(())
     }
 
     /// Retrieve events by pattern
-    ///
-    /// Pattern uses SQL LIKE syntax (% wildcard)
     pub async fn get_events_by_pattern(&self, pattern: &str) -> anyhow::Result<Vec<Value>> {
         let conn = self.backend.get_connection().await?;
         let tenant_id = self.tenant_id.clone();
 
-        let mut rows = conn
-            .query(
+        let mut stmt = conn
+            .prepare(
                 "SELECT payload FROM event_log
                  WHERE tenant_id = ?1 AND event_type LIKE ?2
                  ORDER BY timestamp DESC",
-                vec![
-                    libsql::Value::Text(tenant_id),
-                    libsql::Value::Text(pattern.to_string()),
-                ],
             )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to query events by pattern: {}", e)))?;
+            .map_err(|e| SqliteError::Query(format!("Failed to prepare pattern query: {}", e)))?;
+
+        let mut rows = stmt
+            .query(rusqlite::params![tenant_id, pattern])
+            .map_err(|e| SqliteError::Query(format!("Failed to execute pattern query: {}", e)))?;
 
         let mut events = Vec::new();
-        while let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to iterate events: {}", e)))?
-        {
+        while let Some(row) = rows.next()? {
             let payload_json: String = row.get(0).context("Failed to get payload")?;
             let event: Value =
                 serde_json::from_str(&payload_json).context("Failed to deserialize event")?;
@@ -189,28 +146,24 @@ impl SqliteEventLogStorage {
         let start_ts = start.timestamp();
         let end_ts = end.timestamp();
 
-        let mut rows = conn
-            .query(
+        let mut stmt = conn
+            .prepare(
                 "SELECT payload FROM event_log
                  WHERE tenant_id = ?1 AND timestamp >= ?2 AND timestamp <= ?3
                  ORDER BY timestamp DESC",
-                vec![
-                    libsql::Value::Text(tenant_id),
-                    libsql::Value::Integer(start_ts),
-                    libsql::Value::Integer(end_ts),
-                ],
             )
-            .await
             .map_err(|e| {
-                SqliteError::Query(format!("Failed to query events by time range: {}", e))
+                SqliteError::Query(format!("Failed to prepare time range query: {}", e))
+            })?;
+
+        let mut rows = stmt
+            .query(rusqlite::params![tenant_id, start_ts, end_ts])
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to execute time range query: {}", e))
             })?;
 
         let mut events = Vec::new();
-        while let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to iterate events: {}", e)))?
-        {
+        while let Some(row) = rows.next()? {
             let payload_json: String = row.get(0).context("Failed to get payload")?;
             let event: Value =
                 serde_json::from_str(&payload_json).context("Failed to deserialize event")?;
@@ -227,30 +180,26 @@ impl SqliteEventLogStorage {
     ) -> anyhow::Result<Vec<Value>> {
         let conn = self.backend.get_connection().await?;
         let tenant_id = self.tenant_id.clone();
-
         let correlation_id_str = correlation_id.to_string();
 
-        let mut rows = conn
-            .query(
+        let mut stmt = conn
+            .prepare(
                 "SELECT payload FROM event_log
                  WHERE tenant_id = ?1 AND correlation_id = ?2
                  ORDER BY timestamp DESC",
-                vec![
-                    libsql::Value::Text(tenant_id),
-                    libsql::Value::Text(correlation_id_str),
-                ],
             )
-            .await
             .map_err(|e| {
-                SqliteError::Query(format!("Failed to query events by correlation_id: {}", e))
+                SqliteError::Query(format!("Failed to prepare correlation query: {}", e))
+            })?;
+
+        let mut rows = stmt
+            .query(rusqlite::params![tenant_id, correlation_id_str])
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to execute correlation query: {}", e))
             })?;
 
         let mut events = Vec::new();
-        while let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to iterate events: {}", e)))?
-        {
+        while let Some(row) = rows.next()? {
             let payload_json: String = row.get(0).context("Failed to get payload")?;
             let event: Value =
                 serde_json::from_str(&payload_json).context("Failed to deserialize event")?;
@@ -264,22 +213,17 @@ impl SqliteEventLogStorage {
     pub async fn cleanup_old_events(&self, before: DateTime<Utc>) -> anyhow::Result<usize> {
         let conn = self.backend.get_connection().await?;
         let tenant_id = self.tenant_id.clone();
-
         let before_ts = before.timestamp();
 
         let rows_affected = conn
             .execute(
                 "DELETE FROM event_log
                  WHERE tenant_id = ?1 AND timestamp < ?2",
-                vec![
-                    libsql::Value::Text(tenant_id),
-                    libsql::Value::Integer(before_ts),
-                ],
+                rusqlite::params![tenant_id, before_ts],
             )
-            .await
             .map_err(|e| SqliteError::Query(format!("Failed to cleanup old events: {}", e)))?;
 
-        Ok(rows_affected as usize)
+        Ok(rows_affected)
     }
 
     /// Get storage statistics
@@ -288,50 +232,44 @@ impl SqliteEventLogStorage {
         let tenant_id = self.tenant_id.clone();
 
         // Get total count, oldest/newest timestamps
-        let mut rows = conn
-            .query(
+        let mut stmt = conn
+            .prepare(
                 "SELECT COUNT(*), MIN(timestamp), MAX(timestamp)
                  FROM event_log
                  WHERE tenant_id = ?1",
-                vec![libsql::Value::Text(tenant_id.clone())],
             )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to get storage stats: {}", e)))?;
+            .map_err(|e| SqliteError::Query(format!("Failed to prepare stats query: {}", e)))?;
 
-        let (total_events, oldest_event, newest_event) = if let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to fetch stats row: {}", e)))?
-        {
-            let count: i64 = row.get(0).unwrap_or(0);
-            let oldest: Option<i64> = row.get(1).ok();
-            let newest: Option<i64> = row.get(2).ok();
+        let (total_events, oldest_event, newest_event) = stmt
+            .query_row(rusqlite::params![tenant_id], |row| {
+                let count: i64 = row.get(0).unwrap_or(0);
+                let oldest: Option<i64> = row.get(1).ok();
+                let newest: Option<i64> = row.get(2).ok();
 
-            let oldest_event = oldest.and_then(|ts| DateTime::from_timestamp(ts, 0));
-            let newest_event = newest.and_then(|ts| DateTime::from_timestamp(ts, 0));
+                let oldest_event = oldest.and_then(|ts| DateTime::from_timestamp(ts, 0));
+                let newest_event = newest.and_then(|ts| DateTime::from_timestamp(ts, 0));
 
-            (count as u64, oldest_event, newest_event)
-        } else {
-            (0, None, None)
-        };
+                Ok((count as u64, oldest_event, newest_event))
+            })
+            .map_err(|e| SqliteError::Query(format!("Failed to fetch stats: {}", e)))?;
 
         // Get events by type
-        let mut rows = conn
-            .query(
+        let mut stmt = conn
+            .prepare(
                 "SELECT event_type, COUNT(*) FROM event_log
                  WHERE tenant_id = ?1
                  GROUP BY event_type",
-                vec![libsql::Value::Text(tenant_id)],
             )
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to get events by type: {}", e)))?;
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to prepare type stats query: {}", e))
+            })?;
+
+        let mut rows = stmt.query(rusqlite::params![tenant_id]).map_err(|e| {
+            SqliteError::Query(format!("Failed to execute type stats query: {}", e))
+        })?;
 
         let mut events_by_type = HashMap::new();
-        while let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| SqliteError::Query(format!("Failed to iterate event types: {}", e)))?
-        {
+        while let Some(row) = rows.next()? {
             let event_type: String = row.get(0).context("Failed to get event_type")?;
             let count: i64 = row.get(1).context("Failed to get count")?;
             events_by_type.insert(event_type, count as u64);
@@ -373,9 +311,8 @@ mod tests {
         // V1: Initial setup
         conn.execute(
             "CREATE TABLE IF NOT EXISTS _migrations (version INTEGER PRIMARY KEY)",
-            Vec::<libsql::Value>::new(),
+            rusqlite::params![],
         )
-        .await
         .unwrap();
 
         // V11: event_log table
@@ -393,9 +330,8 @@ mod tests {
                 UNIQUE(tenant_id, event_id),
                 UNIQUE(tenant_id, sequence)
             )",
-            Vec::<libsql::Value>::new(),
+            rusqlite::params![],
         )
-        .await
         .unwrap();
 
         drop(conn);

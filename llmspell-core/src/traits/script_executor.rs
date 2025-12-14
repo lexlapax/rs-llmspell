@@ -100,8 +100,21 @@ pub trait ScriptExecutor: Send + Sync + 'static {
     /// Get the current debug context if set
     ///
     /// Default returns None. Executors with debug support should override.
+    /// Get the current debug context if set
+    ///
+    /// Default returns None. Executors with debug support should override.
     fn get_debug_context(&self) -> Option<Arc<dyn DebugContext>> {
         None
+    }
+
+    /// Set a callback for real-time output capture (stdout/stderr)
+    ///
+    /// This allows execution environments (like IntegratedKernel) to stream output
+    /// as it happens via IOCapture or similar mechanisms.
+    ///
+    /// Default implementation does nothing for backward compatibility.
+    fn set_output_callback(&self, _callback: Box<dyn Fn(&str) + Send + Sync>) {
+        // Default: ignore
     }
 
     /// Set session manager for template infrastructure (Phase 12.8.2.5)

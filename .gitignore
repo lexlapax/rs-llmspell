@@ -45,6 +45,7 @@ sessions/
 *.exe
 *.pdb
 *.lib
+*.hnsw
 
 # Example generated artifacts (Phase 13c.5.4)
 examples/script-users/applications/*/generated/
@@ -60,3 +61,5 @@ memory_fixed.txt
 refactor.txt
 refactor_vector.txt
 task22_*.txt
+llmspell.db-shm
+llmspell.db-wal

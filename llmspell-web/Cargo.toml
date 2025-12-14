@@ -1,0 +1,57 @@
+[package]
+name = "llmspell-web"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+axum = { version = "0.7", features = ["ws", "macros"] }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+rust-embed = "8.0"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+anyhow = "1.0"
+serde_json = "1.0"
+llmspell-kernel = { path = "../llmspell-kernel" }
+llmspell-core = { path = "../llmspell-core" }
+llmspell-events = { path = "../llmspell-events" }
+futures = "0.3"
+tracing = "0.1"
+llmspell-memory = { path = "../llmspell-memory" }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
+mime_guess = "2.0"
+llmspell-templates = { path = "../llmspell-templates" }
+llmspell-config = { path = "../llmspell-config" }
+uuid = { version = "1.4", features = ["serde", "v4"] }
+tracing-subscriber = "0.3"
+llmspell-bridge = { path = "../llmspell-bridge", default-features = false, features = ["lua"] }
+jsonwebtoken = "9.2"
+llmspell-storage = { path = "../llmspell-storage" }
+schemars = "0.8"
+toml = "0.8"
+utoipa = { version = "4.2", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
+llmspell-tools = { path = "../llmspell-tools" }
+llmspell-agents = { path = "../llmspell-agents" }
+llmspell-workflows = { path = "../llmspell-workflows" }
+llmspell-providers = { path = "../llmspell-providers" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+
+[dev-dependencies]
+dotenv = "0.15.0"
+http-body-util = "0.1"
+tempfile.workspace = true
+reqwest = { version = "0.11", features = ["json"] }
+async-trait = "0.1"
+llmspell-testing = { path = "../llmspell-testing" }
+llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-storage = { path = "../llmspell-storage" }
+llmspell-events = { path = "../llmspell-events" }
+llmspell-config = { path = "../llmspell-config" }

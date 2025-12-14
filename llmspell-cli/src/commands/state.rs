@@ -41,7 +41,7 @@ async fn show_state(
 
     match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
+            let _kernel = handle.into_kernel()?;
 
             // Create placeholder state data for now
             let state_data = create_placeholder_state_data(&key);
@@ -70,7 +70,7 @@ async fn clear_state(
 
     match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
+            let _kernel = handle.into_kernel()?;
 
             // Perform state clearing operation
             match &key {
@@ -135,7 +135,7 @@ async fn export_state(
     // Get state data
     let state_data = match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
+            let _kernel = handle.into_kernel()?;
             create_placeholder_state_data(&None)
         }
         ExecutionContext::Connected { .. } => create_placeholder_state_data(&None),
@@ -192,7 +192,7 @@ async fn import_state(
     // Apply state based on context
     match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
+            let _kernel = handle.into_kernel()?;
             // State import logic would go here
         }
         ExecutionContext::Connected { .. } => {

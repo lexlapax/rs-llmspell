@@ -50,6 +50,9 @@ pub struct ExecutionContext {
     /// Context bridge for memory-enhanced context assembly (optional, Task 13.11.1a)
     /// Uses ContextAssembler trait from llmspell-core for compile-time type safety
     pub context_bridge: Option<Arc<dyn llmspell_core::ContextAssembler>>,
+
+    /// Callback for step execution events (optional, Task 14.6.9)
+    pub step_callback: Option<Arc<dyn Fn(crate::core::StepEvent) + Send + Sync>>,
 }
 
 impl ExecutionContext {
@@ -108,6 +111,11 @@ impl ExecutionContext {
     /// Get output directory
     pub fn output_dir(&self) -> Option<&std::path::Path> {
         self.output_dir.as_deref()
+    }
+
+    /// Get step callback
+    pub fn step_callback(&self) -> Option<&Arc<dyn Fn(crate::core::StepEvent) + Send + Sync>> {
+        self.step_callback.as_ref()
     }
 
     /// Check if infrastructure component is available
@@ -500,6 +508,7 @@ pub struct ExecutionContextBuilder {
     output_dir: Option<PathBuf>,
     memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
     context_bridge: Option<Arc<dyn llmspell_core::ContextAssembler>>,
+    step_callback: Option<Arc<dyn Fn(crate::core::StepEvent) + Send + Sync>>,
 }
 
 impl ExecutionContextBuilder {
@@ -614,6 +623,15 @@ impl ExecutionContextBuilder {
         self
     }
 
+    /// Set step callback (Task 14.6.9)
+    pub fn with_step_callback<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(crate::core::StepEvent) + Send + Sync + 'static,
+    {
+        self.step_callback = Some(Arc::new(callback));
+        self
+    }
+
     /// Build the execution context
     ///
     /// # Errors
@@ -660,6 +678,7 @@ impl ExecutionContextBuilder {
             output_dir: self.output_dir,
             memory_manager: self.memory_manager,
             context_bridge: self.context_bridge,
+            step_callback: self.step_callback,
         })
     }
 }

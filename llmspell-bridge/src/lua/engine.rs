@@ -395,6 +395,12 @@ impl ScriptEngineBridge for LuaEngine {
         }
     }
 
+    fn set_output_callback(&self, callback: Box<dyn Fn(&str) + Send + Sync>) {
+        if let Some(capture) = &self.console_capture {
+            capture.set_output_callback(Arc::from(callback));
+        }
+    }
+
     #[allow(clippy::cognitive_complexity)]
     #[instrument(
         level = "info",

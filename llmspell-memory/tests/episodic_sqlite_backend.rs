@@ -73,7 +73,6 @@ async fn create_test_tables(backend: &SqliteBackend, _dimension: usize) {
             "CREATE TABLE IF NOT EXISTS vec_embeddings_{dim} (rowid INTEGER PRIMARY KEY, embedding BLOB)"
         );
         conn.execute(&create_sql, ())
-            .await
             .unwrap_or_else(|_| panic!("Failed to create vec_embeddings_{dim}"));
     }
 
@@ -91,27 +90,24 @@ async fn create_test_tables(backend: &SqliteBackend, _dimension: usize) {
         )",
         (),
     )
-    .await
     .expect("Failed to create vector_metadata table");
 
     // Create all indices exactly as the unit tests do
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_vector_metadata_tenant_scope ON vector_metadata(tenant_id, scope)",
         ()
-    ).await.expect("Failed to create tenant_scope index");
+    ).expect("Failed to create tenant_scope index");
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_vector_metadata_id ON vector_metadata(id)",
         (),
     )
-    .await
     .expect("Failed to create id index");
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_vector_metadata_dimension ON vector_metadata(dimension)",
         (),
     )
-    .await
     .expect("Failed to create dimension index");
 }
 

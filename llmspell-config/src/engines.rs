@@ -1,11 +1,12 @@
 //! ABOUTME: Engine configuration definitions for llmspell
 //! ABOUTME: Includes Lua, JavaScript, and custom engine configurations
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Engine configurations
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct EngineConfigs {
     #[serde(default)]
@@ -17,7 +18,7 @@ pub struct EngineConfigs {
 }
 
 /// Security/access level for script execution
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, JsonSchema)]
 pub enum SecurityLevel {
     #[default]
     Safe,
@@ -26,7 +27,7 @@ pub enum SecurityLevel {
 }
 
 /// Standard library access level
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub enum StdlibLevel {
     None,
     Basic,
@@ -36,7 +37,7 @@ pub enum StdlibLevel {
 }
 
 /// Lua engine configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct LuaConfig {
     /// Standard library access level
@@ -135,7 +136,7 @@ impl Default for LuaConfigBuilder {
 }
 
 /// JavaScript engine configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(default)]
 pub struct JSConfig {
     /// Enable strict mode

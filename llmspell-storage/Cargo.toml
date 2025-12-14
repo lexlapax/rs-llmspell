@@ -33,12 +33,16 @@ deadpool-postgres = { workspace = true, optional = true }
 pgvector = { workspace = true, optional = true }
 refinery = { workspace = true, optional = true }
 
-# SQLite dependencies (Phase 13c.2 - optional)
-libsql = { workspace = true, optional = true }
+# Database Backends
+# Switch to standard rusqlite for static linking compatibility
+rusqlite = { version = "0.32", features = ["bundled", "vtab"], optional = true }
 r2d2 = { workspace = true, optional = true }
-# Phase 13c.2.2a: Vector search - vectorlite-rs only (sqlite-vec removed Task 13c.2.8.16)
-zerocopy = { workspace = true, optional = true }
+# libsql dependency removed to solve ABI mismatch
+# libsql = { version = "0.9", default-features = false, features = ["core", "replication"], optional = true }
+
+# Vector Search (Static Linking)
 vectorlite-rs = { path = "../vectorlite-rs", optional = true }
+zerocopy = { workspace = true, optional = true, features = ["derive"] }
 
 # Phase 13b.14: sha2 required for migration checksums (not postgres-only)
 sha2 = "0.10"
@@ -46,7 +50,7 @@ sha2 = "0.10"
 [features]
 default = []
 postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph", "llmspell-core/postgres"]
-sqlite = ["libsql", "r2d2", "zerocopy", "vectorlite-rs", "llmspell-graph"]
+sqlite = ["rusqlite", "r2d2", "zerocopy", "vectorlite-rs", "llmspell-graph"]
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -54,9 +58,8 @@ rand = "0.8"
 criterion = { workspace = true }
 # Phase 13c.1.6: blake3 removed (use sha2 for content hashing in tests)
 sha2 = "0.10"
-# Phase 13c.2.2: libsql-rusqlite for test consistency (no symbol conflicts)
-# Note: Using libsql-rusqlite instead of rusqlite to avoid libsqlite3-sys conflicts
-rusqlite = { package = "libsql-rusqlite", version = "0.9", default-features = false }
+# Phase 13c.2.2: Standard rusqlite for tests
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [[bench]]
 name = "graph_bench"

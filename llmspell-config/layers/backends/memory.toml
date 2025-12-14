@@ -1,6 +1,20 @@
 # Memory Backend Layer
 # Ephemeral in-memory storage, no persistence
 
+[metadata]
+name = "memory"
+category = "backend"
+description = "In-memory storage"
+use_cases = [
+    "Fast prototyping",
+    "Testing",
+    "Ephemeral state",
+]
+features = [
+    "TODO: Add features"
+]
+
+
 [profile]
 name = "Memory Backend"
 description = "Fast in-memory storage with no persistence"
