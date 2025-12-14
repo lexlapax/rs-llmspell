@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2025-12-13 - Web Interface & Mission Control 🖥️
+
+Unified, single-binary web interface providing a "Mission Control" for AI agents. See [RELEASE_NOTES_v0.14.1.md](RELEASE_NOTES_v0.14.1.md) for full details.
+
+### Added
+
+#### Unified Web Interface (Phase 14.1-14.3)
+- **Single Binary**: No separate frontend server required. React assets are embedded directly into the Rust binary
+- **Mission Control UI**: A comprehensive dashboard for monitoring system status, recent activity, and quick actions
+- **Embedded Monaco Editor**: Full-featured code editor for Lua/JavaScript scripts with syntax highlighting and theme support
+- **Real-time Console**: Interactive console streaming script output (stdout/stderr) via WebSockets
+
+#### API Service (Phase 14.2)
+- **RESTful Endpoints**: Complete API for managing Sessions, Memory, Agents, Tools, and Configuration
+- **WebSocket Streaming**: Real-time event bus subscription for live updates of kernel events
+- **Metrics & Health**: Built-in Prometheus metrics (`/metrics`) and health checks (`/health`)
+- **OpenAPI Support**: Auto-generated API documentation (Phase 14.5)
+
+#### Frontend Experience (Phase 14.3)
+- **Interactive Visualizations**: Force-directed graph for exploring memory nodes and relationships
+- **Session Replay**: Timeline visualization with playback controls for reviewing session history
+- **Configuration Manager**: UI for managing the 18-layer profile system with secure editing simulation
+
+#### Infrastructure (Phase 14.4)
+- **Daemon Integration**: `llmspell web start` command with daemon support
+- **Lifecycle Management**: Graceful shutdown and signal handling
+
+### Changed
+- **New Crate**: `llmspell-web` added to workspace
+- **CLI**: Added `web` subcommand
+
+### Statistics
+- **Crates**: 1 new (`llmspell-web`)
+- **Endpoints**: 15+ new API endpoints
+- **Components**: ~20 new React components
+- **Tests**: >90% coverage
+
 ## [0.14.0] - 2025-12-03 - Usability & Cohesion Refinement
 
 Phase 13c: Usability improvements, example consolidation, and quality validation. See [RELEASE_NOTES_v0.14.0.md](RELEASE_NOTES_v0.14.0.md) for full details.
